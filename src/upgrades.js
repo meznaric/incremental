@@ -139,6 +139,13 @@ const BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 const INDEX_OF = new Map(UPGRADES.map((u, i) => [u.id, i]));
 export const getUpgrade = (id) => BY_ID.get(id);
 
+export const CONVERT_MIN_RATE = 100;
+
+export function isEligible(u, ctx) {
+  if (u.kind === 'convert') return (ctx?.rate || 0) > CONVERT_MIN_RATE;
+  return true;
+}
+
 export function sortSlate(slate) {
   slate.sort((a, b) => (INDEX_OF.get(a) ?? 0) - (INDEX_OF.get(b) ?? 0));
   return slate;
@@ -155,11 +162,11 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 
-export function rollSlate(n = 4) {
+export function rollSlate(n = 4, ctx) {
   const slate = [];
   const taken = new Set();
   while (slate.length < n) {
-    const pool = UPGRADES.filter((u) => !taken.has(u.id));
+    const pool = UPGRADES.filter((u) => !taken.has(u.id) && isEligible(u, ctx));
     if (!pool.length) break;
     const pick = weightedPick(pool);
     slate.push(pick.id);
@@ -168,9 +175,9 @@ export function rollSlate(n = 4) {
   return sortSlate(slate);
 }
 
-export function rerollSlot(slate, idx) {
+export function rerollSlot(slate, idx, ctx) {
   const exclude = new Set(slate);
-  const pool = UPGRADES.filter((u) => !exclude.has(u.id));
+  const pool = UPGRADES.filter((u) => !exclude.has(u.id) && isEligible(u, ctx));
   if (!pool.length) return slate[idx];
   return weightedPick(pool).id;
 }

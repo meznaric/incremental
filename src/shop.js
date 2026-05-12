@@ -1,4 +1,4 @@
-import { getUpgrade, costFor, rollSlate, rerollSlot, sortSlate } from './upgrades.js';
+import { getUpgrade, costFor, rollSlate, rerollSlot, sortSlate, isEligible } from './upgrades.js';
 
 export function makeShopState() {
   return {
@@ -132,7 +132,7 @@ export function tryBuy(state, slotIdx, now) {
     }
     state.gambleCd[id] = now + u.cooldown;
     state.lastResult = { ...result, at: now };
-    state.shop.slots = rollSlate(4);
+    state.shop.slots = rollSlate(4, { rate: effectiveRate(state, now) });
     return { ok: true, result };
   }
 
@@ -140,7 +140,7 @@ export function tryBuy(state, slotIdx, now) {
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     applyBuff(state, u, now);
-    state.shop.slots = rollSlate(4);
+    state.shop.slots = rollSlate(4, { rate: effectiveRate(state, now) });
     return { ok: true };
   }
 
@@ -150,7 +150,7 @@ export function tryBuy(state, slotIdx, now) {
     if (u.permType === 'add') state.flatBonus += u.value;
     if (u.permType === 'mul') state.permMul *= u.value;
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
-    state.shop.slots = rollSlate(4);
+    state.shop.slots = rollSlate(4, { rate: effectiveRate(state, now) });
     return { ok: true };
   }
 
@@ -158,7 +158,7 @@ export function tryBuy(state, slotIdx, now) {
     if (cost <= 0 || state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     state.flatBonus += cost * u.ratio;
-    state.shop.slots = rollSlate(4);
+    state.shop.slots = rollSlate(4, { rate: effectiveRate(state, now) });
     return { ok: true };
   }
   return { ok: false, reason: 'unknown' };
@@ -186,11 +186,24 @@ function applyBuff(state, u, now) {
 
 export const DROP_PCT = 0.01;
 
-export function tryDrop(state, slotIdx) {
+export function validateSlate(state, now) {
+  const ctx = { rate: effectiveRate(state, now) };
+  let changed = false;
+  for (let i = 0; i < state.shop.slots.length; i++) {
+    const u = getUpgrade(state.shop.slots[i]);
+    if (!u || !isEligible(u, ctx)) {
+      state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
+      changed = true;
+    }
+  }
+  if (changed) sortSlate(state.shop.slots);
+}
+
+export function tryDrop(state, slotIdx, now) {
   const cost = state.amount * DROP_PCT;
   if (state.amount < cost || state.amount <= 0) return { ok: false };
   state.amount -= cost;
-  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx);
+  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
   sortSlate(state.shop.slots);
   return { ok: true };
 }

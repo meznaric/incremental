@@ -1,4 +1,4 @@
-import { integrateRate, pruneBuffs } from './shop.js';
+import { integrateRate, pruneBuffs, validateSlate } from './shop.js';
 
 export const SAVE_KEY = 'incremental.save.v2';
 
@@ -58,6 +58,7 @@ export function loadState(state) {
   const offline = Math.max(0, now - savedAt);
   const earnings = offline > 0 ? integrateRate(state, savedAt, now) : 0;
   state.amount += earnings;
+  validateSlate(state, now);
   return { offline, earnings };
 }
 

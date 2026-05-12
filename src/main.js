@@ -103,7 +103,7 @@ for (let i = 0; i < 4; i++) {
   });
   el.querySelector('.drop').addEventListener('click', (e) => {
     e.stopPropagation();
-    tryDrop(state, i);
+    tryDrop(state, i, nowSeconds());
     renderShop();
   });
   slotsEl.appendChild(el);

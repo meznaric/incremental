@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
-import { formatAbbrev, formatGrouped, parseAmount } from './bignum.js';
+import { HeroDisplay } from './hero.js';
+import { formatAbbrev, parseAmount } from './bignum.js';
 import { getUpgrade, costFor } from './upgrades.js';
 import { makeShopState, effectiveRate, tryBuy, tryDrop, DROP_PCT } from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
@@ -14,10 +15,6 @@ const state = {
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');
 const rateInput = document.getElementById('rateInput');
-const dbgAbbrev = document.getElementById('dbgAbbrev');
-const dbgGrouped = document.getElementById('dbgGrouped');
-const dbgScientific = document.getElementById('dbgScientific');
-const dbgRate = document.getElementById('dbgRate');
 const slotsEl = document.getElementById('slots');
 const buffsEl = document.getElementById('buffs');
 const resultEl = document.getElementById('result');
@@ -74,6 +71,9 @@ scene.add(rim);
 
 const display = new MagnitudeDisplay();
 scene.add(display.group);
+
+const hero = new HeroDisplay();
+scene.add(hero.group);
 
 function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -182,15 +182,13 @@ function tick(raf) {
   const t = nowSeconds();
 
   const rate = effectiveRate(state, t);
+  const baseRate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   state.amount += rate * dt;
 
   display.update(state.amount, rate, t, dt);
+  hero.update(state.amount, rate, baseRate, dt);
 
   if (raf - lastHud > 100) {
-    dbgAbbrev.textContent = formatAbbrev(state.amount);
-    dbgGrouped.textContent = formatGrouped(state.amount);
-    dbgScientific.textContent = state.amount.toExponential(3);
-    dbgRate.textContent = formatAbbrev(rate) + '/s';
     renderShop();
     renderBuffs(t);
     renderResult(t);

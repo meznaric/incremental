@@ -31,7 +31,6 @@
       font-variant-numeric: tabular-nums;
     }
     #inputs { top: 16px; left: 16px; }
-    #debug  { top: 16px; right: 16px; text-align: right; pointer-events: none; }
     .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
     .row label {
       font-size: 11px;
@@ -60,16 +59,6 @@
       max-width: 280px;
       line-height: 1.4;
     }
-    #debug .label {
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #8a8ac0;
-      margin-top: 6px;
-    }
-    #debug .val { font-size: 16px; }
-    #debug .val.big { font-size: 22px; color: #b9c1ff; }
-
     #shop {
       bottom: 16px;
       left: 50%;
@@ -205,17 +194,6 @@
       <input id="rateInput" type="text" autocomplete="off" spellcheck="false" />
     </div>
     <div class="hint">accepts: <code>1234</code>, <code>1.5m</code>, <code>2.3e18</code>, <code>200k</code></div>
-  </div>
-
-  <div id="debug" class="panel">
-    <div class="label">abbreviated</div>
-    <div class="val big" id="dbgAbbrev">0</div>
-    <div class="label">grouped</div>
-    <div class="val" id="dbgGrouped">0</div>
-    <div class="label">scientific</div>
-    <div class="val" id="dbgScientific">0</div>
-    <div class="label">effective rate</div>
-    <div class="val" id="dbgRate">0/s</div>
   </div>
 
   <div id="shop" class="panel">

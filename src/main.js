@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { getUpgrade, costFor } from './upgrades.js';
+import { getUpgrade, costFor, KIND_THEME } from './upgrades.js';
 import { makeShopState, effectiveRate, tryBuy, tryDrop, DROP_PCT } from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
+import { checkStart, checkAmount } from './interstitial.js';
+import { makeInterstitialUi } from './interstitialUi.js';
 
 const state = {
   amount: 0,
@@ -25,9 +27,11 @@ state.amount = parseAmount(amountInput.value);
 state.basePerSecond = parseAmount(rateInput.value);
 
 const loaded = loadState(state);
+checkStart(state, !loaded);
 if (loaded) {
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
+  checkAmount(state, state.amount);
   if (loaded.offline > 1) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
   }
@@ -84,12 +88,17 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 
+const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
+
 const slotEls = [];
 for (let i = 0; i < 4; i++) {
   const el = document.createElement('div');
   el.className = 'slot';
   el.innerHTML = `
-    <div class="rarity"></div>
+    <div class="head">
+      <i class="kind-icon"></i>
+      <div class="rarity"></div>
+    </div>
     <div class="name"></div>
     <div class="desc"></div>
     <div class="cost"></div>
@@ -121,31 +130,42 @@ function renderShop() {
     el.style.display = '';
     const cost = costFor(u, { balance: state.amount, rate, owned: state.owned });
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
-    el.querySelector('.rarity').textContent = u.rarity;
+    const theme = KIND_THEME[u.kind] || {};
+    el.dataset.kind = u.kind;
+    el.querySelector('.kind-icon').className = `kind-icon ri ${theme.icon || ''}`;
+    el.querySelector('.rarity').textContent = `${u.rarity} · ${theme.label || u.kind}`;
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    el.querySelector('.cost').textContent = `cost ${formatAbbrev(cost)}`;
+    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)}`;
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
     else if (u.kind === 'convert') meta = `+${formatAbbrev(cost * u.ratio)}/s perm`;
     el.querySelector('.meta').textContent = meta;
-    el.querySelector('.drop').textContent = `drop ${formatAbbrev(state.amount * DROP_PCT)}`;
+    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(state.amount * DROP_PCT)}`;
     const canAfford = state.amount >= cost;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
   }
 }
+
+const BUFF_ICONS = {
+  rate:     'ri-flashlight-fill',
+  luck:     'ri-sparkling-2-fill',
+  cushion:  'ri-shield-fill',
+  compound: 'ri-stack-fill',
+};
 
 function renderBuffs(now) {
   const cards = [];
   const b = state.buffs;
   const push = (kind, name, value, remain, duration) => {
     const pct = Math.max(0, Math.min(1, remain / duration));
+    const icon = BUFF_ICONS[kind] || '';
     cards.push(`
       <div class="buff-card kind-${kind}">
-        <div class="buff-head"><span class="buff-name">${name}</span><span class="buff-val">${value}</span></div>
-        <div class="buff-time">${remain.toFixed(1)}s</div>
+        <div class="buff-head"><span class="buff-name"><i class="ri ri-fw ${icon}"></i>${name}</span><span class="buff-val">${value}</span></div>
+        <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${remain.toFixed(1)}s</div>
         <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
       </div>
     `);
@@ -173,21 +193,29 @@ function renderResult(now) {
 
 renderShop();
 
+const interstitialUi = makeInterstitialUi(state);
+interstitialUi.drain();
+if (typeof window !== 'undefined') { window.__game = { state, interstitialUi }; }
+
 let last = performance.now();
 let lastHud = 0;
 let lastSave = 0;
 const SAVE_INTERVAL_MS = 5000;
 function tick(raf) {
   const dt = Math.min(0.1, (raf - last) / 1000);
+  const dtMs = raf - last;
   last = raf;
   const t = nowSeconds();
 
   const rate = effectiveRate(state, t);
   const baseRate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   state.amount += rate * dt;
+  checkAmount(state, state.amount);
 
   display.update(state.amount, rate, t, dt);
   hero.update(state.amount, rate, baseRate, dt);
+  interstitialUi.tick(dtMs);
+  interstitialUi.drain();
 
   if (raf - lastHud > 100) {
     renderShop();

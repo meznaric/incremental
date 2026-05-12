@@ -136,19 +136,35 @@ export const UPGRADES = [
 ];
 
 const BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
-const INDEX_OF = new Map(UPGRADES.map((u, i) => [u.id, i]));
 export const getUpgrade = (id) => BY_ID.get(id);
 
 export const CONVERT_MIN_RATE = 100;
+
+// Fixed slot layout: [permanent, other, other, gamble].
+// "other" slots accept any non-gamble, non-permanent upgrade kind.
+export const SLOT_KINDS = [
+  ['permanent'],
+  ['buff', 'convert'],
+  ['buff', 'convert'],
+  ['gamble'],
+];
+
+// Per-kind theming used by the shop UI.
+export const KIND_THEME = {
+  permanent: { icon: 'ri-medal-fill',         color: '#4cd07d', label: 'Permanent' },
+  buff:      { icon: 'ri-flashlight-fill',    color: '#9d6ee0', label: 'Buff' },
+  convert:   { icon: 'ri-exchange-funds-fill',color: '#f5d34a', label: 'Convert' },
+  gamble:    { icon: 'ri-dice-line',          color: '#ff5a6e', label: 'Gamble' },
+};
 
 export function isEligible(u, ctx) {
   if (u.kind === 'convert') return (ctx?.rate || 0) > CONVERT_MIN_RATE;
   return true;
 }
 
-export function sortSlate(slate) {
-  slate.sort((a, b) => (INDEX_OF.get(a) ?? 0) - (INDEX_OF.get(b) ?? 0));
-  return slate;
+export function slotMatches(u, slotIdx) {
+  const kinds = SLOT_KINDS[slotIdx];
+  return !!kinds && kinds.includes(u.kind);
 }
 
 function weightedPick(pool) {
@@ -162,22 +178,22 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 
-export function rollSlate(n = 4, ctx) {
+export function rollSlate(n = SLOT_KINDS.length, ctx) {
   const slate = [];
   const taken = new Set();
-  while (slate.length < n) {
-    const pool = UPGRADES.filter((u) => !taken.has(u.id) && isEligible(u, ctx));
-    if (!pool.length) break;
+  for (let i = 0; i < n; i++) {
+    const pool = UPGRADES.filter((u) => !taken.has(u.id) && slotMatches(u, i) && isEligible(u, ctx));
+    if (!pool.length) { slate.push(null); continue; }
     const pick = weightedPick(pool);
     slate.push(pick.id);
     taken.add(pick.id);
   }
-  return sortSlate(slate);
+  return slate;
 }
 
 export function rerollSlot(slate, idx, ctx) {
   const exclude = new Set(slate);
-  const pool = UPGRADES.filter((u) => !exclude.has(u.id) && isEligible(u, ctx));
+  const pool = UPGRADES.filter((u) => !exclude.has(u.id) && slotMatches(u, idx) && isEligible(u, ctx));
   if (!pool.length) return slate[idx];
   return weightedPick(pool).id;
 }

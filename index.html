@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Incremental — number display lab</title>
+  <link rel="stylesheet" href="./vendor/remixicon/remixicon.css" />
   <style>
+    .cc { color: #d49a55; }
+    .cc-icon { display: inline-block; vertical-align: -0.08em; margin-right: 3px; }
     html, body {
       margin: 0;
       padding: 0;
@@ -68,6 +71,7 @@
       padding: 10px;
     }
     .slot {
+      position: relative;
       width: 188px;
       background: rgba(28, 28, 56, 0.78);
       border: 1px solid rgba(120, 140, 255, 0.35);
@@ -79,16 +83,19 @@
     .slot:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.85); }
     .slot:active { transform: translateY(1px); }
     .slot.locked { opacity: 0.45; cursor: not-allowed; }
-    .slot.locked:hover { border-color: rgba(120, 140, 255, 0.35); background: rgba(28, 28, 56, 0.78); }
+    .slot.locked:hover { border-color: var(--kind-border, rgba(120, 140, 255, 0.35)); background: rgba(28, 28, 56, 0.78); }
+    .slot .head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+    .slot .kind-icon { font-size: 16px; line-height: 1; color: var(--kind-color, #8aa0ff); }
     .slot .rarity {
       font-size: 9px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      margin-bottom: 2px;
+      flex: 1;
     }
     .slot .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; color: #e8e8f0; }
     .slot .desc { font-size: 11px; color: #aab0d0; line-height: 1.35; min-height: 30px; }
     .slot .cost { font-size: 12px; color: #b9c1ff; margin-top: 6px; }
+    .slot .cost .cc-icon { color: #d49a55; }
     .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
     .slot .drop {
       display: block;
@@ -105,6 +112,17 @@
       text-align: center;
     }
     .slot .drop:hover { color: #fff; border-color: #8aa0ff; }
+    .slot .drop .cc-icon { color: #d49a55; }
+
+    .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); border-color: var(--kind-border); }
+    .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); border-color: var(--kind-border); }
+    .slot[data-kind="convert"]   { --kind-color: #f5d34a; --kind-border: rgba(245, 211, 74, 0.45);  border-color: var(--kind-border); }
+    .slot[data-kind="gamble"]    { --kind-color: #ff5a6e; --kind-border: rgba(255, 90, 110, 0.45);  border-color: var(--kind-border); }
+    .slot[data-kind="permanent"]:hover { border-color: #4cd07d; }
+    .slot[data-kind="buff"]:hover      { border-color: #9d6ee0; }
+    .slot[data-kind="convert"]:hover   { border-color: #f5d34a; }
+    .slot[data-kind="gamble"]:hover    { border-color: #ff5a6e; }
+
     .rarity-common    { color: #8a8ac0; }
     .rarity-uncommon  { color: #4cd07d; }
     .rarity-rare      { color: #4ea8ff; }
@@ -134,7 +152,11 @@
       letter-spacing: 0.12em;
       text-transform: uppercase;
       color: #8a8ac0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
+    .buff-name .ri-fw { font-size: 13px; line-height: 1; }
     .buff-val { font-size: 14px; font-weight: 600; color: #e8e8f0; }
     .buff-time { font-size: 10px; color: #4cd07d; margin-top: 2px; }
     .buff-bar {
@@ -172,6 +194,72 @@
     }
     .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
     .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
+
+    #interstitial {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 14, 0);
+      backdrop-filter: blur(0px);
+      transition: background 0.18s ease, backdrop-filter 0.18s ease;
+      z-index: 100;
+      cursor: pointer;
+    }
+    #interstitial.it-visible {
+      background: rgba(6, 6, 14, 0.78);
+      backdrop-filter: blur(6px);
+    }
+    .it-card {
+      max-width: 560px;
+      padding: 36px 40px 28px;
+      text-align: center;
+      transform: translateY(8px);
+      opacity: 0;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+    }
+    #interstitial.it-visible .it-card { transform: translateY(0); opacity: 1; }
+    .it-text {
+      font-size: 22px;
+      line-height: 1.45;
+      color: #e8e8f0;
+      font-weight: 500;
+      letter-spacing: 0.005em;
+      min-height: 1.45em;
+    }
+    .it-text.it-typing::after {
+      content: '▍';
+      display: inline-block;
+      margin-left: 2px;
+      color: #8aa0ff;
+      animation: it-blink 0.8s steps(2) infinite;
+    }
+    @keyframes it-blink { 50% { opacity: 0; } }
+    .it-dots {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 22px;
+      min-height: 6px;
+    }
+    .it-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(120, 140, 255, 0.25);
+      transition: background 0.15s;
+    }
+    .it-dot.on { background: #8aa0ff; }
+    .it-hint {
+      margin-top: 18px;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
   </style>
   <script type="importmap">
     {
@@ -186,11 +274,11 @@
 
   <div id="inputs" class="panel">
     <div class="row">
-      <label for="amountInput">amount</label>
+      <label for="amountInput"><i class="ri-copper-coin-fill cc-icon"></i> coins</label>
       <input id="amountInput" type="text" autocomplete="off" spellcheck="false" />
     </div>
     <div class="row">
-      <label for="rateInput">per second</label>
+      <label for="rateInput"><i class="ri-pulse-line cc-icon"></i> per second</label>
       <input id="rateInput" type="text" autocomplete="off" spellcheck="false" />
     </div>
     <div class="hint">accepts: <code>1234</code>, <code>1.5m</code>, <code>2.3e18</code>, <code>200k</code></div>
@@ -203,6 +291,14 @@
   <div id="buffs"></div>
 
   <div id="result" class="result"></div>
+
+  <div id="interstitial">
+    <div class="it-card">
+      <div class="it-text"></div>
+      <div class="it-dots"></div>
+      <div class="it-hint">press space</div>
+    </div>
+  </div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

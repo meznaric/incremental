@@ -1,6 +1,6 @@
 import { integrateRate, pruneBuffs, validateSlate } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v2';
+export const SAVE_KEY = 'incremental.save.v3';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -17,6 +17,7 @@ export function saveState(state) {
     buffs: state.buffs,
     gambleCd: state.gambleCd,
     shopSlots: state.shop.slots,
+    messages: state.messages,
     savedAt: nowSeconds(),
   };
   try {
@@ -51,6 +52,13 @@ export function loadState(state) {
   state.gambleCd = s.gambleCd && typeof s.gambleCd === 'object' ? s.gambleCd : {};
   if (Array.isArray(s.shopSlots) && s.shopSlots.length === 4) {
     state.shop.slots = s.shopSlots.slice();
+  }
+  if (s.messages && typeof s.messages === 'object') {
+    state.messages.shown = s.messages.shown && typeof s.messages.shown === 'object' ? s.messages.shown : {};
+    state.messages.queue = Array.isArray(s.messages.queue) ? s.messages.queue.slice() : [];
+    if (s.messages.stats && typeof s.messages.stats === 'object') {
+      Object.assign(state.messages.stats, s.messages.stats);
+    }
   }
 
   const now = nowSeconds();

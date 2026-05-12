@@ -108,7 +108,7 @@ export class HeroDisplay {
     }
     this._prevDigits = digits;
 
-    const amtText = formatAbbrev(amount);
+    const amtText = `${formatAbbrev(amount)} cc`;
     if (amtText !== this._amtText) {
       this._amtText = amtText;
       paintText(this.amountSprite, amtText, 110, COLOR_AMOUNT, 22);

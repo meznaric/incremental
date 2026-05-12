@@ -120,6 +120,19 @@ export const UPGRADES = [
   { id: 'mult50',       kind: 'permanent', rarity: 'legendary', permType: 'mul',
     name: '+50% Multiplier',   desc: 'Permanent ×1.5 to rate',
     value: 1.5,  baseCost: 100000, growth: 8 },
+
+  { id: 'tip_jar',   kind: 'convert', rarity: 'common',
+    name: 'Tip Jar',    desc: 'Burn 5% balance — perm +0.02% of spent /s',
+    pctCost: 0.05, ratio: 0.0002 },
+  { id: 'side_gig',  kind: 'convert', rarity: 'uncommon',
+    name: 'Side Gig',   desc: 'Burn 10% balance — perm +0.1% of spent /s',
+    pctCost: 0.10, ratio: 0.001 },
+  { id: 'franchise', kind: 'convert', rarity: 'rare',
+    name: 'Franchise',  desc: 'Burn 25% balance — perm +0.4% of spent /s',
+    pctCost: 0.25, ratio: 0.004 },
+  { id: 'empire',    kind: 'convert', rarity: 'legendary',
+    name: 'Empire',     desc: 'Burn ALL balance — perm +1% of spent /s',
+    pctCost: 1.0,  ratio: 0.01 },
 ];
 
 const BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
@@ -167,6 +180,7 @@ export function costFor(upgrade, ctx) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
     case 'buff':      return Math.max(1, ctx.rate * upgrade.costSec);
     case 'permanent': return upgrade.baseCost * Math.pow(upgrade.growth, ctx.owned[upgrade.id] || 0);
+    case 'convert':   return ctx.balance * upgrade.pctCost;
   }
   return 0;
 }

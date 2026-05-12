@@ -129,6 +129,7 @@ function renderShop() {
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
+    else if (u.kind === 'convert') meta = `+${formatAbbrev(cost * u.ratio)}/s perm`;
     el.querySelector('.meta').textContent = meta;
     el.querySelector('.drop').textContent = `drop ${formatAbbrev(state.amount * DROP_PCT)}`;
     const canAfford = state.amount >= cost;

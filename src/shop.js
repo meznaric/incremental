@@ -153,6 +153,14 @@ export function tryBuy(state, slotIdx, now) {
     state.shop.slots = rollSlate(4);
     return { ok: true };
   }
+
+  if (u.kind === 'convert') {
+    if (cost <= 0 || state.amount < cost) return { ok: false, reason: 'broke' };
+    state.amount -= cost;
+    state.flatBonus += cost * u.ratio;
+    state.shop.slots = rollSlate(4);
+    return { ok: true };
+  }
   return { ok: false, reason: 'unknown' };
 }
 

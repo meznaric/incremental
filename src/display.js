@@ -72,7 +72,11 @@ function makeLabel(text, color = 0x8a8ac0, fontSize = 22) {
 }
 
 function updateLabel(sprite, text, color) {
-  const { canvas, ctx, tex, fontSize } = sprite.userData;
+  const ud = sprite.userData;
+  if (ud.lastText === text && ud.lastColor === color) return;
+  ud.lastText = text;
+  ud.lastColor = color;
+  const { canvas, ctx, tex, fontSize } = ud;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textAlign = 'center';
@@ -165,6 +169,7 @@ class Column {
     this.aliveCount = 0;
     this.lastSpawnT = -10;
     this._rateEstimate = 0;
+    this._lastLabelT = 0;
     this._streamSpeed = CONTINUOUS_FALL_SPEED;
     this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
   }
@@ -274,7 +279,7 @@ class Column {
   }
 
   _snapHard(amount, now) {
-    const target = Math.floor(amount / Math.pow(100, this.m100));
+    const target = Math.floor(amount / this._magFactor);
     this.processed = target;
     this.cycleSpawnCount = target % SLOT_COUNT;
     this.aliveCount = this.cycleSpawnCount;
@@ -300,7 +305,7 @@ class Column {
   }
 
   _snapSmooth(amount, now) {
-    const target = Math.floor(amount / Math.pow(100, this.m100));
+    const target = Math.floor(amount / this._magFactor);
     this.processed = target;
     this.cycleSpawnCount = target % SLOT_COUNT;
     this.phase = 'filling';
@@ -364,20 +369,24 @@ class Column {
 
   assignMagnitude(m100, amount, now) {
     this.m100 = m100;
+    this._magFactor = Math.pow(100, m100);
     const pr = periodForBase100(m100);
     this.period = pr.period;
     this.rank = pr.rank;
     const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
     this.outline.material.color.setHex(pDef.color);
+    const lo = 2 * m100;
+    updateLabel(this.tagLabel, `10^${lo}–10^${lo + 1}  ${pDef.abbrev || 'u'}`, pDef.color);
     this.mode = 'discrete';
     this._rateEstimate = 0;
+    this._lastLabelT = 0;
     this._snapHard(amount, now);
   }
 
   update(now, dt, amount, rate) {
     if (this.m100 < 0) return;
-    const target = Math.floor(amount / Math.pow(100, this.m100));
-    const localRate = (rate || 0) / Math.pow(100, this.m100);
+    const target = Math.floor(amount / this._magFactor);
+    const localRate = (rate || 0) / this._magFactor;
     this._rateEstimate = this._rateEstimate * 0.85 + localRate * 0.15;
 
     if (this.mode === 'discrete' && this._rateEstimate > RATE_TO_CONTINUOUS) {
@@ -461,14 +470,13 @@ class Column {
       }
     }
 
-    const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
-    const lo = 2 * this.m100;
-    const hi = lo + 1;
-    updateLabel(this.tagLabel, `10^${lo}–10^${hi}  ${pDef.abbrev || 'u'}`, pDef.color);
-    if (this.mode === 'continuous') {
-      updateLabel(this.valueLabel, `≈ ${formatRate(this._rateEstimate)}`, 0xffaa44);
-    } else {
-      updateLabel(this.valueLabel, `${this.aliveCount.toString().padStart(2, '0')}`, 0xffffff);
+    if (now - this._lastLabelT > 0.1) {
+      this._lastLabelT = now;
+      if (this.mode === 'continuous') {
+        updateLabel(this.valueLabel, `≈ ${formatRate(this._rateEstimate)}`, 0xffaa44);
+      } else {
+        updateLabel(this.valueLabel, `${this.aliveCount.toString().padStart(2, '0')}`, 0xffffff);
+      }
     }
   }
 

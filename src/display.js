@@ -164,7 +164,6 @@ class Column {
     this.cycleSpawnCount = 0;
     this.aliveCount = 0;
     this.lastSpawnT = -10;
-    this._lastTarget = 0;
     this._rateEstimate = 0;
     this._streamSpeed = CONTINUOUS_FALL_SPEED;
     this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
@@ -185,7 +184,6 @@ class Column {
     this.processed = 0;
     this.cycleSpawnCount = 0;
     this.aliveCount = 0;
-    this._lastTarget = 0;
     this._rateEstimate = 0;
     for (const p of this.particles) {
       p.state = 'idle';
@@ -275,7 +273,7 @@ class Column {
     }
   }
 
-  _snapTo(amount, now) {
+  _snapHard(amount, now) {
     const target = Math.floor(amount / Math.pow(100, this.m100));
     this.processed = target;
     this.cycleSpawnCount = target % SLOT_COUNT;
@@ -301,6 +299,50 @@ class Column {
     }
   }
 
+  _snapSmooth(amount, now) {
+    const target = Math.floor(amount / Math.pow(100, this.m100));
+    this.processed = target;
+    this.cycleSpawnCount = target % SLOT_COUNT;
+    this.phase = 'filling';
+    this.lastSpawnT = now;
+
+    const occupied = new Set();
+    for (const p of this.particles) {
+      if (p.state === 'settled' || p.state === 'flying') {
+        if (p.slotIndex >= this.cycleSpawnCount) {
+          p.state = 'leaving';
+          p.leaveT0 = now;
+          p.leaveStartY = p.mesh.position.y;
+          p.velY = OVERFLOW_INITIAL_VEL + (Math.random() - 0.5) * 0.6;
+        } else {
+          occupied.add(p.slotIndex);
+        }
+      } else if (p.state === 'streaming') {
+        p.state = 'leaving';
+        p.leaveT0 = now;
+        p.leaveStartY = p.mesh.position.y;
+      }
+    }
+
+    for (let i = 0; i < this.cycleSpawnCount; i++) {
+      if (occupied.has(i)) continue;
+      const p = this._findIdle();
+      if (!p) break;
+      this._styleParticle(p);
+      p.slotIndex = i;
+      const slot = slotPos(i);
+      p.slotX = slot.x;
+      p.slotY = slot.y;
+      p.spawnY = slot.y + SPAWN_DISTANCE;
+      p.spawnT = now + Math.random() * 0.2;
+      p.mesh.position.set(slot.x, p.spawnY, 0);
+      p.mesh.visible = true;
+      p.mat.opacity = 1;
+      p.state = 'flying';
+      this.aliveCount++;
+    }
+  }
+
   _enterContinuous(now) {
     this.mode = 'continuous';
     this.phase = 'filling';
@@ -317,7 +359,7 @@ class Column {
 
   _exitContinuous(amount, now) {
     this.mode = 'discrete';
-    this._snapTo(amount, now);
+    this._snapSmooth(amount, now);
   }
 
   assignMagnitude(m100, amount, now) {
@@ -328,18 +370,15 @@ class Column {
     const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
     this.outline.material.color.setHex(pDef.color);
     this.mode = 'discrete';
-    this._lastTarget = Math.floor(amount / Math.pow(100, m100));
     this._rateEstimate = 0;
-    this._snapTo(amount, now);
+    this._snapHard(amount, now);
   }
 
-  update(now, dt, amount) {
+  update(now, dt, amount, rate) {
     if (this.m100 < 0) return;
     const target = Math.floor(amount / Math.pow(100, this.m100));
-
-    const inst = Math.max(0, target - this._lastTarget) / Math.max(dt, 0.0001);
-    this._rateEstimate = this._rateEstimate * 0.92 + inst * 0.08;
-    this._lastTarget = target;
+    const localRate = (rate || 0) / Math.pow(100, this.m100);
+    this._rateEstimate = this._rateEstimate * 0.85 + localRate * 0.15;
 
     if (this.mode === 'discrete' && this._rateEstimate > RATE_TO_CONTINUOUS) {
       this._enterContinuous(now);
@@ -357,7 +396,7 @@ class Column {
 
     if (this.mode === 'discrete') {
       if (backlog > SNAP_BACKLOG || backlog < 0) {
-        this._snapTo(amount, now);
+        this._snapSmooth(amount, now);
       } else if (this.phase === 'filling' && this.processed < target && (now - this.lastSpawnT) >= SPAWN_INTERVAL) {
         this._spawnDiscrete(now);
       }
@@ -370,7 +409,7 @@ class Column {
 
     for (const p of this.particles) {
       if (p.state === 'flying') {
-        const t = (now - p.spawnT) / FLIGHT_TIME;
+        const t = Math.max(0, (now - p.spawnT) / FLIGHT_TIME);
         if (t >= 1) {
           this._onArrive(p, now);
         } else {
@@ -444,7 +483,7 @@ export class MagnitudeDisplay {
     }
   }
 
-  update(amount, now, dt) {
+  update(amount, rate, now, dt) {
     const { cols } = decomposeByBase100(amount, COLUMN_COUNT);
     const desired = cols.map((c) => c.m).filter((m) => m >= 0);
     const desiredSet = new Set(desired);
@@ -490,7 +529,7 @@ export class MagnitudeDisplay {
     }
 
     for (const col of this.columns) {
-      if (col.m100 >= 0) col.update(now, dt, amount);
+      if (col.m100 >= 0) col.update(now, dt, amount, rate);
       col.animate(dt);
       if (!col.assigned && col.root.scale.x < 0.02 && col.m100 >= 0) {
         col.reset();

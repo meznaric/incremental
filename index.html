@@ -122,17 +122,51 @@
     .rarity-legendary { color: #ff8a3a; }
 
     #buffs {
-      bottom: 16px;
-      right: 16px;
+      position: fixed;
+      top: 160px;
+      left: 16px;
       display: none;
       flex-direction: column;
-      gap: 4px;
-      font-size: 11px;
-      min-width: 170px;
-      padding: 10px 12px;
+      gap: 8px;
+      width: 190px;
+      pointer-events: none;
     }
-    .buff-row { display: flex; justify-content: space-between; gap: 8px; }
-    .buff-row .time { color: #4cd07d; }
+    .buff-card {
+      background: rgba(20, 20, 40, 0.78);
+      border: 1px solid rgba(120, 140, 255, 0.3);
+      border-radius: 10px;
+      backdrop-filter: blur(8px);
+      padding: 8px 10px 7px;
+      font-variant-numeric: tabular-nums;
+    }
+    .buff-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .buff-name {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+    }
+    .buff-val { font-size: 14px; font-weight: 600; color: #e8e8f0; }
+    .buff-time { font-size: 10px; color: #4cd07d; margin-top: 2px; }
+    .buff-bar {
+      height: 3px;
+      margin-top: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .buff-bar-fill {
+      height: 100%;
+      transition: width 0.1s linear;
+    }
+    .kind-rate     .buff-bar-fill { background: #ff8a3a; }
+    .kind-rate     .buff-val      { color: #ff8a3a; }
+    .kind-luck     .buff-bar-fill { background: #f5d34a; }
+    .kind-luck     .buff-val      { color: #f5d34a; }
+    .kind-cushion  .buff-bar-fill { background: #4ea8ff; }
+    .kind-cushion  .buff-val      { color: #4ea8ff; }
+    .kind-compound .buff-bar-fill { background: #ff4ad0; }
+    .kind-compound .buff-val      { color: #ff4ad0; }
 
     #result {
       position: fixed;
@@ -188,7 +222,7 @@
     <div id="slots" style="display: contents;"></div>
   </div>
 
-  <div id="buffs" class="panel"></div>
+  <div id="buffs"></div>
 
   <div id="result" class="result"></div>
 

@@ -3,6 +3,7 @@ import { MagnitudeDisplay } from './display.js';
 import { formatAbbrev, formatGrouped, parseAmount } from './bignum.js';
 import { getUpgrade, costFor } from './upgrades.js';
 import { makeShopState, effectiveRate, tryBuy, tryDrop, DROP_PCT } from './shop.js';
+import { loadState, saveState, nowSeconds } from './save.js';
 
 const state = {
   amount: 0,
@@ -25,6 +26,22 @@ amountInput.value = '0';
 rateInput.value = '5';
 state.amount = parseAmount(amountInput.value);
 state.basePerSecond = parseAmount(rateInput.value);
+
+const loaded = loadState(state);
+if (loaded) {
+  amountInput.value = formatAbbrev(state.amount);
+  rateInput.value = formatAbbrev(state.basePerSecond);
+  if (loaded.offline > 1) {
+    console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
+  }
+} else {
+  const STARTUP_BUFF_MULT = 10;
+  const STARTUP_BUFF_DURATION = 6;
+  const initNow = nowSeconds();
+  state.buffs.rateMul.value = STARTUP_BUFF_MULT;
+  state.buffs.rateMul.duration = STARTUP_BUFF_DURATION;
+  state.buffs.rateMul.expiresAt = initNow + STARTUP_BUFF_DURATION;
+}
 
 amountInput.addEventListener('input', () => {
   state.amount = parseAmount(amountInput.value);
@@ -79,8 +96,7 @@ for (let i = 0; i < 4; i++) {
   `;
   el.addEventListener('click', (e) => {
     if (e.target.closest('.drop')) return;
-    const now = performance.now() / 1000;
-    tryBuy(state, i, now);
+    tryBuy(state, i, nowSeconds());
     renderShop();
   });
   el.querySelector('.drop').addEventListener('click', (e) => {
@@ -93,7 +109,7 @@ for (let i = 0; i < 4; i++) {
 }
 
 function renderShop() {
-  const now = performance.now() / 1000;
+  const now = nowSeconds();
   const rate = effectiveRate(state, now);
   for (let i = 0; i < 4; i++) {
     const id = state.shop.slots[i];
@@ -119,19 +135,27 @@ function renderShop() {
 }
 
 function renderBuffs(now) {
-  const rows = [];
+  const cards = [];
   const b = state.buffs;
-  if (now < b.rateMul.expiresAt) rows.push([`rate ×${b.rateMul.value}`, b.rateMul.expiresAt - now]);
-  if (now < b.gambleLuck.expiresAt) rows.push([`luck +${Math.round(b.gambleLuck.value * 100)}%`, b.gambleLuck.expiresAt - now]);
-  if (now < b.gambleCushion.expiresAt) rows.push([`cushion ${Math.round(b.gambleCushion.value * 100)}%`, b.gambleCushion.expiresAt - now]);
+  const push = (kind, name, value, remain, duration) => {
+    const pct = Math.max(0, Math.min(1, remain / duration));
+    cards.push(`
+      <div class="buff-card kind-${kind}">
+        <div class="buff-head"><span class="buff-name">${name}</span><span class="buff-val">${value}</span></div>
+        <div class="buff-time">${remain.toFixed(1)}s</div>
+        <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
+      </div>
+    `);
+  };
+  if (now < b.rateMul.expiresAt) push('rate', 'Rate', `×${b.rateMul.value}`, b.rateMul.expiresAt - now, b.rateMul.duration);
+  if (now < b.gambleLuck.expiresAt) push('luck', 'Luck', `+${Math.round(b.gambleLuck.value * 100)}%`, b.gambleLuck.expiresAt - now, b.gambleLuck.duration);
+  if (now < b.gambleCushion.expiresAt) push('cushion', 'Cushion', `${Math.round(b.gambleCushion.value * 100)}%`, b.gambleCushion.expiresAt - now, b.gambleCushion.duration);
   if (now < b.compound.expiresAt) {
     const cur = Math.pow(1 + b.compound.rate, now - b.compound.startedAt);
-    rows.push([`compound ×${cur.toFixed(2)}`, b.compound.expiresAt - now]);
+    push('compound', 'Compound', `×${cur.toFixed(2)}`, b.compound.expiresAt - now, b.compound.duration);
   }
-  buffsEl.style.display = rows.length ? '' : 'none';
-  buffsEl.innerHTML = rows.map(([name, t]) =>
-    `<div class="buff-row"><span>${name}</span><span class="time">${t.toFixed(1)}s</span></div>`
-  ).join('');
+  buffsEl.style.display = cards.length ? 'flex' : 'none';
+  buffsEl.innerHTML = cards.join('');
 }
 
 function renderResult(now) {
@@ -150,17 +174,19 @@ renderShop();
 
 let last = performance.now();
 let lastHud = 0;
-function tick(now) {
-  const dt = Math.min(0.1, (now - last) / 1000);
-  last = now;
-  const t = now / 1000;
+let lastSave = 0;
+const SAVE_INTERVAL_MS = 5000;
+function tick(raf) {
+  const dt = Math.min(0.1, (raf - last) / 1000);
+  last = raf;
+  const t = nowSeconds();
 
   const rate = effectiveRate(state, t);
   state.amount += rate * dt;
 
-  display.update(state.amount, t, dt);
+  display.update(state.amount, rate, t, dt);
 
-  if (now - lastHud > 100) {
+  if (raf - lastHud > 100) {
     dbgAbbrev.textContent = formatAbbrev(state.amount);
     dbgGrouped.textContent = formatGrouped(state.amount);
     dbgScientific.textContent = state.amount.toExponential(3);
@@ -168,10 +194,19 @@ function tick(now) {
     renderShop();
     renderBuffs(t);
     renderResult(t);
-    lastHud = now;
+    lastHud = raf;
+  }
+  if (raf - lastSave > SAVE_INTERVAL_MS) {
+    saveState(state);
+    lastSave = raf;
   }
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+window.addEventListener('beforeunload', () => saveState(state));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveState(state);
+});

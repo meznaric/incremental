@@ -642,7 +642,24 @@
       .slot .outcomes { font-size: 10px; }
       .slot .rarity { font-size: 8px; }
       #result { bottom: auto; top: 12px; right: 12px; left: auto; transform: none; font-size: 14px; padding: 6px 12px; }
-      #buffs { top: 64px; left: 8px; width: 160px; }
+      #buffs {
+        top: auto;
+        left: 0;
+        right: 0;
+        width: auto;
+        bottom: calc(var(--shop-h, 200px) + 12px);
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0 8px 4px;
+        gap: 8px;
+        pointer-events: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+      }
+      #buffs::-webkit-scrollbar { display: none; }
+      #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
       #menu { top: 8px; left: 8px; }
     }
 

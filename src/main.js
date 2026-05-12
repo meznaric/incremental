@@ -136,6 +136,7 @@ const shopEl = document.getElementById('shop');
 function onResize() {
   const shopRect = shopEl.getBoundingClientRect();
   const shopTop = shopRect.height ? shopRect.top : window.innerHeight;
+  document.documentElement.style.setProperty('--shop-h', shopRect.height + 'px');
   const w = window.innerWidth;
   const h = Math.max(240, shopTop - 8);
   renderer.setSize(w, h);

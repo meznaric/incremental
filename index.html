@@ -69,6 +69,86 @@
     }
     #debug .val { font-size: 16px; }
     #debug .val.big { font-size: 22px; color: #b9c1ff; }
+
+    #shop {
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+    }
+    .slot {
+      width: 188px;
+      background: rgba(28, 28, 56, 0.78);
+      border: 1px solid rgba(120, 140, 255, 0.35);
+      border-radius: 8px;
+      padding: 9px 10px 8px;
+      cursor: pointer;
+      transition: border-color 0.12s, transform 0.1s, background 0.12s;
+    }
+    .slot:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.85); }
+    .slot:active { transform: translateY(1px); }
+    .slot.locked { opacity: 0.45; cursor: not-allowed; }
+    .slot.locked:hover { border-color: rgba(120, 140, 255, 0.35); background: rgba(28, 28, 56, 0.78); }
+    .slot .rarity {
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .slot .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; color: #e8e8f0; }
+    .slot .desc { font-size: 11px; color: #aab0d0; line-height: 1.35; min-height: 30px; }
+    .slot .cost { font-size: 12px; color: #b9c1ff; margin-top: 6px; }
+    .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
+    .slot .drop {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(120, 140, 255, 0.3);
+      color: #aab0d0;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 10px;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+    }
+    .slot .drop:hover { color: #fff; border-color: #8aa0ff; }
+    .rarity-common    { color: #8a8ac0; }
+    .rarity-uncommon  { color: #4cd07d; }
+    .rarity-rare      { color: #4ea8ff; }
+    .rarity-legendary { color: #ff8a3a; }
+
+    #buffs {
+      bottom: 16px;
+      right: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      min-width: 170px;
+      padding: 10px 12px;
+    }
+    .buff-row { display: flex; justify-content: space-between; gap: 8px; }
+    .buff-row .time { color: #4cd07d; }
+
+    #result {
+      position: fixed;
+      bottom: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
+    .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
   </style>
   <script type="importmap">
     {
@@ -100,7 +180,17 @@
     <div class="val" id="dbgGrouped">0</div>
     <div class="label">scientific</div>
     <div class="val" id="dbgScientific">0</div>
+    <div class="label">effective rate</div>
+    <div class="val" id="dbgRate">0/s</div>
   </div>
+
+  <div id="shop" class="panel">
+    <div id="slots" style="display: contents;"></div>
+  </div>
+
+  <div id="buffs" class="panel"></div>
+
+  <div id="result" class="result"></div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

@@ -155,6 +155,41 @@ function fmtPct(p) {
   return `${v.toFixed(0)}%`;
 }
 
+// Re-trigger a one-shot animation class. Strip stale fx classes, force reflow, re-add.
+function playSlotFx(el, cls) {
+  el.classList.remove('fx-buy', 'fx-drop', 'fx-reject');
+  // Force reflow so re-adding the class restarts the animation.
+  // eslint-disable-next-line no-unused-expressions
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+function markContentFresh(el) {
+  el.classList.remove('fx-content');
+  void el.offsetWidth;
+  el.classList.add('fx-content');
+}
+function spawnCoinBurn(el) {
+  const c = document.createElement('i');
+  c.className = 'ri-copper-coin-fill coin-burn';
+  el.appendChild(c);
+  c.addEventListener('animationend', () => c.remove(), { once: true });
+  // Safety fallback if animationend doesn't fire (reduced motion hides it).
+  setTimeout(() => { if (c.parentNode) c.remove(); }, 600);
+}
+// Single delegated handler to clear fx classes after they finish so they don't leak.
+slotsEl.addEventListener('animationend', (e) => {
+  const slot = e.target.closest('.slot');
+  if (!slot) return;
+  if (e.animationName === 'slot-buy' || e.animationName === 'slot-flash') slot.classList.remove('fx-buy');
+  if (e.animationName === 'slot-drop' || e.animationName === 'slot-flash') slot.classList.remove('fx-drop');
+  if (e.animationName === 'slot-reject' || e.animationName === 'slot-flash') slot.classList.remove('fx-reject');
+  if (e.animationName === 'slot-content-in') {
+    // Only strip the parent fx-content once all inner content animations have finished.
+    // Simpler: clear after a short delay since all run in parallel with identical duration.
+    slot.classList.remove('fx-content');
+  }
+});
+
 const slotEls = [];
 for (let i = 0; i < 4; i++) {
   const el = document.createElement('div');
@@ -177,13 +212,15 @@ for (let i = 0; i < 4; i++) {
   el.addEventListener('click', (e) => {
     if (e.target.closest('.drop')) return;
     if (e.target.closest('.slot-info')) { openSlotModal(i); return; }
-    tryBuy(state, i, nowSeconds());
-    renderShop();
+    const res = tryBuy(state, i, nowSeconds());
+    if (res.ok) { playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el); }
+    else { playSlotFx(el, 'fx-reject'); }
   });
   el.querySelector('.drop').addEventListener('click', (e) => {
     e.stopPropagation();
-    tryDrop(state, i, nowSeconds());
-    renderShop();
+    const res = tryDrop(state, i, nowSeconds());
+    if (res.ok) { playSlotFx(el, 'fx-drop'); renderShop(); markContentFresh(el); }
+    else { playSlotFx(el, 'fx-reject'); }
   });
   slotsEl.appendChild(el);
   slotEls.push(el);

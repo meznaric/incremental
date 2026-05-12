@@ -276,14 +276,93 @@
     }
     .slot .slot-info:hover { color: #fff; border-color: #8aa0ff; }
 
-    .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); border-color: var(--kind-border); }
-    .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); border-color: var(--kind-border); }
-    .slot[data-kind="convert"]   { --kind-color: #f5d34a; --kind-border: rgba(245, 211, 74, 0.45);  border-color: var(--kind-border); }
-    .slot[data-kind="gamble"]    { --kind-color: #ff5a6e; --kind-border: rgba(255, 90, 110, 0.45);  border-color: var(--kind-border); }
+    .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); --kind-glow: rgba(76, 208, 125, 0.55); border-color: var(--kind-border); }
+    .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); --kind-glow: rgba(157, 110, 224, 0.6); border-color: var(--kind-border); }
+    .slot[data-kind="convert"]   { --kind-color: #f5d34a; --kind-border: rgba(245, 211, 74, 0.45);  --kind-glow: rgba(245, 211, 74, 0.55); border-color: var(--kind-border); }
+    .slot[data-kind="gamble"]    { --kind-color: #ff5a6e; --kind-border: rgba(255, 90, 110, 0.45);  --kind-glow: rgba(255, 90, 110, 0.6); border-color: var(--kind-border); }
     .slot[data-kind="permanent"]:hover { border-color: #4cd07d; }
     .slot[data-kind="buff"]:hover      { border-color: #9d6ee0; }
     .slot[data-kind="convert"]:hover   { border-color: #f5d34a; }
     .slot[data-kind="gamble"]:hover    { border-color: #ff5a6e; }
+
+    /* --- Shop feedback animations (max 0.5s each) --- */
+    .slot { will-change: transform; }
+    .slot.fx-buy { animation: slot-buy 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+    .slot.fx-drop { animation: slot-drop 0.34s ease-out; }
+    .slot.fx-reject { animation: slot-reject 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+    @keyframes slot-buy {
+      0%   { transform: scale(1); box-shadow: 0 0 0 0 var(--kind-glow, rgba(120, 140, 255, 0.5)); }
+      30%  { transform: scale(1.06); box-shadow: 0 0 22px 6px var(--kind-glow, rgba(120, 140, 255, 0.5)); background: rgba(212, 154, 85, 0.18); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+    }
+    @keyframes slot-drop {
+      0%   { transform: translateY(0); filter: saturate(1); }
+      35%  { transform: translateY(3px) translateX(-2px); filter: saturate(0.3) brightness(0.8); }
+      60%  { transform: translateY(2px) translateX(2px); filter: saturate(0.5) brightness(0.85); }
+      100% { transform: translateY(0); filter: saturate(1); }
+    }
+    @keyframes slot-reject {
+      0%, 100% { transform: translateX(0); border-color: var(--kind-border, rgba(120, 140, 255, 0.35)); }
+      15% { transform: translateX(-5px); border-color: #ff5a6e; box-shadow: 0 0 14px 2px rgba(255, 90, 110, 0.45); }
+      35% { transform: translateX(5px); border-color: #ff5a6e; box-shadow: 0 0 14px 2px rgba(255, 90, 110, 0.45); }
+      55% { transform: translateX(-3px); border-color: #ff5a6e; }
+      75% { transform: translateX(3px); border-color: #ff5a6e; }
+    }
+
+    /* Fresh-content reveal: applied to inner elements when a new upgrade lands */
+    .slot.fx-content > .head,
+    .slot.fx-content > .name,
+    .slot.fx-content > .desc,
+    .slot.fx-content > .cost,
+    .slot.fx-content > .outcomes,
+    .slot.fx-content > .meta {
+      animation: slot-content-in 0.32s ease-out both;
+    }
+    @keyframes slot-content-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Coin-burn glyph floating up from cost line on purchase */
+    .slot .coin-burn {
+      position: absolute;
+      left: 50%;
+      bottom: 38px;
+      transform: translateX(-50%);
+      color: #d49a55;
+      font-size: 18px;
+      line-height: 1;
+      pointer-events: none;
+      text-shadow: 0 0 8px rgba(212, 154, 85, 0.8);
+      animation: coin-burn 0.5s ease-out forwards;
+    }
+    @keyframes coin-burn {
+      0%   { opacity: 0; transform: translate(-50%, 0) scale(0.7); }
+      20%  { opacity: 1; transform: translate(-50%, -8px) scale(1.1); }
+      100% { opacity: 0; transform: translate(-50%, -34px) scale(0.9); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .slot.fx-buy,
+      .slot.fx-drop,
+      .slot.fx-reject {
+        animation: slot-flash 0.1s ease-out;
+      }
+      .slot.fx-content > .head,
+      .slot.fx-content > .name,
+      .slot.fx-content > .desc,
+      .slot.fx-content > .cost,
+      .slot.fx-content > .outcomes,
+      .slot.fx-content > .meta {
+        animation: none;
+      }
+      .slot .coin-burn { display: none; }
+      @keyframes slot-flash {
+        0%, 100% { background: rgba(28, 28, 56, 0.78); }
+        50%      { background: rgba(80, 80, 140, 0.85); }
+      }
+    }
 
     .rarity-common    { color: #8a8ac0; }
     .rarity-uncommon  { color: #4cd07d; }

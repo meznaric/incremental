@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { getUpgrade, costFor, KIND_THEME } from './upgrades.js';
-import { makeShopState, effectiveRate, tryBuy, tryDrop, DROP_PCT } from './shop.js';
+import { getUpgrade, KIND_THEME } from './upgrades.js';
+import { makeShopState, effectiveRate, tryBuy, tryDrop, validateSlate } from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
@@ -45,6 +45,10 @@ if (loaded) {
     expiresAt: initNow + STARTUP_BUFF_DURATION,
   });
 }
+
+// Fill any empty slots and reroll any items that no longer fit (kind/rate gate).
+// Existing slots keep their frozen cost.
+validateSlate(state, nowSeconds());
 
 amountInput.addEventListener('input', () => {
   state.amount = parseAmount(amountInput.value);
@@ -90,6 +94,15 @@ window.addEventListener('resize', onResize);
 
 const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
 
+const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
+
+function fmtPct(p) {
+  const v = p * 100;
+  if (v < 1) return `${v.toFixed(2)}%`;
+  if (v < 10) return `${v.toFixed(1)}%`;
+  return `${v.toFixed(0)}%`;
+}
+
 const slotEls = [];
 for (let i = 0; i < 4; i++) {
   const el = document.createElement('div');
@@ -102,6 +115,7 @@ for (let i = 0; i < 4; i++) {
     <div class="name"></div>
     <div class="desc"></div>
     <div class="cost"></div>
+    <div class="outcomes"></div>
     <div class="meta"></div>
     <button class="drop" type="button"></button>
   `;
@@ -121,14 +135,13 @@ for (let i = 0; i < 4; i++) {
 
 function renderShop() {
   const now = nowSeconds();
-  const rate = effectiveRate(state, now);
   for (let i = 0; i < 4; i++) {
-    const id = state.shop.slots[i];
-    const u = getUpgrade(id);
+    const slot = state.shop.slots[i];
+    const u = slot ? getUpgrade(slot.id) : null;
     const el = slotEls[i];
-    if (!u) { el.style.display = 'none'; continue; }
+    if (!u || !slot) { el.style.display = 'none'; continue; }
     el.style.display = '';
-    const cost = costFor(u, { balance: state.amount, rate, owned: state.owned });
+    const cost = slot.cost;
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
     const theme = KIND_THEME[u.kind] || {};
     el.dataset.kind = u.kind;
@@ -137,13 +150,26 @@ function renderShop() {
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)}`;
+    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)} cc`;
+
+    let outcomes = '';
+    if (u.kind === 'gamble') {
+      const winNet = cost * (u.payout - 1);
+      const winPct = fmtPct(u.chance);
+      const losePct = fmtPct(1 - u.chance);
+      outcomes =
+        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(winNet)} cc · ${winPct}</div>` +
+        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> −${formatAbbrev(cost)} cc · ${losePct}</div>`;
+    } else if (u.kind === 'convert') {
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
+    }
+    el.querySelector('.outcomes').innerHTML = outcomes;
+
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
-    else if (u.kind === 'convert') meta = `+${formatAbbrev(cost * u.ratio)}/s perm`;
     el.querySelector('.meta').textContent = meta;
-    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(state.amount * DROP_PCT)}`;
+    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)} cc`;
     const canAfford = state.amount >= cost;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
   }
@@ -195,7 +221,6 @@ renderShop();
 
 const interstitialUi = makeInterstitialUi(state);
 interstitialUi.drain();
-if (typeof window !== 'undefined') { window.__game = { state, interstitialUi }; }
 
 let last = performance.now();
 let lastHud = 0;

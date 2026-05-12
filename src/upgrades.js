@@ -178,6 +178,17 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 
+// Each slot freezes its cost and drop-cost at the moment it was offered, so the
+// number on the card doesn't drift as the player's balance / rate change. ctx
+// must carry { balance, rate, owned, dropCost }.
+function buildSlot(u, ctx) {
+  return {
+    id: u.id,
+    cost: costFor(u, ctx),
+    dropCost: ctx.dropCost ?? 0,
+  };
+}
+
 export function rollSlate(n = SLOT_KINDS.length, ctx) {
   const slate = [];
   const taken = new Set();
@@ -185,17 +196,17 @@ export function rollSlate(n = SLOT_KINDS.length, ctx) {
     const pool = UPGRADES.filter((u) => !taken.has(u.id) && slotMatches(u, i) && isEligible(u, ctx));
     if (!pool.length) { slate.push(null); continue; }
     const pick = weightedPick(pool);
-    slate.push(pick.id);
+    slate.push(buildSlot(pick, ctx));
     taken.add(pick.id);
   }
   return slate;
 }
 
 export function rerollSlot(slate, idx, ctx) {
-  const exclude = new Set(slate);
+  const exclude = new Set(slate.map((s) => s?.id).filter(Boolean));
   const pool = UPGRADES.filter((u) => !exclude.has(u.id) && slotMatches(u, idx) && isEligible(u, ctx));
   if (!pool.length) return slate[idx];
-  return weightedPick(pool).id;
+  return buildSlot(weightedPick(pool), ctx);
 }
 
 export function costFor(upgrade, ctx) {

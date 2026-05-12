@@ -1,6 +1,6 @@
 import { integrateRate, pruneBuffs, validateSlate } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v3';
+export const SAVE_KEY = 'incremental.save.v4';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -51,7 +51,14 @@ export function loadState(state) {
   }
   state.gambleCd = s.gambleCd && typeof s.gambleCd === 'object' ? s.gambleCd : {};
   if (Array.isArray(s.shopSlots) && s.shopSlots.length === 4) {
-    state.shop.slots = s.shopSlots.slice();
+    state.shop.slots = s.shopSlots.map((slot) => {
+      if (!slot || typeof slot !== 'object') return null;
+      const id = typeof slot.id === 'string' ? slot.id : null;
+      const cost = Number(slot.cost);
+      const dropCost = Number(slot.dropCost);
+      if (!id || !Number.isFinite(cost) || !Number.isFinite(dropCost)) return null;
+      return { id, cost, dropCost };
+    });
   }
   if (s.messages && typeof s.messages === 'object') {
     state.messages.shown = s.messages.shown && typeof s.messages.shown === 'object' ? s.messages.shown : {};

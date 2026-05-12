@@ -1,4 +1,4 @@
-import { getUpgrade, costFor, rollSlate, rerollSlot, isEligible, slotMatches } from './upgrades.js';
+import { getUpgrade, rollSlate, rerollSlot, isEligible, slotMatches } from './upgrades.js';
 import { checkGamble } from './interstitial.js';
 
 export function makeShopState() {
@@ -13,7 +13,7 @@ export function makeShopState() {
       compound:      [], // { rate,  duration, startedAt, expiresAt }
     },
     gambleCd: {},
-    shop: { slots: rollSlate(4) },
+    shop: { slots: [null, null, null, null] },
     lastResult: null,
     messages: {
       shown: {},
@@ -112,15 +112,26 @@ export function integrateRate(state, t0, t1) {
   return total;
 }
 
+export const DROP_PCT = 0.01;
+
+export function rollContext(state, now) {
+  return {
+    balance: state.amount,
+    rate: effectiveRate(state, now),
+    owned: state.owned,
+    dropCost: state.amount * DROP_PCT,
+  };
+}
+
 export function tryBuy(state, slotIdx, now) {
-  const id = state.shop.slots[slotIdx];
-  const u = getUpgrade(id);
+  const slot = state.shop.slots[slotIdx];
+  if (!slot) return { ok: false, reason: 'invalid' };
+  const u = getUpgrade(slot.id);
   if (!u) return { ok: false, reason: 'invalid' };
-  const rate = effectiveRate(state, now);
-  const cost = costFor(u, { balance: state.amount, rate, owned: state.owned });
+  const cost = slot.cost;
 
   if (u.kind === 'gamble') {
-    if (now < (state.gambleCd[id] || 0)) return { ok: false, reason: 'cooldown' };
+    if (now < (state.gambleCd[slot.id] || 0)) return { ok: false, reason: 'cooldown' };
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     const luck = state.buffs.gambleLuck.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
@@ -129,17 +140,17 @@ export function tryBuy(state, slotIdx, now) {
     if (won) {
       const payout = cost * u.payout;
       state.amount += payout;
-      result = { id, won: true, delta: payout - cost };
+      result = { id: slot.id, won: true, delta: payout - cost };
     } else {
       const cushion = Math.min(1, state.buffs.gambleCushion.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0));
       const refund = cost * cushion;
       state.amount += refund;
-      result = { id, won: false, delta: -(cost - refund) };
+      result = { id: slot.id, won: false, delta: -(cost - refund) };
     }
-    state.gambleCd[id] = now + u.cooldown;
+    state.gambleCd[slot.id] = now + u.cooldown;
     state.lastResult = { ...result, at: now };
     checkGamble(state, { won: result.won, isAllIn: u.wagerPct >= 1, balanceAfter: state.amount });
-    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
+    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
     return { ok: true, result };
   }
 
@@ -147,7 +158,7 @@ export function tryBuy(state, slotIdx, now) {
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     applyBuff(state, u, now);
-    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
+    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
     return { ok: true };
   }
 
@@ -157,7 +168,7 @@ export function tryBuy(state, slotIdx, now) {
     if (u.permType === 'add') state.flatBonus += u.value;
     if (u.permType === 'mul') state.permMul *= u.value;
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
-    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
+    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
     return { ok: true };
   }
 
@@ -165,7 +176,7 @@ export function tryBuy(state, slotIdx, now) {
     if (cost <= 0 || state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     state.flatBonus += cost * u.ratio;
-    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
+    state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
     return { ok: true };
   }
   return { ok: false, reason: 'unknown' };
@@ -191,12 +202,11 @@ function applyBuff(state, u, now) {
   }
 }
 
-export const DROP_PCT = 0.01;
-
 export function validateSlate(state, now) {
-  const ctx = { rate: effectiveRate(state, now) };
+  const ctx = rollContext(state, now);
   for (let i = 0; i < state.shop.slots.length; i++) {
-    const u = getUpgrade(state.shop.slots[i]);
+    const slot = state.shop.slots[i];
+    const u = slot ? getUpgrade(slot.id) : null;
     if (!u || !isEligible(u, ctx) || !slotMatches(u, i)) {
       state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
     }
@@ -204,9 +214,10 @@ export function validateSlate(state, now) {
 }
 
 export function tryDrop(state, slotIdx, now) {
-  const cost = state.amount * DROP_PCT;
+  const slot = state.shop.slots[slotIdx];
+  const cost = slot?.dropCost ?? state.amount * DROP_PCT;
   if (state.amount < cost || state.amount <= 0) return { ok: false };
   state.amount -= cost;
-  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, { rate: effectiveRate(state, now) });
+  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
   return { ok: true };
 }

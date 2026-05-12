@@ -94,8 +94,6 @@ window.addEventListener('resize', onResize);
 
 const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
 
-const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
-
 function fmtPct(p) {
   const v = p * 100;
   if (v < 1) return `${v.toFixed(2)}%`;

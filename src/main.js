@@ -148,7 +148,7 @@ function renderShop() {
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)} cc`;
+    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)}`;
 
     let outcomes = '';
     if (u.kind === 'gamble') {
@@ -156,8 +156,8 @@ function renderShop() {
       const winPct = fmtPct(u.chance);
       const losePct = fmtPct(1 - u.chance);
       outcomes =
-        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(winNet)} cc · ${winPct}</div>` +
-        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> −${formatAbbrev(cost)} cc · ${losePct}</div>`;
+        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(winNet)}${COIN} · ${winPct}</div>` +
+        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> −${formatAbbrev(cost)}${COIN} · ${losePct}</div>`;
     } else if (u.kind === 'convert') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
     }
@@ -167,7 +167,7 @@ function renderShop() {
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
     el.querySelector('.meta').textContent = meta;
-    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)} cc`;
+    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)}`;
     const canAfford = state.amount >= cost;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
   }

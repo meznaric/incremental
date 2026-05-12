@@ -2,11 +2,18 @@ import * as THREE from 'three';
 import { formatAbbrev } from './bignum.js';
 
 const FONT_MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+const COIN_GLYPH = '\ueBDB';            // ri-copper-coin-fill
+const COIN_COLOR = '#d49a55';
 
 const COLOR_AMOUNT     = '#ffffff';
 const COLOR_RATE_BASE  = '#b9c1ff';
 const COLOR_RATE_BUFF  = '#ff8a3a';
 const COLOR_BURST      = 0xffd866;
+
+let coinFontReady = false;
+if (typeof document !== 'undefined' && document.fonts) {
+  document.fonts.load('110px remixicon').then(() => { coinFontReady = true; }).catch(() => {});
+}
 
 function makeTextSprite(w, h) {
   const canvas = document.createElement('canvas');
@@ -39,6 +46,52 @@ function paintText(sprite, text, fontSize, color, glow) {
   ctx.shadowBlur = 0;
   ctx.fillStyle = color;
   ctx.fillText(text, cx, cy);
+  tex.needsUpdate = true;
+}
+
+function paintTextWithCoin(sprite, text, fontSize, color, glow) {
+  const { canvas, ctx, tex } = sprite.userData;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const gap = fontSize * 0.28;
+
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  ctx.font = `700 ${fontSize}px ${FONT_MONO}`;
+  const textWidth = ctx.measureText(text).width;
+
+  let iconWidth = 0;
+  if (coinFontReady) {
+    ctx.font = `${fontSize}px "remixicon"`;
+    iconWidth = ctx.measureText(COIN_GLYPH).width;
+  }
+
+  const total = textWidth + (iconWidth > 0 ? gap + iconWidth : 0);
+  const startX = cx - total / 2;
+
+  ctx.font = `700 ${fontSize}px ${FONT_MONO}`;
+  if (glow > 0) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+    ctx.fillStyle = color;
+    ctx.fillText(text, startX, cy);
+    ctx.fillText(text, startX, cy);
+  }
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color;
+  ctx.fillText(text, startX, cy);
+
+  if (iconWidth > 0) {
+    ctx.font = `${fontSize}px "remixicon"`;
+    ctx.shadowColor = COIN_COLOR;
+    ctx.shadowBlur = glow * 0.6;
+    ctx.fillStyle = COIN_COLOR;
+    ctx.fillText(COIN_GLYPH, startX + textWidth + gap, cy);
+    ctx.shadowBlur = 0;
+  }
+
   tex.needsUpdate = true;
 }
 
@@ -108,10 +161,15 @@ export class HeroDisplay {
     }
     this._prevDigits = digits;
 
-    const amtText = `${formatAbbrev(amount)} cc`;
+    if (coinFontReady && !this._fontPainted) {
+      this._fontPainted = true;
+      this._amtText = null;
+    }
+
+    const amtText = formatAbbrev(amount);
     if (amtText !== this._amtText) {
       this._amtText = amtText;
-      paintText(this.amountSprite, amtText, 110, COLOR_AMOUNT, 22);
+      paintTextWithCoin(this.amountSprite, amtText, 110, COLOR_AMOUNT, 22);
       if (this._amtPulse < 0.25) this._amtPulse = 0.25;
     }
 

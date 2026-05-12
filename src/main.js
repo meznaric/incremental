@@ -35,9 +35,11 @@ if (loaded) {
   const STARTUP_BUFF_MULT = 10;
   const STARTUP_BUFF_DURATION = 6;
   const initNow = nowSeconds();
-  state.buffs.rateMul.value = STARTUP_BUFF_MULT;
-  state.buffs.rateMul.duration = STARTUP_BUFF_DURATION;
-  state.buffs.rateMul.expiresAt = initNow + STARTUP_BUFF_DURATION;
+  state.buffs.rateMul.push({
+    value: STARTUP_BUFF_MULT,
+    duration: STARTUP_BUFF_DURATION,
+    expiresAt: initNow + STARTUP_BUFF_DURATION,
+  });
 }
 
 amountInput.addEventListener('input', () => {
@@ -147,13 +149,11 @@ function renderBuffs(now) {
       </div>
     `);
   };
-  if (now < b.rateMul.expiresAt) push('rate', 'Rate', `×${b.rateMul.value}`, b.rateMul.expiresAt - now, b.rateMul.duration);
-  if (now < b.gambleLuck.expiresAt) push('luck', 'Luck', `+${Math.round(b.gambleLuck.value * 100)}%`, b.gambleLuck.expiresAt - now, b.gambleLuck.duration);
-  if (now < b.gambleCushion.expiresAt) push('cushion', 'Cushion', `${Math.round(b.gambleCushion.value * 100)}%`, b.gambleCushion.expiresAt - now, b.gambleCushion.duration);
-  if (now < b.compound.expiresAt) {
-    const cur = Math.pow(1 + b.compound.rate, now - b.compound.startedAt);
-    push('compound', 'Compound', `×${cur.toFixed(2)}`, b.compound.expiresAt - now, b.compound.duration);
-  }
+  const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
+  for (const x of active(b.rateMul))       push('rate',     'Rate',     `×${x.value}`,                          x.expiresAt - now, x.duration);
+  for (const x of active(b.gambleLuck))    push('luck',     'Luck',     `+${Math.round(x.value * 100)}%`,       x.expiresAt - now, x.duration);
+  for (const x of active(b.gambleCushion)) push('cushion',  'Cushion',  `${Math.round(x.value * 100)}%`,        x.expiresAt - now, x.duration);
+  for (const x of active(b.compound))      push('compound', 'Compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration);
   buffsEl.style.display = cards.length ? 'flex' : 'none';
   buffsEl.innerHTML = cards.join('');
 }

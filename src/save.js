@@ -1,12 +1,13 @@
-import { integrateRate } from './shop.js';
+import { integrateRate, pruneBuffs } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v1';
+export const SAVE_KEY = 'incremental.save.v2';
 
 export function nowSeconds() {
   return Date.now() / 1000;
 }
 
 export function saveState(state) {
+  pruneBuffs(state, nowSeconds());
   const snapshot = {
     amount: state.amount,
     basePerSecond: state.basePerSecond,
@@ -44,7 +45,7 @@ export function loadState(state) {
   state.owned = s.owned && typeof s.owned === 'object' ? s.owned : {};
   if (s.buffs && typeof s.buffs === 'object') {
     for (const k of Object.keys(state.buffs)) {
-      if (s.buffs[k]) Object.assign(state.buffs[k], s.buffs[k]);
+      if (Array.isArray(s.buffs[k])) state.buffs[k] = s.buffs[k];
     }
   }
   state.gambleCd = s.gambleCd && typeof s.gambleCd === 'object' ? s.gambleCd : {};

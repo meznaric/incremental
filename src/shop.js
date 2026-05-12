@@ -6,10 +6,10 @@ export function makeShopState() {
     permMul: 1,
     owned: {},
     buffs: {
-      rateMul:        { value: 1, duration: 0, expiresAt: 0 },
-      gambleLuck:     { value: 0, duration: 0, expiresAt: 0 },
-      gambleCushion:  { value: 0, duration: 0, expiresAt: 0 },
-      compound:       { rate: 0, duration: 0, startedAt: 0, expiresAt: 0 },
+      rateMul:       [], // { value, duration, expiresAt }
+      gambleLuck:    [], // { value, duration, expiresAt }
+      gambleCushion: [], // { value, duration, expiresAt }
+      compound:      [], // { rate,  duration, startedAt, expiresAt }
     },
     gambleCd: {},
     shop: { slots: rollSlate(4) },
@@ -17,55 +17,65 @@ export function makeShopState() {
   };
 }
 
-// Declarative table of rate-affecting buffs. To add a new one:
-//   1. Add a `state.buffs.<key>` entry in makeShopState() with `expiresAt`.
-//   2. Append a descriptor here with `multAt`, `transitions`, and (if time-varying) `isContinuous` + `integral`.
+// Declarative table of rate-affecting buffs. Each buff key is a list of
+// active instances. To add a new buff type:
+//   1. Add an empty array under `state.buffs.<key>` in makeShopState().
+//   2. Append a descriptor here with `multAt`, `transitions`, and (if time-varying)
+//      `isContinuous` + `integral`.
 //   3. Apply it in `applyBuff` below.
-// `multAt(b, t)` returns the current multiplier (1 if inactive).
-// `transitions(b)` returns timestamps where the multiplier changes.
-// `isContinuous(b, a, c)` returns true if the multiplier varies within [a, c] (default: false → piecewise-constant).
-// `integral(b, a, c)` returns ∫(a→c) multAt(b, t) dt, required when isContinuous can return true.
+// `multAt(instances, t)` returns the combined multiplier at t (1 if none active).
+// `transitions(instances)` returns timestamps where the multiplier changes.
+// `isContinuous(instances, a, c)` returns true if the combined multiplier varies within [a, c].
+// `integral(instances, a, c)` returns ∫(a→c) multAt(instances, t) dt, required when isContinuous can return true.
 export const RATE_BUFFS = [
   {
     key: 'rateMul',
-    transitions: (b) => [b.expiresAt],
-    multAt: (b, t) => (t < b.expiresAt ? b.value : 1),
+    transitions: (xs) => xs.map((b) => b.expiresAt),
+    multAt: (xs, t) => xs.reduce((p, b) => (t < b.expiresAt ? p * b.value : p), 1),
   },
   {
     key: 'compound',
-    transitions: (b) => [b.expiresAt],
-    multAt: (b, t) => (t >= b.startedAt && t < b.expiresAt ? Math.pow(1 + b.rate, t - b.startedAt) : 1),
-    isContinuous: (b, a, c) => {
+    transitions: (xs) => xs.flatMap((b) => [b.startedAt, b.expiresAt]),
+    multAt: (xs, t) => xs.reduce((p, b) => (
+      t >= b.startedAt && t < b.expiresAt ? p * Math.pow(1 + b.rate, t - b.startedAt) : p
+    ), 1),
+    isContinuous: (xs, a, c) => {
       const mid = (a + c) / 2;
-      return mid >= b.startedAt && mid < b.expiresAt;
+      return xs.some((b) => mid >= b.startedAt && mid < b.expiresAt);
     },
-    integral: (b, a, c) => {
-      const r = b.rate;
-      const k = Math.log(1 + r);
-      return (Math.pow(1 + r, c - b.startedAt) - Math.pow(1 + r, a - b.startedAt)) / k;
+    // ∫ ∏_i (1+r)^(t-s_i) dt over [a, c] = (1+r)^(-Σ s_i) * ((1+r)^(N*c) - (1+r)^(N*a)) / (N * ln(1+r)).
+    // Assumes all active compound buffs share the same rate (true for the current upgrade pool).
+    integral: (xs, a, c) => {
+      const mid = (a + c) / 2;
+      const active = xs.filter((b) => mid >= b.startedAt && mid < b.expiresAt);
+      if (active.length === 0) return c - a;
+      const r = active[0].rate;
+      const n = active.length;
+      const sumS = active.reduce((s, b) => s + b.startedAt, 0);
+      const k = n * Math.log(1 + r);
+      return Math.pow(1 + r, -sumS) * (Math.pow(1 + r, n * c) - Math.pow(1 + r, n * a)) / k;
     },
   },
 ];
 
 export function effectiveRate(state, now) {
   let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
-  for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key], now);
+  for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
   return rate;
 }
 
 // Closed-form integral of effective rate from t0 to t1. Splits the window at every
-// buff expiry, then for each segment multiplies all piecewise-constant buff factors
-// at the midpoint with the segment's time integral. If a buff has a continuous
-// multiplier (e.g. compound), its analytical integral replaces the (c - a) factor.
-// Assumes at most one continuous buff is active per segment; extending to more
-// would require generalized numerical integration.
+// buff transition (start or expiry), then for each segment multiplies all
+// piecewise-constant buff factors at the midpoint with the segment's time integral.
+// If a buff has a continuous multiplier (e.g. compound), its analytical integral
+// replaces the (c - a) factor. Assumes at most one continuous descriptor is active
+// per segment; extending to more would require generalized numerical integration.
 export function integrateRate(state, t0, t1) {
   if (t1 <= t0) return 0;
   const transitions = new Set([t0, t1]);
   for (const desc of RATE_BUFFS) {
-    const bs = state.buffs[desc.key];
-    if (!bs) continue;
-    for (const tr of desc.transitions(bs)) {
+    const xs = state.buffs[desc.key] || [];
+    for (const tr of desc.transitions(xs)) {
       if (tr > t0 && tr < t1) transitions.add(tr);
     }
   }
@@ -79,17 +89,16 @@ export function integrateRate(state, t0, t1) {
     let timeIntegral = c - a;
     let continuousFound = false;
     for (const desc of RATE_BUFFS) {
-      const bs = state.buffs[desc.key];
-      if (!bs) continue;
-      if (desc.isContinuous && desc.isContinuous(bs, a, c)) {
+      const xs = state.buffs[desc.key] || [];
+      if (desc.isContinuous && desc.isContinuous(xs, a, c)) {
         if (!continuousFound) {
-          timeIntegral = desc.integral(bs, a, c);
+          timeIntegral = desc.integral(xs, a, c);
           continuousFound = true;
         } else {
-          factor *= desc.multAt(bs, (a + c) / 2);
+          factor *= desc.multAt(xs, (a + c) / 2);
         }
       } else {
-        factor *= desc.multAt(bs, (a + c) / 2);
+        factor *= desc.multAt(xs, (a + c) / 2);
       }
     }
     total += base * factor * timeIntegral;
@@ -108,7 +117,7 @@ export function tryBuy(state, slotIdx, now) {
     if (now < (state.gambleCd[id] || 0)) return { ok: false, reason: 'cooldown' };
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
-    const luck = now < state.buffs.gambleLuck.expiresAt ? state.buffs.gambleLuck.value : 0;
+    const luck = state.buffs.gambleLuck.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
     const won = Math.random() < Math.min(1, u.chance + luck);
     let result;
     if (won) {
@@ -116,7 +125,8 @@ export function tryBuy(state, slotIdx, now) {
       state.amount += payout;
       result = { id, won: true, delta: payout - cost };
     } else {
-      const refund = now < state.buffs.gambleCushion.expiresAt ? cost * state.buffs.gambleCushion.value : 0;
+      const cushion = Math.min(1, state.buffs.gambleCushion.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0));
+      const refund = cost * cushion;
       state.amount += refund;
       result = { id, won: false, delta: -(cost - refund) };
     }
@@ -146,25 +156,23 @@ export function tryBuy(state, slotIdx, now) {
   return { ok: false, reason: 'unknown' };
 }
 
+export function pruneBuffs(state, now) {
+  for (const k of Object.keys(state.buffs)) {
+    state.buffs[k] = state.buffs[k].filter((b) => b.expiresAt > now);
+  }
+}
+
 function applyBuff(state, u, now) {
+  pruneBuffs(state, now);
   const b = state.buffs;
   if (u.buffType === 'rateMul') {
-    b.rateMul.value = u.mult;
-    b.rateMul.duration = u.duration;
-    b.rateMul.expiresAt = now + u.duration;
+    b.rateMul.push({ value: u.mult, duration: u.duration, expiresAt: now + u.duration });
   } else if (u.buffType === 'gambleLuck') {
-    b.gambleLuck.value = u.bonus;
-    b.gambleLuck.duration = u.duration;
-    b.gambleLuck.expiresAt = now + u.duration;
+    b.gambleLuck.push({ value: u.bonus, duration: u.duration, expiresAt: now + u.duration });
   } else if (u.buffType === 'gambleCushion') {
-    b.gambleCushion.value = u.refund;
-    b.gambleCushion.duration = u.duration;
-    b.gambleCushion.expiresAt = now + u.duration;
+    b.gambleCushion.push({ value: u.refund, duration: u.duration, expiresAt: now + u.duration });
   } else if (u.buffType === 'compound') {
-    b.compound.rate = u.rate;
-    b.compound.duration = u.duration;
-    b.compound.startedAt = now;
-    b.compound.expiresAt = now + u.duration;
+    b.compound.push({ rate: u.rate, duration: u.duration, startedAt: now, expiresAt: now + u.duration });
   }
 }
 

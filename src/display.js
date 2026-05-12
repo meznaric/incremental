@@ -9,9 +9,11 @@ const CELL_W = 0.55;
 const CELL_H = 0.5;
 const COLUMN_WIDTH = GRID_W * CELL_W;
 const COLUMN_SPACING = COLUMN_WIDTH + 1.6;
+const COLUMN_TOP_Y = GRID_H * CELL_H - CELL_H * 0.6;
+const COLUMN_BOTTOM_Y = -CELL_H * 0.6;
 const SPAWN_DISTANCE = 8.0;
 const FLIGHT_TIME = 1.4;
-const BOTTOM_EXIT_Y = -3.0;
+const BOTTOM_EXIT_Y = COLUMN_BOTTOM_Y;
 const OVERFLOW_GRAVITY = 14;
 const OVERFLOW_INITIAL_VEL = -1.0;
 const FLOW_THROUGH_VEL = -3.0;
@@ -45,58 +47,14 @@ function slotPos(slotIndex) {
   };
 }
 
-function formatRate(r) {
-  if (r < 1000) return `${r.toFixed(0)}/s`;
-  if (r < 1e6) return `${(r / 1000).toFixed(1)}k/s`;
-  if (r < 1e9) return `${(r / 1e6).toFixed(1)}M/s`;
-  return `${(r / 1e9).toFixed(1)}B/s`;
-}
-
-function makeLabel(text, color = 0x8a8ac0, fontSize = 22) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-  ctx.fillText(text, 128, 32);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  tex.anisotropy = 4;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sprite.scale.set(2.6, 0.65, 1);
-  sprite.userData = { canvas, ctx, tex, fontSize };
-  return sprite;
-}
-
-function updateLabel(sprite, text, color) {
-  const ud = sprite.userData;
-  if (ud.lastText === text && ud.lastColor === color) return;
-  ud.lastText = text;
-  ud.lastColor = color;
-  const { canvas, ctx, tex, fontSize } = ud;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-  ctx.fillText(text, 128, 32);
-  tex.needsUpdate = true;
-}
-
 function makeGridOutline(color) {
   const w = COLUMN_WIDTH;
-  const h = GRID_H * CELL_H;
-  const bottom = -CELL_H * 0.6;
-  const top = h - CELL_H * 0.6;
   const points = [
-    new THREE.Vector3(-w / 2, bottom, 0),
-    new THREE.Vector3(w / 2, bottom, 0),
-    new THREE.Vector3(w / 2, top, 0),
-    new THREE.Vector3(-w / 2, top, 0),
-    new THREE.Vector3(-w / 2, bottom, 0),
+    new THREE.Vector3(-w / 2, COLUMN_BOTTOM_Y, 0),
+    new THREE.Vector3(w / 2, COLUMN_BOTTOM_Y, 0),
+    new THREE.Vector3(w / 2, COLUMN_TOP_Y, 0),
+    new THREE.Vector3(-w / 2, COLUMN_TOP_Y, 0),
+    new THREE.Vector3(-w / 2, COLUMN_BOTTOM_Y, 0),
   ];
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22 });
@@ -152,13 +110,6 @@ class Column {
       });
     }
 
-    this.tagLabel = makeLabel('', 0xaaaacc, 22);
-    this.tagLabel.position.y = -1.6;
-    this.root.add(this.tagLabel);
-    this.valueLabel = makeLabel('', 0xffffff, 30);
-    this.valueLabel.position.y = -2.3;
-    this.root.add(this.valueLabel);
-
     this.m100 = -1;
     this.period = 0;
     this.rank = 0;
@@ -169,7 +120,6 @@ class Column {
     this.aliveCount = 0;
     this.lastSpawnT = -10;
     this._rateEstimate = 0;
-    this._lastLabelT = 0;
     this._streamSpeed = CONTINUOUS_FALL_SPEED;
     this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
   }
@@ -219,7 +169,7 @@ class Column {
     const slot = slotPos(p.slotIndex);
     p.slotX = slot.x;
     p.slotY = slot.y;
-    p.spawnY = slot.y + SPAWN_DISTANCE;
+    p.spawnY = Math.min(slot.y + SPAWN_DISTANCE, COLUMN_TOP_Y);
     p.spawnT = now;
     p.mesh.position.set(slot.x, p.spawnY, 0);
     p.mesh.visible = true;
@@ -242,7 +192,7 @@ class Column {
     const x = (Math.random() - 0.5) * COLUMN_WIDTH * 0.85;
     p.slotX = x;
     p.slotY = 0;
-    p.spawnY = (GRID_H - 1) * CELL_H + SPAWN_DISTANCE;
+    p.spawnY = COLUMN_TOP_Y;
     p.spawnT = now;
     p.mesh.position.set(x, p.spawnY, 0);
     p.mesh.visible = true;
@@ -338,7 +288,7 @@ class Column {
       const slot = slotPos(i);
       p.slotX = slot.x;
       p.slotY = slot.y;
-      p.spawnY = slot.y + SPAWN_DISTANCE;
+      p.spawnY = Math.min(slot.y + SPAWN_DISTANCE, COLUMN_TOP_Y);
       p.spawnT = now + Math.random() * 0.2;
       p.mesh.position.set(slot.x, p.spawnY, 0);
       p.mesh.visible = true;
@@ -375,11 +325,8 @@ class Column {
     this.rank = pr.rank;
     const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
     this.outline.material.color.setHex(pDef.color);
-    const lo = 2 * m100;
-    updateLabel(this.tagLabel, `10^${lo}–10^${lo + 1}  ${pDef.abbrev || 'u'}`, pDef.color);
     this.mode = 'discrete';
     this._rateEstimate = 0;
-    this._lastLabelT = 0;
     this._snapHard(amount, now);
   }
 
@@ -467,15 +414,6 @@ class Column {
         this.phase = 'filling';
         this.cycleSpawnCount = 0;
         this.aliveCount = 0;
-      }
-    }
-
-    if (now - this._lastLabelT > 0.1) {
-      this._lastLabelT = now;
-      if (this.mode === 'continuous') {
-        updateLabel(this.valueLabel, `≈ ${formatRate(this._rateEstimate)}`, 0xffaa44);
-      } else {
-        updateLabel(this.valueLabel, `${this.aliveCount.toString().padStart(2, '0')}`, 0xffffff);
       }
     }
   }

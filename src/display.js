@@ -24,6 +24,13 @@ const CONTINUOUS_FALL_SPEED = 8.5;
 const CONTINUOUS_SPAWN_INTERVAL = 0.035;
 const RATE_TO_CONTINUOUS = 30;
 const RATE_TO_DISCRETE = 18;
+const STREAM_MAX_SPEED = 38;
+const STREAM_SPEED_LOG_SCALE = 6.5;
+const STREAM_MIN_INTERVAL = 0.008;
+
+const COLUMN_COUNT = 5;
+const POS_LERP_K = 5.5;
+const SCALE_LERP_K = 7;
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
@@ -109,7 +116,12 @@ class Column {
   constructor(parent, x) {
     this.root = new THREE.Group();
     this.root.position.x = x;
+    this.root.scale.setScalar(0);
     parent.add(this.root);
+
+    this.targetX = x;
+    this.scaleTarget = 0;
+    this.assigned = false;
 
     this.outline = makeGridOutline(0x444466);
     this.root.add(this.outline);
@@ -154,6 +166,32 @@ class Column {
     this.lastSpawnT = -10;
     this._lastTarget = 0;
     this._rateEstimate = 0;
+    this._streamSpeed = CONTINUOUS_FALL_SPEED;
+    this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
+  }
+
+  animate(dt) {
+    const tp = 1 - Math.exp(-dt * POS_LERP_K);
+    this.root.position.x += (this.targetX - this.root.position.x) * tp;
+    const ts = 1 - Math.exp(-dt * SCALE_LERP_K);
+    const s = this.root.scale.x + (this.scaleTarget - this.root.scale.x) * ts;
+    this.root.scale.setScalar(s);
+  }
+
+  reset() {
+    this.m100 = -1;
+    this.mode = 'discrete';
+    this.phase = 'filling';
+    this.processed = 0;
+    this.cycleSpawnCount = 0;
+    this.aliveCount = 0;
+    this._lastTarget = 0;
+    this._rateEstimate = 0;
+    for (const p of this.particles) {
+      p.state = 'idle';
+      p.mesh.visible = false;
+      p.mat.opacity = 1;
+    }
   }
 
   _styleParticle(p) {
@@ -206,7 +244,7 @@ class Column {
     p.mesh.position.set(x, p.spawnY, 0);
     p.mesh.visible = true;
     p.mat.opacity = 1;
-    p.velY = -CONTINUOUS_FALL_SPEED;
+    p.velY = -this._streamSpeed;
     p.state = 'streaming';
     this.aliveCount++;
     this.lastSpawnT = now;
@@ -309,6 +347,12 @@ class Column {
       this._exitContinuous(amount, now);
     }
 
+    if (this.mode === 'continuous') {
+      const over = Math.max(1, this._rateEstimate / RATE_TO_CONTINUOUS);
+      this._streamSpeed = Math.min(STREAM_MAX_SPEED, CONTINUOUS_FALL_SPEED + Math.log10(over) * STREAM_SPEED_LOG_SCALE);
+      this._streamInterval = Math.max(STREAM_MIN_INTERVAL, CONTINUOUS_SPAWN_INTERVAL * (CONTINUOUS_FALL_SPEED / this._streamSpeed));
+    }
+
     const backlog = target - this.processed;
 
     if (this.mode === 'discrete') {
@@ -319,7 +363,7 @@ class Column {
       }
     } else {
       this.processed = target;
-      if ((now - this.lastSpawnT) >= CONTINUOUS_SPAWN_INTERVAL) {
+      if ((now - this.lastSpawnT) >= this._streamInterval) {
         this._spawnContinuous(now);
       }
     }
@@ -339,7 +383,7 @@ class Column {
         p.mesh.rotation.x += dt * 0.3;
         p.mesh.rotation.y += dt * 0.45;
       } else if (p.state === 'streaming') {
-        p.mesh.position.y += p.velY * dt;
+        p.mesh.position.y -= this._streamSpeed * dt;
         p.mesh.rotation.x += dt * 2.5;
         p.mesh.rotation.y += dt * 3.5;
         if (p.mesh.position.y < BOTTOM_EXIT_Y) {
@@ -389,39 +433,67 @@ class Column {
     }
   }
 
-  hide() {
-    this.root.visible = false;
-    this.m100 = -1;
-  }
-  show() {
-    this.root.visible = true;
-  }
 }
 
 export class MagnitudeDisplay {
   constructor() {
     this.group = new THREE.Group();
-    this.columns = [
-      new Column(this.group, -COLUMN_SPACING),
-      new Column(this.group, 0),
-      new Column(this.group, COLUMN_SPACING),
-    ];
+    this.columns = [];
+    for (let i = 0; i < COLUMN_COUNT; i++) {
+      this.columns.push(new Column(this.group, 0));
+    }
   }
 
   update(amount, now, dt) {
-    const { cols } = decomposeByBase100(amount);
-    for (let c = 0; c < 3; c++) {
-      const col = this.columns[c];
-      const data = cols[c];
-      if (!data) {
-        col.hide();
-        continue;
+    const { cols } = decomposeByBase100(amount, COLUMN_COUNT);
+    const desired = cols.map((c) => c.m).filter((m) => m >= 0);
+    const desiredSet = new Set(desired);
+
+    for (const col of this.columns) {
+      if (col.assigned && !desiredSet.has(col.m100)) {
+        col.assigned = false;
+        col.scaleTarget = 0;
       }
-      col.show();
-      if (col.m100 !== data.m) {
-        col.assignMagnitude(data.m, amount, now);
+    }
+
+    const byM = new Map();
+    for (const col of this.columns) {
+      if (col.m100 >= 0) byM.set(col.m100, col);
+    }
+
+    const positioned = [];
+    const freshAssigns = [];
+    for (const m of desired) {
+      let col = byM.get(m);
+      if (col) {
+        col.assigned = true;
+        col.scaleTarget = 1;
       } else {
-        col.update(now, dt, amount);
+        col = this.columns.find((c) => c.m100 < 0 && !c.assigned);
+        if (!col) col = this.columns.find((c) => !c.assigned);
+        if (!col) continue;
+        col.assigned = true;
+        col.scaleTarget = 1;
+        freshAssigns.push({ col, m });
+      }
+      positioned.push(col);
+    }
+
+    const n = positioned.length;
+    for (let i = 0; i < n; i++) {
+      positioned[i].targetX = (i - (n - 1) / 2) * COLUMN_SPACING;
+    }
+
+    for (const { col, m } of freshAssigns) {
+      if (col.root.scale.x < 0.1) col.root.position.x = col.targetX;
+      col.assignMagnitude(m, amount, now);
+    }
+
+    for (const col of this.columns) {
+      if (col.m100 >= 0) col.update(now, dt, amount);
+      col.animate(dt);
+      if (!col.assigned && col.root.scale.x < 0.02 && col.m100 >= 0) {
+        col.reset();
       }
     }
   }

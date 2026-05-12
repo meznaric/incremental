@@ -30,12 +30,12 @@ export function decomposeByMagnitude(n) {
   return { top, mags };
 }
 
-export function decomposeByBase100(n) {
+export function decomposeByBase100(n, count = 3) {
   if (!isFinite(n) || n < 1) return { top: 0, cols: [{ m: 0, value: Math.max(0, Math.floor(n || 0)) }] };
   const maxM = Math.floor((MAX_PERIOD * 3 + 2) / 2);
   const top = Math.min(maxM, Math.floor(log10(n) / 2));
   const cols = [];
-  for (let off = 0; off < 3; off++) {
+  for (let off = 0; off < count; off++) {
     const m = top - off;
     if (m < 0) break;
     const v = Math.floor(n / Math.pow(100, m)) % 100;

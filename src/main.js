@@ -7,6 +7,9 @@ import { makeShopState, effectiveRate, tryBuy, tryDrop, validateSlate } from './
 import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
+import { initMenu } from './menu.js';
+
+initMenu();
 
 const state = {
   amount: 0,
@@ -19,7 +22,51 @@ const amountInput = document.getElementById('amountInput');
 const rateInput = document.getElementById('rateInput');
 const slotsEl = document.getElementById('slots');
 const buffsEl = document.getElementById('buffs');
+const buffModalEl = document.getElementById('buffModal');
 const resultEl = document.getElementById('result');
+
+const openBuffModal = () => buffModalEl.classList.add('open');
+const closeBuffModal = () => buffModalEl.classList.remove('open');
+buffsEl.addEventListener('click', (e) => {
+  if (e.target.closest('.buff-info')) openBuffModal();
+});
+buffModalEl.addEventListener('click', (e) => {
+  if (e.target === buffModalEl || e.target.closest('.bm-close')) closeBuffModal();
+});
+
+const slotModalEl = document.getElementById('slotModal');
+const slotModalTitleEl = document.getElementById('slotModalTitle');
+const slotModalBodyEl = document.getElementById('slotModalBody');
+const closeSlotModal = () => slotModalEl.classList.remove('open');
+slotModalEl.addEventListener('click', (e) => {
+  if (e.target === slotModalEl || e.target.closest('.bm-close')) closeSlotModal();
+});
+function openSlotModal(idx) {
+  const slot = state.shop.slots[idx];
+  const u = slot ? getUpgrade(slot.id) : null;
+  if (!u || !slot) return;
+  const theme = KIND_THEME[u.kind] || {};
+  slotModalTitleEl.textContent = u.name;
+  const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${COIN}${formatAbbrev(slot.cost)}</span></div>`];
+  if (u.kind === 'gamble') {
+    rows.push(
+      `<div class="slot-modal-row"><span>Win chance</span><span>${fmtPct(u.chance)}</span></div>`,
+      `<div class="slot-modal-row"><span>Payout</span><span>${u.payout}× wager</span></div>`,
+      `<div class="slot-modal-row"><span>Cooldown</span><span>${u.cooldown}s</span></div>`,
+    );
+  } else if (u.kind === 'convert') {
+    rows.push(`<div class="slot-modal-row"><span>Grants</span><span>+${formatAbbrev(slot.cost * u.ratio)}/s permanent</span></div>`);
+  } else if (u.kind === 'buff') {
+    rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
+  }
+  rows.push(`<div class="slot-modal-row"><span>Drop cost</span><span>${COIN}${formatAbbrev(slot.dropCost)}</span></div>`);
+  slotModalBodyEl.innerHTML = `
+    <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${theme.label || u.kind}</span>
+    <p class="slot-modal-desc">${u.desc}</p>
+    ${rows.join('')}
+  `;
+  slotModalEl.classList.add('open');
+}
 
 amountInput.value = '0';
 rateInput.value = '5';
@@ -85,12 +132,19 @@ scene.add(display.group);
 const hero = new HeroDisplay();
 scene.add(hero.group);
 
+const shopEl = document.getElementById('shop');
 function onResize() {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const shopRect = shopEl.getBoundingClientRect();
+  const shopTop = shopRect.height ? shopRect.top : window.innerHeight;
+  const w = window.innerWidth;
+  const h = Math.max(240, shopTop - 8);
+  renderer.setSize(w, h);
+  canvas.style.height = h + 'px';
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', onResize);
+new ResizeObserver(onResize).observe(shopEl);
 
 const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
 
@@ -115,10 +169,14 @@ for (let i = 0; i < 4; i++) {
     <div class="cost"></div>
     <div class="outcomes"></div>
     <div class="meta"></div>
-    <button class="drop" type="button"></button>
+    <div class="foot">
+      <button class="drop" type="button"></button>
+      <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
+    </div>
   `;
   el.addEventListener('click', (e) => {
     if (e.target.closest('.drop')) return;
+    if (e.target.closest('.slot-info')) { openSlotModal(i); return; }
     tryBuy(state, i, nowSeconds());
     renderShop();
   });
@@ -167,9 +225,12 @@ function renderShop() {
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
     el.querySelector('.meta').textContent = meta;
-    el.querySelector('.drop').innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)}`;
+    const dropEl = el.querySelector('.drop');
+    dropEl.innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)}`;
     const canAfford = state.amount >= cost;
+    const canDrop = state.amount >= slot.dropCost && state.amount > 0;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
+    dropEl.classList.toggle('locked', !canDrop);
   }
 }
 
@@ -188,7 +249,11 @@ function renderBuffs(now) {
     const icon = BUFF_ICONS[kind] || '';
     cards.push(`
       <div class="buff-card kind-${kind}">
-        <div class="buff-head"><span class="buff-name"><i class="ri ri-fw ${icon}"></i>${name}</span><span class="buff-val">${value}</span></div>
+        <div class="buff-head">
+          <span class="buff-name"><i class="ri ri-fw ${icon}"></i>${name}</span>
+          <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
+          <span class="buff-val">${value}</span>
+        </div>
         <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${remain.toFixed(1)}s</div>
         <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
       </div>

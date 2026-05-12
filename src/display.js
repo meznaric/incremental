@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PERIODS, geometryFor } from './periods.js';
 import { decomposeByBase100, periodForBase100 } from './bignum.js';
 
-const GRID_W = 5;
+const GRID_W = 4;
 const GRID_H = 20;
 const SLOT_COUNT = GRID_W * GRID_H;
 const CELL_W = 0.55;

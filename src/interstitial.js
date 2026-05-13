@@ -1,3 +1,7 @@
+import {
+  WORLD_FOR_INTERSTITIAL, recordContact, saveContactLog, getRun,
+} from './contactLog.js';
+
 // Interstitial messages — lore beats keyed to in-game triggers.
 // Voices: K (Kalen, first person), S (Sera, second person), N (Narrator, third
 // person, rare), A (Anonymous, italic, ~once per season). See
@@ -149,6 +153,33 @@ export const INTERSTITIALS = {
       { text: 'They kept arriving while you were gone.' },
     ],
   },
+
+  // voice: Sera. Once per cycle from cycle 4 onward. The interrogation
+  // grows with the log — Sera reads from it directly, names and all. By
+  // cycle 4 the run-history has weight: more names, more questions, more
+  // silence between them. `repeat` so it can fire again next cycle; gated
+  // by stats.lastSeraCycle so it never fires twice in the same run.
+  sera_interrogation_open: {
+    repeat: true,
+    steps: [
+      { text: (s) => `Cycle ${getRun(s.contactLog)}. The file is heavier than it was.` },
+      { text: (s) => {
+        const n = (s.contactLog && s.contactLog.worlds.length) || 0;
+        return `I have ${n} name${n === 1 ? '' : 's'} on your log.`;
+      } },
+      { text: (s) => {
+        // Most recent first, take up to three names, fall back gracefully.
+        const ws = (s.contactLog && s.contactLog.worlds) || [];
+        const recent = ws.slice().sort((a, b) => (b.contactedAt || 0) - (a.contactedAt || 0)).slice(0, 3);
+        const names = recent.map((w) => w.name);
+        if (names.length === 0) return 'And not one of them is forgotten.';
+        if (names.length === 1) return `${names[0]}. I would like to start there.`;
+        if (names.length === 2) return `${names[0]}. ${names[1]}. In that order, I think.`;
+        return `${names[0]}. ${names[1]}. ${names[2]}. We will take them in that order.`;
+      } },
+      { text: 'Walk me through the part where you said this would be the last one.' },
+    ],
+  },
 };
 
 const MILESTONE_THRESHOLDS = [
@@ -176,14 +207,33 @@ export function enqueue(state, id) {
   if (m.shown[id] && !INTERSTITIALS[id].repeat) return false;
   if (m.queue.includes(id)) return false;
   m.queue.push(id);
+  // If this interstitial corresponds to a contacted world, add it to the
+  // persistent Contact Log immediately. The log is the prestige currency —
+  // it must reflect the *act* of contact, not the player reading the beat.
+  if (state.contactLog && WORLD_FOR_INTERSTITIAL[id]) {
+    if (recordContact(state.contactLog, id, Date.now() / 1000)) {
+      saveContactLog(state.contactLog);
+    }
+  }
   return true;
 }
 
 // Call once on game start. Welcome only fires for fresh players. If the player
 // drifted away for >OFFLINE_RETURN_S seconds, queue a soft return beat.
+// From cycle 4 onward, queue the Sera-heavy interrogation opener once per cycle.
 export function checkStart(state, isFreshPlayer, offlineSeconds) {
   if (isFreshPlayer) enqueue(state, 'welcome');
   else if ((offlineSeconds || 0) >= OFFLINE_RETURN_S) enqueue(state, 'offline_returner');
+  const run = getRun(state.contactLog);
+  const s = state.messages.stats;
+  if (run >= 4 && (s.lastSeraCycle || 0) < run) {
+    s.lastSeraCycle = run;
+    // The shown-map prevents enqueue() from re-running a non-repeat interstitial;
+    // since this one carries `repeat: true`, the stats gate above is what
+    // enforces "once per cycle".
+    delete state.messages.shown.sera_interrogation_open;
+    enqueue(state, 'sera_interrogation_open');
+  }
 }
 
 // Call after a gamble resolves. result: { won: bool, isAllIn: bool, balanceAfter: number }.

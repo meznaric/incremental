@@ -44,7 +44,10 @@ export function makeInterstitialUi(state, onShown) {
     waitingInput = false;
     autoTimer = 0;
     hintEl.style.opacity = '0';
-    typing = { i: 0, full: step.text, doneAt: 0 };
+    // Allow dynamic text — a function lets Sera reference past contacts at
+    // run-time without baking strings into the static table.
+    const full = typeof step.text === 'function' ? step.text(state) : step.text;
+    typing = { i: 0, full, doneAt: 0 };
     textEl.textContent = '';
     textEl.classList.add('it-typing');
     // Anonymous-voice steps render italic; everything else stays roman.

@@ -13,14 +13,18 @@ import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
-
-initMenu();
+import { loadContactLog, saveContactLog, backfillFromShown } from './contactLog.js';
 
 const state = {
   amount: 0,
   basePerSecond: 0,
   ...makeShopState(),
+  // The Contact Log persists across save resets — it is the run-accumulating
+  // narrative state, separate from the gameplay save.
+  contactLog: loadContactLog(),
 };
+
+initMenu(state);
 
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');
@@ -81,6 +85,11 @@ state.amount = parseAmount(amountInput.value);
 state.basePerSecond = parseAmount(rateInput.value);
 
 const loaded = loadState(state);
+// Back-fill the Contact Log from any milestones already marked shown by an
+// older code version. One-time, idempotent.
+if (loaded && backfillFromShown(state.contactLog, state.messages.shown, nowSeconds()) > 0) {
+  saveContactLog(state.contactLog);
+}
 checkStart(state, !loaded, loaded ? loaded.offline : 0);
 if (loaded) {
   amountInput.value = formatAbbrev(state.amount);

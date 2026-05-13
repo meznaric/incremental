@@ -179,6 +179,62 @@
       line-height: 1.45;
       max-width: 220px;
     }
+    .cl-meta {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+      padding: 2px 4px 8px;
+    }
+    .cl-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 4px;
+      max-height: 260px;
+      overflow-y: auto;
+      min-width: 220px;
+    }
+    .cl-list::-webkit-scrollbar { width: 4px; }
+    .cl-list::-webkit-scrollbar-thumb { background: rgba(120, 140, 255, 0.2); border-radius: 2px; }
+    .cl-list li {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      gap: 8px;
+      padding: 6px 4px;
+      border-top: 1px solid rgba(120, 140, 255, 0.1);
+      font-variant-numeric: tabular-nums;
+    }
+    .cl-list li:first-child { border-top: none; }
+    .cl-name {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: #e8e8f0;
+    }
+    .cl-ep {
+      font-size: 10px;
+      color: #6a6a90;
+      letter-spacing: 0.1em;
+    }
+    .cl-status {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .cl-status.s-triggered { color: #ff8a3a; }
+    .cl-status.s-collapsed { color: #ff5a6e; }
+    .cl-status.s-shifted   { color: #9d6ee0; }
+    .cl-status.s-missing   { color: #4ea8ff; }
+    .cl-empty {
+      font-size: 11px;
+      color: #6a6a90;
+      padding: 8px 4px 4px;
+      font-style: italic;
+      display: none;
+    }
+    .menu-view.cl-empty-only .cl-empty { display: block; }
+    .menu-view.cl-empty-only .cl-list { display: none; }
     .reset-actions {
       display: flex;
       gap: 8px;
@@ -798,6 +854,7 @@
     <button id="menuToggle" class="menu-toggle" aria-label="Menu" type="button"><i class="ri-menu-line"></i></button>
     <div class="menu-body">
       <div class="menu-view active" data-view="list">
+        <button class="menu-item" type="button" data-action="open-contact-log"><i class="ri ri-radar-line"></i>Contact Log</button>
         <button class="menu-item" type="button" data-action="open-debug"><i class="ri ri-bug-line"></i>Debug</button>
         <button class="menu-item" type="button" data-action="open-community"><i class="ri ri-discord-line"></i>Community</button>
         <button class="menu-item danger" type="button" data-action="open-reset"><i class="ri ri-refresh-line"></i>Reset save</button>
@@ -830,11 +887,18 @@
 
       <div class="menu-view" data-view="reset">
         <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Reset save</div>
-        <div class="reset-warning">This wipes your save permanently. The page will reload.</div>
+        <div class="reset-warning">This wipes your save permanently. The page will reload.<br><br>The Contact Log is kept.</div>
         <div class="reset-actions">
           <button type="button" data-action="back">Cancel</button>
           <button type="button" class="danger" data-action="reset-confirm">Reset</button>
         </div>
+      </div>
+
+      <div class="menu-view" data-view="contact-log">
+        <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Contact Log</div>
+        <div class="cl-meta"></div>
+        <ul class="cl-list"></ul>
+        <div class="cl-empty">No contacts on the log yet.</div>
       </div>
     </div>
   </div>

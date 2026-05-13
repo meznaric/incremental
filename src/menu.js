@@ -1,12 +1,16 @@
 import { clearSave } from './save.js';
+import { sortedWorlds, getRun } from './contactLog.js';
 
 const PIN = '0011';
 
-export function initMenu() {
+export function initMenu(state) {
   const menu = document.getElementById('menu');
   const toggle = document.getElementById('menuToggle');
   const pinInput = menu.querySelector('.pin-input');
   const pinError = menu.querySelector('.pin-error');
+  const clView = menu.querySelector('[data-view="contact-log"]');
+  const clMetaEl = clView.querySelector('.cl-meta');
+  const clListEl = clView.querySelector('.cl-list');
 
   let view = 'list';
 
@@ -29,7 +33,30 @@ export function initMenu() {
       pinError.classList.remove('show');
       setTimeout(() => pinInput.focus(), 0);
     }
+    if (next === 'contact-log') renderContactLog();
   };
+
+  function renderContactLog() {
+    const log = state && state.contactLog;
+    const worlds = log ? sortedWorlds(log) : [];
+    const run = getRun(log);
+    clMetaEl.textContent = `Cycle ${run} · ${worlds.length} contact${worlds.length === 1 ? '' : 's'}`;
+    if (!worlds.length) {
+      clView.classList.add('cl-empty-only');
+      clListEl.innerHTML = '';
+      return;
+    }
+    clView.classList.remove('cl-empty-only');
+    clListEl.innerHTML = worlds.map((w) => `
+      <li>
+        <div>
+          <div class="cl-name">${w.name}</div>
+          <div class="cl-ep">ep ${w.ep}${w.run > 1 ? ` · cycle ${w.run}` : ''}</div>
+        </div>
+        <div class="cl-status s-${w.status.toLowerCase()}">${w.status}</div>
+      </li>
+    `).join('');
+  }
 
   toggle.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -48,11 +75,13 @@ export function initMenu() {
   menu.addEventListener('click', (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (!action) return;
-    if (action === 'open-debug')     setView('pin');
-    if (action === 'open-community') setView('community');
-    if (action === 'open-reset')     setView('reset');
-    if (action === 'back')           setView('list');
+    if (action === 'open-contact-log') setView('contact-log');
+    if (action === 'open-debug')       setView('pin');
+    if (action === 'open-community')   setView('community');
+    if (action === 'open-reset')       setView('reset');
+    if (action === 'back')             setView('list');
     if (action === 'reset-confirm') {
+      // Deliberately does not touch the Contact Log — that survives resets.
       clearSave();
       location.reload();
     }

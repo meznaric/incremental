@@ -3,7 +3,7 @@ import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
 import { getUpgrade, KIND_THEME } from './upgrades.js';
-import { makeShopState, effectiveRate, tryBuy, tryDrop, validateSlate } from './shop.js';
+import { makeShopState, effectiveRate, integrateRate, tryBuy, tryDrop, validateSlate } from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
@@ -324,6 +324,7 @@ const interstitialUi = makeInterstitialUi(state);
 interstitialUi.drain();
 
 let last = performance.now();
+let lastWall = nowSeconds();
 let lastHud = 0;
 let lastSave = 0;
 const SAVE_INTERVAL_MS = 5000;
@@ -332,10 +333,15 @@ function tick(raf) {
   const dtMs = raf - last;
   last = raf;
   const t = nowSeconds();
+  const wallDt = Math.max(0, t - lastWall);
+  lastWall = t;
 
   const rate = effectiveRate(state, t);
   const baseRate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
-  state.amount += rate * dt;
+  // Use closed-form integral over wall-clock so backgrounded tabs (where rAF
+  // throttles to ~1Hz) and resumes from sleep don't undercount production.
+  // Also handles buff start/expiry transitions inside the window.
+  state.amount += integrateRate(state, t - wallDt, t);
   checkAmount(state, state.amount);
 
   display.update(state.amount, rate, t, dt);

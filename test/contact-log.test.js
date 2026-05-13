@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   recordContact, sortedWorlds, getRun, advanceRun,
   WORLD_FOR_INTERSTITIAL, backfillFromShown,
+  cycleContactCount, canCloseCycle, memoryShards, memoryMul,
+  closeCycle, ECHO_MEMORY_PER_SHARD,
 } from '../src/contactLog.js';
 
 const freshLog = () => ({ run: 1, worlds: [] });
@@ -104,4 +106,68 @@ test('advanceRun: increments the run counter monotonically', () => {
   advanceRun(log);
   advanceRun(log);
   assert.equal(getRun(log), 4);
+});
+
+test('cycleContactCount: only counts contacts tagged with the current run', () => {
+  const log = freshLog();
+  assert.equal(cycleContactCount(log), 0);
+  recordContact(log, 'milestone_1k', 100);
+  recordContact(log, 'milestone_1m', 110);
+  assert.equal(cycleContactCount(log), 2);
+  advanceRun(log);
+  assert.equal(cycleContactCount(log), 0, 'old run contacts no longer count');
+  recordContact(log, 'milestone_1b', 200);
+  assert.equal(cycleContactCount(log), 1);
+});
+
+test('canCloseCycle: false on a fresh log, true once a contact lands this cycle', () => {
+  const log = freshLog();
+  assert.equal(canCloseCycle(log), false);
+  recordContact(log, 'milestone_1k', 100);
+  assert.equal(canCloseCycle(log), true);
+});
+
+test('canCloseCycle: false again immediately after closing, until next contact', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1k', 100);
+  closeCycle(log);
+  assert.equal(canCloseCycle(log), false, 'new cycle starts empty');
+});
+
+test('memoryShards: counts every world ever logged across all cycles', () => {
+  const log = freshLog();
+  assert.equal(memoryShards(log), 0);
+  recordContact(log, 'milestone_1k', 100);
+  recordContact(log, 'milestone_1m', 110);
+  advanceRun(log);
+  recordContact(log, 'milestone_1b', 200);
+  assert.equal(memoryShards(log), 3);
+});
+
+test('memoryMul: 1 + ECHO_MEMORY_PER_SHARD * shards', () => {
+  const log = freshLog();
+  assert.equal(memoryMul(log), 1);
+  recordContact(log, 'milestone_1k', 100);
+  assert.equal(memoryMul(log), 1 + ECHO_MEMORY_PER_SHARD);
+  recordContact(log, 'milestone_1m', 110);
+  recordContact(log, 'milestone_1b', 120);
+  assert.equal(memoryMul(log), 1 + 3 * ECHO_MEMORY_PER_SHARD);
+});
+
+test('closeCycle: refuses to close an empty cycle', () => {
+  const log = freshLog();
+  assert.equal(closeCycle(log), false);
+  assert.equal(getRun(log), 1, 'run does not advance');
+});
+
+test('closeCycle: advances the run and keeps the world list intact', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1k', 100);
+  recordContact(log, 'milestone_1m', 110);
+  const ok = closeCycle(log);
+  assert.equal(ok, true);
+  assert.equal(getRun(log), 2);
+  assert.equal(log.worlds.length, 2, 'worlds survive prestige');
+  // Echo Memory carries forward — shards persist.
+  assert.equal(memoryShards(log), 2);
 });

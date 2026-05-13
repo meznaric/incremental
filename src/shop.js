@@ -102,10 +102,16 @@ export const RATE_BUFFS = [
   },
 ];
 
+// Echo Memory multiplier from the Contact Log. Scalar over the whole rate;
+// state.memoryMul is derived (not persisted) and defaults to 1 if absent.
+function memoryFactor(state) {
+  return Number.isFinite(state.memoryMul) && state.memoryMul > 0 ? state.memoryMul : 1;
+}
+
 export function effectiveRate(state, now) {
   let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
-  return rate;
+  return rate * memoryFactor(state);
 }
 
 // Closed-form integral of effective rate from t0 to t1. Splits the window at every
@@ -124,7 +130,7 @@ export function integrateRate(state, t0, t1) {
     }
   }
   const sorted = [...transitions].sort((x, y) => x - y);
-  const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
+  const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul * memoryFactor(state);
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i], c = sorted[i + 1];

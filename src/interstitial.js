@@ -80,6 +80,22 @@ export const INTERSTITIALS = {
     ],
   },
 
+  // voice: Kalen. Fires the first time the Console boots into a new cycle
+  // (run > 1 with a fresh save). Gated by stats.lastCycleOpener so the same
+  // cycle does not replay it on reload — but the entry persists in
+  // `shown` only via the stats gate, mirroring sera_interrogation_open.
+  cycle_open: {
+    repeat: true,
+    steps: [
+      { text: 'The console boots. I have been here before.' },
+      { text: (s) => {
+        const n = s.contactLog && Array.isArray(s.contactLog.worlds) ? s.contactLog.worlds.length : 0;
+        return `Cycle ${getRun(s.contactLog)}. The names remain — ${n} of them, on the heavier carrier.`;
+      } },
+      { text: 'I start the listening.' },
+    ],
+  },
+
   // voice: Kalen. First time a Hail (gamble) fails.
   first_gamble: {
     steps: [
@@ -222,10 +238,16 @@ export function enqueue(state, id) {
 // drifted away for >OFFLINE_RETURN_S seconds, queue a soft return beat.
 // From cycle 4 onward, queue the Sera-heavy interrogation opener once per cycle.
 export function checkStart(state, isFreshPlayer, offlineSeconds) {
-  if (isFreshPlayer) enqueue(state, 'welcome');
-  else if ((offlineSeconds || 0) >= OFFLINE_RETURN_S) enqueue(state, 'offline_returner');
   const run = getRun(state.contactLog);
   const s = state.messages.stats;
+  // Welcome only on the very first boot (cycle 1, no save). Subsequent
+  // cycles get the cycle_open beat instead, which knows about the log.
+  if (isFreshPlayer && run === 1) enqueue(state, 'welcome');
+  else if (isFreshPlayer && run > 1 && (s.lastCycleOpener || 0) < run) {
+    s.lastCycleOpener = run;
+    delete state.messages.shown.cycle_open;
+    enqueue(state, 'cycle_open');
+  } else if ((offlineSeconds || 0) >= OFFLINE_RETURN_S) enqueue(state, 'offline_returner');
   if (run >= 4 && (s.lastSeraCycle || 0) < run) {
     s.lastSeraCycle = run;
     // The shown-map prevents enqueue() from re-running a non-repeat interstitial;

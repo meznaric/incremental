@@ -105,16 +105,54 @@ export function getRun(log) {
   return (log && log.run) || 1;
 }
 
-// Called by the (future) prestige action to start the next run. The world
-// list survives; only the run counter advances. Until prestige ships this
-// function exists only for tests and forward-compat.
+// Called by the prestige action ("Close the Cycle") to start the next run.
+// The world list survives; only the run counter advances.
 export function advanceRun(log) {
   log.run = (log.run || 1) + 1;
   return log;
 }
 
-// Hard-erase the log. Reserved for an explicit user action (deep reset).
-// Normal "Reset save" should NOT clear this — that's the whole point.
+// Hard-erase the log. Reserved for the burger-menu "Reset save" action, which
+// is a full wipe. Soft prestige (Close the Cycle) must not call this.
 export function clearContactLog() {
   try { localStorage.removeItem(CONTACT_LOG_KEY); } catch (e) { /* noop */ }
+}
+
+// — Echo Memory & prestige eligibility —
+//
+// Each contact ever recorded is a "memory shard." Memory shards add a
+// flat +ECHO_MEMORY_PER_SHARD multiplier to base Echo accrual, and that
+// multiplier carries across cycles. Pushing further in a single cycle
+// means more shards earned, which means a stronger carrier next cycle.
+export const ECHO_MEMORY_PER_SHARD = 0.10;
+
+export function cycleContactCount(log) {
+  if (!log || !Array.isArray(log.worlds)) return 0;
+  const run = getRun(log);
+  let n = 0;
+  for (const w of log.worlds) if ((w.run || 1) === run) n++;
+  return n;
+}
+
+// At least one contact in the current cycle is required to close it.
+// Thematically: Kalen needs someone on the line before he can let the cycle go.
+export function canCloseCycle(log) {
+  return cycleContactCount(log) > 0;
+}
+
+export function memoryShards(log) {
+  return log && Array.isArray(log.worlds) ? log.worlds.length : 0;
+}
+
+export function memoryMul(log) {
+  return 1 + ECHO_MEMORY_PER_SHARD * memoryShards(log);
+}
+
+// Performs the prestige bookkeeping on the log itself. Callers are still
+// responsible for wiping the gameplay save and reloading the page.
+// Returns false if the cycle is not eligible to close.
+export function closeCycle(log) {
+  if (!canCloseCycle(log)) return false;
+  advanceRun(log);
+  return true;
 }

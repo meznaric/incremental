@@ -9,11 +9,11 @@ import {
   nextSlotUnlockCost, computeRerollCost,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
 } from './shop.js';
-import { loadState, saveState, nowSeconds } from './save.js';
+import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
-import { loadContactLog, saveContactLog, backfillFromShown } from './contactLog.js';
+import { loadContactLog, saveContactLog, backfillFromShown, closeCycle, memoryMul } from './contactLog.js';
 import { initContactLogUi } from './contactLogUi.js';
 
 const state = {
@@ -24,9 +24,22 @@ const state = {
   // narrative state, separate from the gameplay save.
   contactLog: loadContactLog(),
 };
+// Derived each session from the log. Drives Echo Memory in the rate math.
+state.memoryMul = memoryMul(state.contactLog);
 
 initMenu();
-initContactLogUi(state);
+initContactLogUi(state, {
+  // "Close the Cycle" — soft prestige. Wipes the gameplay save, advances the
+  // log's run counter so milestones can fire again, leaves the world list
+  // (and therefore Echo Memory) intact, then reloads.
+  onCloseCycle() {
+    if (!closeCycle(state.contactLog)) return false;
+    saveContactLog(state.contactLog);
+    clearSave();
+    location.reload();
+    return true;
+  },
+});
 
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');

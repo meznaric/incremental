@@ -1,4 +1,5 @@
 import { clearSave } from './save.js';
+import { clearContactLog } from './contactLog.js';
 
 const PIN = '0011';
 
@@ -53,8 +54,11 @@ export function initMenu() {
     if (action === 'open-reset')     setView('reset');
     if (action === 'back')           setView('list');
     if (action === 'reset-confirm') {
-      // Deliberately does not touch the Contact Log — that survives resets.
+      // Full wipe — gameplay save AND the Contact Log. The thematic soft
+      // reset ("Close the Cycle") is in the Contact Log modal; that one
+      // preserves the log and banks Echo Memory.
       clearSave();
+      clearContactLog();
       location.reload();
     }
   });

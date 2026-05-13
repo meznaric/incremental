@@ -197,12 +197,91 @@
     }
     #contactLogBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
     #contactLogBtn .ri { line-height: 1; }
-    .cl-meta {
-      font-size: 10px;
+    .cl-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 4px 0 12px;
+    }
+    .cl-stat {
+      background: rgba(20, 20, 40, 0.55);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .cl-stat-label {
+      font-size: 9px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: #8a8ac0;
-      padding: 2px 0 12px;
+      color: #6a6a90;
+    }
+    .cl-stat-value {
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: #e8e8f0;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .cl-memory { color: #f5d34a; }
+    .cl-action {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 0 14px;
+      border-top: 1px solid rgba(120, 140, 255, 0.12);
+      border-bottom: 1px solid rgba(120, 140, 255, 0.12);
+      margin-bottom: 10px;
+    }
+    .cl-action-hint {
+      font-size: 11px;
+      color: #aab0d0;
+      letter-spacing: 0.02em;
+      line-height: 1.45;
+    }
+    .cl-close-btn {
+      background: rgba(245, 211, 74, 0.12);
+      border: 1px solid rgba(245, 211, 74, 0.45);
+      color: #f5d34a;
+      border-radius: 5px;
+      padding: 8px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    .cl-close-btn:hover { background: rgba(245, 211, 74, 0.22); border-color: #f5d34a; }
+    .cl-close-btn.danger {
+      background: rgba(255, 90, 110, 0.18);
+      border-color: rgba(255, 90, 110, 0.55);
+      color: #ff7a8c;
+    }
+    .cl-close-btn.danger:hover { border-color: #ff5a6e; color: #ff5a6e; }
+    .cl-cancel-btn {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(120, 140, 255, 0.3);
+      color: #e8e8f0;
+      border-radius: 5px;
+      padding: 8px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .cl-cancel-btn:hover { border-color: #8aa0ff; }
+    .cl-confirm p {
+      font-size: 11px;
+      color: #aab0d0;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .cl-confirm-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     .cl-list {
       list-style: none;
@@ -210,7 +289,24 @@
       margin: 0;
       font-variant-numeric: tabular-nums;
     }
-    .cl-list li {
+    .cl-group {
+      padding: 0;
+      list-style: none;
+    }
+    .cl-group + .cl-group { margin-top: 10px; }
+    .cl-group-head {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #6a6a90;
+      padding: 6px 0 4px;
+    }
+    .cl-group-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .cl-group-list li {
       display: grid;
       grid-template-columns: 1fr auto;
       align-items: baseline;
@@ -218,7 +314,7 @@
       padding: 10px 4px;
       border-top: 1px solid rgba(120, 140, 255, 0.1);
     }
-    .cl-list li:first-child { border-top: none; }
+    .cl-group-list li:first-child { border-top: none; }
     .cl-name {
       font-size: 13px;
       letter-spacing: 0.04em;
@@ -904,7 +1000,7 @@
 
       <div class="menu-view" data-view="reset">
         <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Reset save</div>
-        <div class="reset-warning">This wipes your save permanently. The page will reload.<br><br>The Contact Log is kept.</div>
+        <div class="reset-warning">Wipes everything — your save <em>and</em> the Contact Log. Echo Memory is lost. The page will reload.<br><br>To start a new cycle without losing the log, use <em>Close the Cycle</em> in the Contact Log instead.</div>
         <div class="reset-actions">
           <button type="button" data-action="back">Cancel</button>
           <button type="button" class="danger" data-action="reset-confirm">Reset</button>
@@ -948,9 +1044,10 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body">
-        <div class="cl-meta"></div>
+        <div class="cl-stats"></div>
+        <div class="cl-action"></div>
         <ul class="cl-list"></ul>
-        <div class="cl-empty">No contacts on the log yet.</div>
+        <div class="cl-empty">The log is empty. The dark is still listening.</div>
       </div>
     </div>
   </div>

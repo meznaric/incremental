@@ -1,12 +1,15 @@
 import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v7';
+export const SAVE_KEY = 'incremental.save.v10';
 
 export function nowSeconds() {
   return Date.now() / 1000;
 }
 
+let suppressed = false;
+
 export function saveState(state) {
+  if (suppressed) return false;
   pruneBuffs(state, nowSeconds());
   const snapshot = {
     amount: state.amount,
@@ -101,5 +104,6 @@ export function loadState(state) {
 }
 
 export function clearSave() {
+  suppressed = true;
   try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* noop */ }
 }

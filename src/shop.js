@@ -1,4 +1,4 @@
-import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade } from './upgrades.js';
+import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade, SLOT_FILTERS } from './upgrades.js';
 import { checkGamble } from './interstitial.js';
 
 export const DEFAULT_SLOTS = 2;
@@ -214,6 +214,12 @@ export function tryBuy(state, slotIdx, now) {
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }
+
+  if (u.kind === 'gift') {
+    state.amount += u.reward;
+    replaceSlot(state, slotIdx, now);
+    return { ok: true };
+  }
   return { ok: false, reason: 'unknown' };
 }
 
@@ -255,7 +261,11 @@ export function validateSlate(state, now) {
   for (let i = 0; i < state.shop.slots.length; i++) {
     const slot = state.shop.slots[i];
     const u = slot ? resolveUpgrade(slot) : null;
-    if (!u || !isEligible(u, ctx) || !slotMatches(u, i)) {
+    // Pinned slots (those with a SLOT_FILTERS entry) skip the eligibility gate
+    // so a seeded fresh-game upgrade (e.g. mult_starter) isn't wiped on reload.
+    const pinned = i < SLOT_FILTERS.length;
+    const bad = !u || !slotMatches(u, i) || (!pinned && !isEligible(u, ctx));
+    if (bad) {
       state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
       rerolled = true;
     }

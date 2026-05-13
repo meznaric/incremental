@@ -35,6 +35,13 @@ test('genBaseAdd: cost is finite and proportional to value', () => {
   assert.ok(huge.cost / huge.upgrade.value < 1e5);
 });
 
+test('genBaseAdd: value is floored at 1 even at rate 0', () => {
+  for (const rarity of Object.keys(ADD_VALUE_MULT)) {
+    const { upgrade } = genBaseAdd(rarity, { rate: 0, balance: 0, owned: {} });
+    assert.ok(upgrade.value >= 1, `${rarity} value ${upgrade.value} should be ≥ 1`);
+  }
+});
+
 test('genBaseAdd: ids are unique per (rarity, value)', () => {
   const a = genBaseAdd('common', { rate: 100, balance: 0, owned: {} }).upgrade;
   const b = genBaseAdd('common', { rate: 100, balance: 0, owned: {} }).upgrade;

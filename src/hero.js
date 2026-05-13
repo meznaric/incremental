@@ -70,27 +70,28 @@ function paintTextWithCoin(sprite, text, fontSize, color, glow) {
 
   const total = textWidth + (iconWidth > 0 ? gap + iconWidth : 0);
   const startX = cx - total / 2;
+  const textX = startX + (iconWidth > 0 ? iconWidth + gap : 0);
+
+  if (iconWidth > 0) {
+    ctx.font = `${fontSize}px "remixicon"`;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow * 0.6;
+    ctx.fillStyle = color;
+    ctx.fillText(COIN_GLYPH, startX, cy);
+    ctx.shadowBlur = 0;
+  }
 
   ctx.font = `700 ${fontSize}px ${FONT_MONO}`;
   if (glow > 0) {
     ctx.shadowColor = color;
     ctx.shadowBlur = glow;
     ctx.fillStyle = color;
-    ctx.fillText(text, startX, cy);
-    ctx.fillText(text, startX, cy);
+    ctx.fillText(text, textX, cy);
+    ctx.fillText(text, textX, cy);
   }
   ctx.shadowBlur = 0;
   ctx.fillStyle = color;
-  ctx.fillText(text, startX, cy);
-
-  if (iconWidth > 0) {
-    ctx.font = `${fontSize}px "remixicon"`;
-    ctx.shadowColor = COIN_COLOR;
-    ctx.shadowBlur = glow * 0.6;
-    ctx.fillStyle = COIN_COLOR;
-    ctx.fillText(COIN_GLYPH, startX + textWidth + gap, cy);
-    ctx.shadowBlur = 0;
-  }
+  ctx.fillText(text, textX, cy);
 
   tex.needsUpdate = true;
 }
@@ -169,7 +170,7 @@ export class HeroDisplay {
     const amtText = formatAbbrev(amount);
     if (amtText !== this._amtText) {
       this._amtText = amtText;
-      paintTextWithCoin(this.amountSprite, amtText, 110, COLOR_AMOUNT, 22);
+      paintTextWithCoin(this.amountSprite, amtText, 110, COIN_COLOR, 22);
       if (this._amtPulse < 0.25) this._amtPulse = 0.25;
     }
 

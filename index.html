@@ -212,6 +212,32 @@
       flex-direction: column;
       gap: 8px;
     }
+    #slotsWrap { position: relative; }
+    .slots-nav {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 56px;
+      align-items: center;
+      justify-content: center;
+      background: rgba(20, 20, 40, 0.85);
+      border: 1px solid rgba(120, 140, 255, 0.4);
+      color: #e8e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+      z-index: 3;
+    }
+    .slots-nav:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.95); color: #c0d0ff; }
+    .slots-nav.left  { left: -10px; }
+    .slots-nav.right { right: -10px; }
+    .slots-nav.hidden { display: none !important; }
+    @media (hover: hover) and (pointer: fine) { .slots-nav { display: inline-flex; } }
     #shopToolbar {
       display: flex;
       flex-wrap: wrap;
@@ -235,14 +261,21 @@
     }
     .tb-btn:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.7); }
     .tb-btn .ri { font-size: 13px; line-height: 1; color: #8aa0ff; }
+    .tb-btn .cc { color: #d49a55; }
     .tb-btn.locked { opacity: 0.5; cursor: not-allowed; }
     .tb-btn.locked:hover { border-color: rgba(120, 140, 255, 0.35); background: rgba(0, 0, 0, 0.35); }
     #slots {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
       gap: 10px;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
+    #slots::-webkit-scrollbar { display: none; }
+    .slot { flex: 0 0 auto; scroll-snap-align: start; }
     .slot {
       position: relative;
       width: 188px;
@@ -309,12 +342,12 @@
     }
     .slot .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; color: #e8e8f0; }
     .slot .desc { font-size: 11px; color: #aab0d0; line-height: 1.35; min-height: 30px; }
-    .slot .cost { font-size: 13px; font-weight: 600; color: #e8e8f0; margin-top: 6px; }
-    .slot .cost .cc-icon { color: #d49a55; }
+    .slot .cost { font-size: 13px; font-weight: 600; color: #d49a55; margin-top: 6px; }
     .slot .outcomes { margin-top: 4px; min-height: 14px; line-height: 1.45; font-size: 11px; }
     .slot .outcome { display: flex; align-items: center; gap: 4px; }
     .slot .outcome.win  { color: #4cd07d; }
     .slot .outcome.lose { color: #ff7a8c; }
+    .slot .outcome .cc  { color: #d49a55; }
     .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
     .slot .foot { display: none; gap: 6px; margin-top: 6px; }
     .slot .slot-info {
@@ -550,6 +583,7 @@
       color: #aab0d0;
     }
     .slot-modal-row span:last-child { color: #e8e8f0; font-variant-numeric: tabular-nums; }
+    .slot-modal-row span.cc { color: #d49a55; }
     .bm-card {
       background: rgba(20, 20, 40, 0.95);
       border: 1px solid rgba(120, 140, 255, 0.35);
@@ -790,7 +824,11 @@
 
   <div id="shop" class="panel">
     <div id="shopToolbar"></div>
-    <div id="slots"></div>
+    <div id="slotsWrap">
+      <button id="slotsLeft" class="slots-nav left hidden" type="button" aria-label="Scroll upgrades left"><i class="ri ri-arrow-left-s-line"></i></button>
+      <div id="slots"></div>
+      <button id="slotsRight" class="slots-nav right hidden" type="button" aria-label="Scroll upgrades right"><i class="ri ri-arrow-right-s-line"></i></button>
+    </div>
   </div>
 
   <div id="buffs"></div>

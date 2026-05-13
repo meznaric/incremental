@@ -461,6 +461,8 @@ class Column {
 
   _writeInstances() {
     const im = this.imesh;
+    const streamT = Math.max(0, Math.min(1, (this._streamSpeed - CONTINUOUS_FALL_SPEED) / (STREAM_MAX_SPEED - CONTINUOUS_FALL_SPEED)));
+    const stretchY = 1 + 2 * streamT;
     for (const p of this.particles) {
       if (p.state === 'idle') {
         im.setMatrixAt(p.index, _hiddenMat);
@@ -470,7 +472,15 @@ class Column {
       _euler.set(p.rotX, p.rotY, 0);
       _quat.setFromEuler(_euler);
       _scl.setScalar(p.scale);
-      _mat.compose(_pos, _quat, _scl);
+      if (p.state === 'streaming' && stretchY > 1) {
+        // Stretch along world Y (fall axis) after rotation so column footprint stays at p.scale.
+        _mat.compose(_pos, _quat, _scl);
+        _mat.elements[1] *= stretchY;
+        _mat.elements[5] *= stretchY;
+        _mat.elements[9] *= stretchY;
+      } else {
+        _mat.compose(_pos, _quat, _scl);
+      }
       im.setMatrixAt(p.index, _mat);
       // Bake opacity into the per-instance color. Against the dark fog
       // background this fades particles to invisible without needing a

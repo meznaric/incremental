@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { resolveUpgrade, KIND_THEME } from './upgrades.js';
+import { resolveUpgrade, KIND_THEME, getUpgrade, buildSlot } from './upgrades.js';
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
@@ -52,7 +52,8 @@ function openSlotModal(idx) {
   if (!u || !slot) return;
   const theme = KIND_THEME[u.kind] || {};
   slotModalTitleEl.textContent = u.name;
-  const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${COIN}${formatAbbrev(slot.cost)}</span></div>`];
+  const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${COIN}${formatAbbrev(slot.cost)}</span>`;
+  const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${costCell}</span></div>`];
   if (u.kind === 'gamble') {
     rows.push(
       `<div class="slot-modal-row"><span>Win chance</span><span>${fmtPct(u.chance)}</span></div>`,
@@ -63,6 +64,8 @@ function openSlotModal(idx) {
     rows.push(`<div class="slot-modal-row"><span>Grants</span><span>+${formatAbbrev(slot.cost * u.ratio)}/s permanent</span></div>`);
   } else if (u.kind === 'buff') {
     rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
+  } else if (u.kind === 'gift') {
+    rows.push(`<div class="slot-modal-row"><span>Grants</span><span class="cc">${COIN}+${formatAbbrev(u.reward)}</span></div>`);
   }
   slotModalBodyEl.innerHTML = `
     <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${theme.label || u.kind}</span>
@@ -73,7 +76,7 @@ function openSlotModal(idx) {
 }
 
 amountInput.value = '0';
-rateInput.value = '5';
+rateInput.value = '1';
 state.amount = parseAmount(amountInput.value);
 state.basePerSecond = parseAmount(rateInput.value);
 
@@ -86,26 +89,22 @@ if (loaded) {
   if (loaded.offline > 1) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
   }
-} else {
-  const STARTUP_BUFF_MULT = 3;
-  const STARTUP_BUFF_DURATION = 6;
-  const initNow = nowSeconds();
-  state.buffs.rateMul.push({
-    value: STARTUP_BUFF_MULT,
-    duration: STARTUP_BUFF_DURATION,
-    expiresAt: initNow + STARTUP_BUFF_DURATION,
-  });
-  // Start the player with one base additive and one strong multiplier already
-  // applied, so the early game isn't dead air before the first upgrade lands.
-  state.flatBonus += 2;
-  state.permMul *= 3;
-  state.owned['startup_add'] = 1;
-  state.owned['startup_mul'] = 1;
 }
 
 // Fill any empty slots and reroll any items that no longer fit (kind/rate gate).
 // Existing slots keep their frozen cost.
 validateSlate(state, nowSeconds());
+
+// First-roll seed: slot 1 starts as the cheap starter mul (×1.5, cost ≤ 100).
+// Subsequent rerolls/buys fall back to any rarity mul per SLOT_FILTERS.
+// Also grant one starting buff: 3× rate for 20 seconds.
+if (!loaded) {
+  const ctx = { balance: state.amount, rate: state.basePerSecond, owned: state.owned };
+  const starterMul = getUpgrade('mult_starter');
+  if (starterMul) state.shop.slots[1] = buildSlot(starterMul, ctx);
+  const t0 = nowSeconds();
+  state.buffs.rateMul.push({ value: 3, duration: 20, expiresAt: t0 + 20 });
+}
 
 amountInput.addEventListener('input', () => {
   state.amount = parseAmount(amountInput.value);
@@ -215,6 +214,31 @@ slotsEl.addEventListener('animationend', (e) => {
   }
 });
 
+const slotsLeftBtn = document.getElementById('slotsLeft');
+const slotsRightBtn = document.getElementById('slotsRight');
+function updateSlotsNav() {
+  const max = slotsEl.scrollWidth - slotsEl.clientWidth;
+  const overflow = max > 1;
+  slotsLeftBtn.classList.toggle('hidden', !overflow || slotsEl.scrollLeft <= 0);
+  slotsRightBtn.classList.toggle('hidden', !overflow || slotsEl.scrollLeft >= max - 1);
+}
+function scrollSlotsBy(dir) {
+  const step = Math.max(slotsEl.clientWidth * 0.8, 200);
+  slotsEl.scrollBy({ left: dir * step, behavior: 'smooth' });
+}
+slotsLeftBtn.addEventListener('click', () => scrollSlotsBy(-1));
+slotsRightBtn.addEventListener('click', () => scrollSlotsBy(1));
+slotsEl.addEventListener('scroll', updateSlotsNav, { passive: true });
+slotsEl.addEventListener('wheel', (e) => {
+  const dy = e.deltaY;
+  if (!dy) return;
+  const max = slotsEl.scrollWidth - slotsEl.clientWidth;
+  if (max <= 1) return;
+  e.preventDefault();
+  slotsEl.scrollLeft += dy;
+}, { passive: false });
+new ResizeObserver(updateSlotsNav).observe(slotsEl);
+
 const toolbarEl = document.getElementById('shopToolbar');
 
 const slotEls = [];
@@ -292,25 +316,25 @@ function renderToolbar() {
   const slotCost = nextSlotUnlockCost(state);
   const slotVisible = slotCost != null;
   setTbBtn('unlock-slot', slotVisible, slotVisible && state.amount < slotCost,
-    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · ${COIN}${formatAbbrev(slotCost)}` : '');
+    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · <span class="cc">${COIN}${formatAbbrev(slotCost)}</span>` : '');
 
   const rerollUnlockVisible = !state.shop.rerollUnlocked && state.amount >= REROLL_UNLOCK_AT;
   const rerollVisible = state.shop.rerollUnlocked;
   setTbBtn('unlock-reroll', rerollUnlockVisible,
     rerollUnlockVisible && state.amount < REROLL_UNLOCK_COST,
-    `Unlock Reroll · ${COIN}${formatAbbrev(REROLL_UNLOCK_COST)}`);
+    `Unlock Reroll · <span class="cc">${COIN}${formatAbbrev(REROLL_UNLOCK_COST)}</span>`);
   if (rerollVisible) {
     const n = countRerollableForUi();
     const cost = computeRerollCost(state, nowSeconds(), n);
     setTbBtn('reroll', true, !(n > 0 && state.amount >= cost && state.amount > 0),
-      `Reroll ${n} · ${COIN}${formatAbbrev(cost)}`);
+      `Reroll ${n} · <span class="cc">${COIN}${formatAbbrev(cost)}</span>`);
   } else {
     setTbBtn('reroll', false, false, '');
   }
 
   const pinVisible = state.shop.rerollUnlocked && !state.shop.pinUnlocked && state.amount >= PIN_UNLOCK_AT;
   setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
-    `Unlock Pin · ${COIN}${formatAbbrev(PIN_UNLOCK_COST)}`);
+    `Unlock Pin · <span class="cc">${COIN}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
 
   const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible;
   toolbarEl.style.display = anyVisible ? '' : 'none';
@@ -367,7 +391,7 @@ function renderShop() {
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    const costHtml = `${COIN}${formatAbbrev(cost)}`;
+    const costHtml = u.kind === 'gift' ? 'FREE' : `${COIN}${formatAbbrev(cost)}`;
     setHtmlIfChanged(el.querySelector('.cost'), costHtml);
 
     let outcomes = '';
@@ -376,10 +400,12 @@ function renderShop() {
       const winPct = fmtPct(u.chance);
       const losePct = fmtPct(1 - u.chance);
       outcomes =
-        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(winNet)}${COIN} · ${winPct}</div>` +
-        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> −${formatAbbrev(cost)}${COIN} · ${losePct}</div>`;
+        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${COIN}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
+        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${COIN}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
     } else if (u.kind === 'convert') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
+    } else if (u.kind === 'gift') {
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${COIN}+${formatAbbrev(u.reward)}</span></div>`;
     }
     setHtmlIfChanged(el.querySelector('.outcomes'), outcomes);
 
@@ -393,6 +419,7 @@ function renderShop() {
     const canAfford = state.amount >= cost;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
   }
+  updateSlotsNav();
 }
 
 const BUFF_ICONS = {

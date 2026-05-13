@@ -5,7 +5,7 @@ import {
   tryUnlockPin, tryTogglePin, SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST,
   PIN_UNLOCK_COST, REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
 } from '../src/shop.js';
-import { getUpgrade, genBaseAdd } from '../src/upgrades.js';
+import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS } from '../src/upgrades.js';
 
 function freshState(over = {}) {
   return { amount: 0, basePerSecond: 0, ...makeShopState(), ...over };
@@ -272,4 +272,45 @@ test('tryTogglePin: toggles only when pin is unlocked', () => {
 // Reference the imported constant so unused-import lint stays quiet.
 test('REROLL_PCT_PER_SLOT is 3%', () => {
   assert.equal(REROLL_PCT_PER_SLOT, 0.03);
+});
+
+function installDynGift(state, idx, rarity, ctx) {
+  const { upgrade, cost } = genGift(rarity, ctx);
+  installSlot(state, idx, upgrade.id, cost, upgrade);
+  return upgrade;
+}
+
+test('gift: cost 0, adds reward to balance, rerolls slot', () => {
+  const s = freshState({ amount: 100, basePerSecond: 10 });
+  const ctx = { rate: 10, balance: 100, owned: {} };
+  const u = installDynGift(s, 3, 'common', ctx);
+  assert.equal(u.kind, 'gift');
+  const slotBefore = s.shop.slots[3];
+  assert.equal(slotBefore.cost, 0);
+
+  const res = tryBuy(s, 3, 0);
+  assert.ok(res.ok);
+  assert.equal(s.amount, 100 + u.reward);
+  // slot got replaced (id differs, or fell to null if pool empty)
+  assert.notEqual(s.shop.slots[3], slotBefore);
+});
+
+test('gift: legendary reward dwarfs common at the same rate', () => {
+  const ctx = { rate: 100, balance: 0, owned: {} };
+  const common = genGift('common', ctx).upgrade;
+  const leg = genGift('legendary', ctx).upgrade;
+  assert.ok(leg.reward >= common.reward * 10,
+    `legendary ${leg.reward} should be much bigger than common ${common.reward}`);
+});
+
+test('gift: reward roughly equals rate × GIFT_SECONDS by rarity', () => {
+  const rate = 100;
+  for (const rarity of Object.keys(GIFT_SECONDS)) {
+    const { upgrade, cost } = genGift(rarity, { rate, balance: 0, owned: {} });
+    assert.equal(cost, 0);
+    const target = rate * GIFT_SECONDS[rarity];
+    // niceRound can land within a factor of ~2.5 either way
+    assert.ok(upgrade.reward >= target / 3 && upgrade.reward <= target * 3,
+      `${rarity} reward ${upgrade.reward} far from target ${target}`);
+  }
 });

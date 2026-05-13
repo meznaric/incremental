@@ -113,9 +113,9 @@ export function checkStart(state, isFreshPlayer) {
 export function checkGamble(state, result) {
   const s = state.messages.stats;
   s.gambles = (s.gambles || 0) + 1;
-  if (s.gambles === 1) enqueue(state, 'first_gamble');
   if (!result.won) {
     s.gambleLosses = (s.gambleLosses || 0) + 1;
+    if (s.gambleLosses === 1) setTimeout(() => enqueue(state, 'first_gamble'), 1000);
     if (s.gambleLosses === 10) enqueue(state, 'tenth_loss');
     if (result.isAllIn && result.balanceAfter <= 0 && !s.allInLost) {
       s.allInLost = true;

@@ -170,7 +170,17 @@ export const UPGRADES = [
   { kind: 'permanent', rarity: 'rare',      _dyn: 'add' },
   { kind: 'permanent', rarity: 'legendary', _dyn: 'add' },
 
+  // One-shot coin gifts, scaled to current rate. Common/uncommon/rare are
+  // modest top-ups; legendary is a noticeable jump.
+  { kind: 'gift', rarity: 'common',    _dyn: 'gift' },
+  { kind: 'gift', rarity: 'uncommon',  _dyn: 'gift' },
+  { kind: 'gift', rarity: 'rare',      _dyn: 'gift' },
+  { kind: 'gift', rarity: 'legendary', _dyn: 'gift' },
+
   // Multiplicative permanents — weak mults phase out, strong ones unlock later.
+  { id: 'mult_starter',   kind: 'permanent', rarity: 'common',    permType: 'mul',
+    name: '+50% Multiplier (Starter)', desc: 'Permanent ×1.5 to rate',
+    value: 1.5,  baseCost: 50,     growth: 3,                          maxRate: 500 },
   { id: 'mult5',          kind: 'permanent', rarity: 'common',    permType: 'mul',
     name: '+5% Multiplier',      desc: 'Permanent ×1.05 to rate',
     value: 1.05, baseCost: 250,    growth: 2.5,                        maxRate: 2000 },
@@ -227,11 +237,18 @@ export const resolveUpgrade = (slot) => slot && (slot.dyn || BY_ID.get(slot.id))
 
 export const CONVERT_MIN_RATE = 100;
 
-// Fixed kinds for the first two slots, which the player starts with. Slots
-// beyond index 1 are unlocked over time and can hold any upgrade kind.
-export const SLOT_KINDS = [
-  ['permanent'],
-  ['gamble'],
+// Per-slot type pin. Slots 0..3 are typed; slot 1's *first* roll is seeded to
+// a cheap common mul by main.js, but the filter stays permissive so rerolls/buys
+// land on any rarity mul. Anything past idx 3 accepts any upgrade kind.
+//   0: base-rate additive permanent (generated tier)
+//   1: multiplicative permanent (any rarity)
+//   2: buff or gift
+//   3: gamble
+export const SLOT_FILTERS = [
+  (u) => u.kind === 'permanent' && (u._dyn === 'add' || u.permType === 'add'),
+  (u) => u.kind === 'permanent' && u.permType === 'mul',
+  (u) => u.kind === 'buff' || u.kind === 'gift',
+  (u) => u.kind === 'gamble',
 ];
 
 // Per-kind theming used by the shop UI.
@@ -240,6 +257,7 @@ export const KIND_THEME = {
   buff:      { icon: 'ri-flashlight-fill',    color: '#9d6ee0', label: 'Buff' },
   convert:   { icon: 'ri-exchange-funds-fill',color: '#f5d34a', label: 'Convert' },
   gamble:    { icon: 'ri-dice-line',          color: '#ff5a6e', label: 'Gamble' },
+  gift:      { icon: 'ri-gift-fill',          color: '#ffb84a', label: 'Gift' },
 };
 
 export function isEligible(u, ctx) {
@@ -252,9 +270,9 @@ export function isEligible(u, ctx) {
 }
 
 export function slotMatches(u, slotIdx) {
-  const kinds = SLOT_KINDS[slotIdx];
-  if (!kinds) return true; // slots past the fixed pair accept any kind
-  return kinds.includes(u.kind);
+  const f = SLOT_FILTERS[slotIdx];
+  if (!f) return true; // slots past the pinned set accept any kind
+  return f(u);
 }
 
 function weightedPick(pool) {
@@ -284,7 +302,7 @@ function niceRound(x) {
 export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 6 };
 export function genBaseAdd(rarity, ctx) {
   const r = Math.max(ctx?.rate || 0, 1);
-  const value = niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1));
+  const value = Math.max(1, niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1)));
   const cost = Math.max(10, value * (40 + Math.log10(Math.max(value, 10)) * 30));
   const label = formatAbbrev(value);
   return {
@@ -301,16 +319,37 @@ export function genBaseAdd(rarity, ctx) {
   };
 }
 
+// Dynamic gift. Reward is a fixed multiple of current rate by rarity: small
+// for common/uncommon/rare, much bigger for legendary. Cost is always 0.
+export const GIFT_SECONDS = { common: 30, uncommon: 90, rare: 240, legendary: 1800 };
+export function genGift(rarity, ctx) {
+  const r = Math.max(ctx?.rate || 0, 1);
+  const reward = niceRound(r * (GIFT_SECONDS[rarity] || 30));
+  const label = formatAbbrev(reward);
+  return {
+    upgrade: {
+      id: `dyn_gift_${rarity}_${reward}`,
+      kind: 'gift',
+      rarity,
+      name: `Gift: +${label}`,
+      desc: `Free coins: +${label}`,
+      reward,
+    },
+    cost: 0,
+  };
+}
+
 // Materialize a virtual generator into a concrete upgrade + cost.
 function materialize(u, ctx) {
   if (u._dyn === 'add') return genBaseAdd(u.rarity, ctx);
+  if (u._dyn === 'gift') return genGift(u.rarity, ctx);
   return { upgrade: u, cost: costFor(u, ctx) };
 }
 
 // Each slot freezes its cost at the moment it was offered, so the number on
 // the card doesn't drift as the player's balance / rate change. For dynamic
 // upgrades the full definition rides along on the slot under `dyn`.
-function buildSlot(u, ctx) {
+export function buildSlot(u, ctx) {
   const m = materialize(u, ctx);
   const slot = { id: m.upgrade.id, cost: m.cost };
   if (u._dyn) slot.dyn = m.upgrade;
@@ -343,7 +382,7 @@ export function rerollSlot(slate, idx, ctx) {
     if (i === idx) continue;
     const s = slate[i];
     if (!s) continue;
-    if (s.dyn) excludeDyn.add(`${s.dyn.kind}:add`);
+    if (s.dyn) excludeDyn.add(`${s.dyn.kind}:${s.dyn.kind === 'gift' ? 'gift' : 'add'}`);
     else if (s.id) excludeIds.add(s.id);
   }
   const pool = UPGRADES.filter((u) => {

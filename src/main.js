@@ -83,7 +83,7 @@ if (loaded) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
   }
 } else {
-  const STARTUP_BUFF_MULT = 10;
+  const STARTUP_BUFF_MULT = 3;
   const STARTUP_BUFF_DURATION = 6;
   const initNow = nowSeconds();
   state.buffs.rateMul.push({
@@ -112,8 +112,8 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0a0a14, 0.025);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(0, 4.5, 26);
-camera.lookAt(0, 4.5, 0);
+camera.position.set(0, 6, 18);
+camera.lookAt(0, 6, 0);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const key = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -154,6 +154,14 @@ function fmtPct(p) {
   if (v < 1) return `${v.toFixed(2)}%`;
   if (v < 10) return `${v.toFixed(1)}%`;
   return `${v.toFixed(0)}%`;
+}
+
+function fmtDuration(s) {
+  if (s < 60) return `${s.toFixed(1)}s`;
+  if (s < 3600) return `${(s / 60).toFixed(1)}m`;
+  if (s < 86400) return `${(s / 3600).toFixed(1)}h`;
+  const d = s / 86400;
+  return `${d.toFixed(1)} day${d >= 2 ? 's' : ''}`;
 }
 
 // Re-trigger a one-shot animation class. Strip stale fx classes, force reflow, re-add.
@@ -227,8 +235,14 @@ for (let i = 0; i < 4; i++) {
   slotEls.push(el);
 }
 
+const SHOP_UNLOCK_AT = 100;
+let shopUnlocked = state.amount > SHOP_UNLOCK_AT;
+
 function renderShop() {
   const now = nowSeconds();
+  if (!shopUnlocked && state.amount > SHOP_UNLOCK_AT) shopUnlocked = true;
+  shopEl.style.display = shopUnlocked ? '' : 'none';
+  if (!shopUnlocked) return;
   for (let i = 0; i < 4; i++) {
     const slot = state.shop.slots[i];
     const u = slot ? getUpgrade(slot.id) : null;
@@ -292,7 +306,7 @@ function renderBuffs(now) {
           <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
           <span class="buff-val">${value}</span>
         </div>
-        <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${remain.toFixed(1)}s</div>
+        <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(remain)}</div>
         <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
       </div>
     `);

@@ -44,6 +44,7 @@ Add new modules under `src/` and import them from `main.js`. Keep `vendor/` for 
 ## Testing
 
 Playwright via MCP. Start the server, navigate to the page, check `browser_console_messages` for errors, screenshot to verify visuals. There is no test suite — visual + console check is the contract.
+Only do this when user asks.
 
 ## Save compatibility
 

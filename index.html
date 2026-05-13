@@ -179,45 +179,60 @@
       line-height: 1.45;
       max-width: 220px;
     }
+    #contactLogBtn {
+      top: 16px;
+      right: 16px;
+      padding: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e8e8f0;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 50;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #contactLogBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
+    #contactLogBtn .ri { line-height: 1; }
     .cl-meta {
       font-size: 10px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: #8a8ac0;
-      padding: 2px 4px 8px;
+      padding: 2px 0 12px;
     }
     .cl-list {
       list-style: none;
       padding: 0;
-      margin: 0 0 4px;
-      max-height: 260px;
-      overflow-y: auto;
-      min-width: 220px;
+      margin: 0;
+      font-variant-numeric: tabular-nums;
     }
-    .cl-list::-webkit-scrollbar { width: 4px; }
-    .cl-list::-webkit-scrollbar-thumb { background: rgba(120, 140, 255, 0.2); border-radius: 2px; }
     .cl-list li {
       display: grid;
       grid-template-columns: 1fr auto;
       align-items: baseline;
       gap: 8px;
-      padding: 6px 4px;
+      padding: 10px 4px;
       border-top: 1px solid rgba(120, 140, 255, 0.1);
-      font-variant-numeric: tabular-nums;
     }
     .cl-list li:first-child { border-top: none; }
     .cl-name {
-      font-size: 12px;
+      font-size: 13px;
       letter-spacing: 0.04em;
       color: #e8e8f0;
     }
     .cl-ep {
       font-size: 10px;
       color: #6a6a90;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 2px;
     }
     .cl-status {
-      font-size: 9px;
+      font-size: 10px;
       letter-spacing: 0.18em;
       text-transform: uppercase;
       font-weight: 600;
@@ -227,14 +242,15 @@
     .cl-status.s-shifted   { color: #9d6ee0; }
     .cl-status.s-missing   { color: #4ea8ff; }
     .cl-empty {
-      font-size: 11px;
+      font-size: 12px;
       color: #6a6a90;
-      padding: 8px 4px 4px;
+      padding: 18px 4px;
       font-style: italic;
+      text-align: center;
       display: none;
     }
-    .menu-view.cl-empty-only .cl-empty { display: block; }
-    .menu-view.cl-empty-only .cl-list { display: none; }
+    .cl-body.is-empty .cl-empty { display: block; }
+    .cl-body.is-empty .cl-list { display: none; }
     .reset-actions {
       display: flex;
       gap: 8px;
@@ -605,7 +621,7 @@
     .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
     .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
 
-    #buffModal, #slotModal {
+    #buffModal, #slotModal, #contactLogModal {
       position: fixed;
       inset: 0;
       display: none;
@@ -617,7 +633,7 @@
       padding: 20px;
       box-sizing: border-box;
     }
-    #buffModal.open, #slotModal.open { display: flex; }
+    #buffModal.open, #slotModal.open, #contactLogModal.open { display: flex; }
     .slot-modal-tag {
       display: inline-block;
       font-size: 10px;
@@ -835,7 +851,9 @@
       #buffs::-webkit-scrollbar { display: none; }
       #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
       #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
-      #result { top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
+      #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+      /* Push the win/loss flash below the contact-log button so they don't overlap. */
+      #result { top: calc(max(12px, env(safe-area-inset-top)) + 56px); right: max(12px, env(safe-area-inset-right)); }
     }
 
   </style>
@@ -854,7 +872,6 @@
     <button id="menuToggle" class="menu-toggle" aria-label="Menu" type="button"><i class="ri-menu-line"></i></button>
     <div class="menu-body">
       <div class="menu-view active" data-view="list">
-        <button class="menu-item" type="button" data-action="open-contact-log"><i class="ri ri-radar-line"></i>Contact Log</button>
         <button class="menu-item" type="button" data-action="open-debug"><i class="ri ri-bug-line"></i>Debug</button>
         <button class="menu-item" type="button" data-action="open-community"><i class="ri ri-discord-line"></i>Community</button>
         <button class="menu-item danger" type="button" data-action="open-reset"><i class="ri ri-refresh-line"></i>Reset save</button>
@@ -894,14 +911,12 @@
         </div>
       </div>
 
-      <div class="menu-view" data-view="contact-log">
-        <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Contact Log</div>
-        <div class="cl-meta"></div>
-        <ul class="cl-list"></ul>
-        <div class="cl-empty">No contacts on the log yet.</div>
-      </div>
     </div>
   </div>
+
+  <button id="contactLogBtn" class="panel cl-btn" type="button" aria-label="Open Contact Log">
+    <i class="ri ri-radar-line"></i>
+  </button>
 
   <div id="shop" class="panel">
     <div id="shopToolbar"></div>
@@ -923,6 +938,20 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body" id="slotModalBody"></div>
+    </div>
+  </div>
+
+  <div id="contactLogModal" role="dialog" aria-modal="true" aria-label="Contact Log">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Contact Log</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body cl-body">
+        <div class="cl-meta"></div>
+        <ul class="cl-list"></ul>
+        <div class="cl-empty">No contacts on the log yet.</div>
+      </div>
     </div>
   </div>
 

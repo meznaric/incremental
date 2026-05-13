@@ -14,6 +14,7 @@ import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
 import { loadContactLog, saveContactLog, backfillFromShown } from './contactLog.js';
+import { initContactLogUi } from './contactLogUi.js';
 
 const state = {
   amount: 0,
@@ -24,7 +25,8 @@ const state = {
   contactLog: loadContactLog(),
 };
 
-initMenu(state);
+initMenu();
+initContactLogUi(state);
 
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');

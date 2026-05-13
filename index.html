@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Incremental — number display lab</title>
   <link rel="stylesheet" href="./vendor/remixicon/remixicon.css" />
   <style>
@@ -258,6 +258,8 @@
       letter-spacing: 0.04em;
       cursor: pointer;
       font-variant-numeric: tabular-nums;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .tb-btn:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.7); }
     .tb-btn .ri { font-size: 13px; line-height: 1; color: #8aa0ff; }
@@ -278,6 +280,8 @@
     .slot { flex: 0 0 auto; scroll-snap-align: start; }
     .slot {
       position: relative;
+      display: flex;
+      flex-direction: column;
       width: 188px;
       box-sizing: border-box;
       background: rgba(28, 28, 56, 0.78);
@@ -288,17 +292,19 @@
       transition: border-color 0.12s, transform 0.1s, background 0.12s;
       min-width: 0;
     }
+    .slot { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .slot:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.85); }
     .slot:active { transform: translateY(1px); }
+    .slot .pin, .slot .slot-info { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .slot.locked { cursor: not-allowed; }
     .slot.locked > :not(.pin) { opacity: 0.45; }
     .slot.locked:hover { border-color: var(--kind-border, rgba(120, 140, 255, 0.35)); background: rgba(28, 28, 56, 0.78); }
     .slot .pin {
       position: absolute;
-      top: 0;
-      right: 0;
-      width: 34px;
-      height: 34px;
+      top: 5px;
+      right: 5px;
+      width: 24px;
+      height: 24px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -315,10 +321,7 @@
     .slot .pin::before {
       content: '';
       position: absolute;
-      top: 6px;
-      right: 6px;
-      width: 22px;
-      height: 22px;
+      inset: 0;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(120, 140, 255, 0.3);
       border-radius: 4px;
@@ -349,23 +352,23 @@
     .slot .outcome.lose { color: #ff7a8c; }
     .slot .outcome .cc  { color: #d49a55; }
     .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
-    .slot .foot { display: none; gap: 6px; margin-top: 6px; }
+    .slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; }
     .slot .slot-info {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      flex: 1;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(120, 140, 255, 0.3);
-      color: #aab0d0;
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 13px;
+      width: 22px;
+      height: 22px;
+      background: transparent;
+      border: none;
+      color: #6a6a90;
+      padding: 0;
+      font-size: 14px;
       font-family: inherit;
       cursor: pointer;
       line-height: 1;
     }
-    .slot .slot-info:hover { color: #fff; border-color: #8aa0ff; }
+    .slot .slot-info:hover { color: #c0d0ff; }
 
     .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); --kind-glow: rgba(76, 208, 125, 0.55); border-color: var(--kind-border); }
     .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); --kind-glow: rgba(157, 110, 224, 0.6); border-color: var(--kind-border); }
@@ -721,14 +724,25 @@
 
     @media (max-width: 820px) {
       #shop {
-        left: 8px;
-        right: 8px;
+        bottom: 0;
+        left: 0;
+        right: 0;
         transform: none;
+        width: auto;
         max-width: none;
-        padding: 8px;
-        gap: 8px;
+        padding: 6px 0 calc(8px + env(safe-area-inset-bottom));
+        gap: 6px;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        backdrop-filter: none;
       }
-      #slots { gap: 8px; }
+      #shopToolbar { padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)); }
+      #slots {
+        gap: 8px;
+        padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+        scroll-padding-inline: 8px;
+      }
       .slot { width: 150px; padding: 8px; }
       .slot .name { font-size: 12px; }
       .slot .desc { font-size: 10px; min-height: 28px; }
@@ -741,11 +755,11 @@
         left: 0;
         right: 0;
         width: auto;
-        bottom: calc(var(--shop-h, 200px) + 12px);
+        bottom: calc(var(--shop-h, 200px) + 8px);
         flex-direction: row;
         overflow-x: auto;
         overflow-y: hidden;
-        padding: 0 8px 4px;
+        padding: 0 8px 0;
         gap: 8px;
         pointer-events: auto;
         scrollbar-width: none;
@@ -754,7 +768,8 @@
       }
       #buffs::-webkit-scrollbar { display: none; }
       #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
-      #menu { top: 8px; left: 8px; }
+      #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
+      #result { top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
     }
 
   </style>

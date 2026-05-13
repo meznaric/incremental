@@ -1,6 +1,8 @@
-# Incremental
+# Incremental — *Echoes Beyond the Stars* companion game
 
-3D incremental/idle game. Three.js, zero-build, deploys as static files.
+3D incremental/idle game. Three.js, zero-build, deploys as static files. Companion to the dark sci-fi drama *Echoes Beyond the Stars*. **The player is Kalen Vale.** The number going up is signal — *Echoes* — returning from the dark.
+
+> *The dark was never silent.*
 
 ## Run it
 
@@ -57,3 +59,23 @@ When `state` shape changes:
 1. Bump `SAVE_KEY` suffix (`v1` → `v2`).
 2. Old saves are dropped on next load. That is acceptable during development.
 3. Once we ship, write a migration in `load()` instead.
+
+## Lore — read before adding content
+
+All story, world, character, naming, voice, and image references live under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). The mapping from existing mechanics to in-world names is in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — that is the canonical naming source for any new upgrade / buff / gamble / convert.
+
+The codebase has **not yet been lore-renamed**: ids, save key, and many UI strings are still the original casino-flavoured names. That's intentional — the docs are the contract, the rename rolls out in the order listed in [`game-mapping.md`](./docs/lore/game-mapping.md#conversion-order-ifwhen-we-do-the-rename). Don't ship a partial rename that mixes voices.
+
+### Non-negotiable when writing in-world copy
+
+- **The player is Kalen.** Never "you, the user." The game speaks *to Kalen* or *as Kalen*. Voices are: **Kalen** (first person, ambient), **Sera** (second person, procedural), **Narrator** (third person, rare), **Anonymous** (italic, one sentence, ~once per season). Details in [`docs/lore/voice-and-tone.md`](./docs/lore/voice-and-tone.md).
+- **Currency is *Echoes*.** Plural. The icon is the triple-arc Echo glyph (see [`docs/lore/images/echo-glyph.png`](./docs/lore/images/echo-glyph.png)). The code field `state.amount` stays as-is — only display labels change.
+- **No real-world references.** No emoji, no internet vernacular, no fourth-wall breaks. No swearing.
+- **No Trek terms.** Banned list in [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md#names-you-should-not-use-ip--trek-overlap). If you find one in a draft, rewrite.
+- **Every new term goes into [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md).** If it's worth using, it's worth being canonical.
+- **Every new interstitial declares a voice** via a `// voice: …` comment above its `INTERSTITIALS[key]` block. See [`docs/lore/interstitials.md`](./docs/lore/interstitials.md).
+- **Story commitments live in [`docs/lore/episodes.md`](./docs/lore/episodes.md).** Don't answer S2/S3 mysteries in S1 content. The reveal order matters.
+
+### When generating images
+
+Use [`docs/lore/scripts/gen-images.py`](./docs/lore/scripts/gen-images.py). The script bakes in the canonical visual-DNA prompt prefix; do not call the Imagen endpoint with ad-hoc prompts. If the visual DNA changes, edit `CANONICAL_PREFIX` in that script and rerun the full set so everything stays consistent. Style rules + banned terms in [`docs/lore/image-style-guide.md`](./docs/lore/image-style-guide.md).

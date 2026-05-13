@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { formatAbbrev } from './bignum.js';
 
 const FONT_MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
-const COIN_GLYPH = '\ueBDB';            // ri-copper-coin-fill
-const COIN_COLOR = '#d49a55';
+const COIN_GLYPH = '\uEAF8';            // ri-broadcast-fill \u2014 the Echo glyph
+const COIN_COLOR = '#d49a55';           // warm tungsten accent vs. the cool palette
 
 const COLOR_AMOUNT     = '#ffffff';
 const COLOR_RATE_BASE  = '#b9c1ff';

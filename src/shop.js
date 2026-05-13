@@ -1,5 +1,5 @@
 import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade, SLOT_FILTERS } from './upgrades.js';
-import { checkGamble } from './interstitial.js';
+import { checkGamble, checkPurchase } from './interstitial.js';
 
 export const DEFAULT_SLOTS = 2;
 export const MAX_SLOTS = 10;
@@ -195,6 +195,7 @@ export function tryBuy(state, slotIdx, now) {
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     applyBuff(state, u, now);
+    checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }
@@ -205,6 +206,7 @@ export function tryBuy(state, slotIdx, now) {
     if (u.permType === 'add') state.flatBonus += u.value;
     if (u.permType === 'mul') state.permMul *= u.value;
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }
@@ -213,12 +215,14 @@ export function tryBuy(state, slotIdx, now) {
     if (cost <= 0 || state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     state.flatBonus += cost * u.ratio;
+    checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }
 
   if (u.kind === 'gift') {
     state.amount += u.reward;
+    checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }

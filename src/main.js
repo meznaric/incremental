@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { resolveUpgrade, KIND_THEME, getUpgrade, buildSlot } from './upgrades.js';
+import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade, buildSlot } from './upgrades.js';
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
@@ -52,23 +52,23 @@ function openSlotModal(idx) {
   if (!u || !slot) return;
   const theme = KIND_THEME[u.kind] || {};
   slotModalTitleEl.textContent = u.name;
-  const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${COIN}${formatAbbrev(slot.cost)}</span>`;
+  const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${ECHO_ICON}${formatAbbrev(slot.cost)}</span>`;
   const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${costCell}</span></div>`];
   if (u.kind === 'gamble') {
     rows.push(
-      `<div class="slot-modal-row"><span>Win chance</span><span>${fmtPct(u.chance)}</span></div>`,
-      `<div class="slot-modal-row"><span>Payout</span><span>${u.payout}× wager</span></div>`,
+      `<div class="slot-modal-row"><span>Carry chance</span><span>${fmtPct(u.chance)}</span></div>`,
+      `<div class="slot-modal-row"><span>Return</span><span>${u.payout}× wager</span></div>`,
       `<div class="slot-modal-row"><span>Cooldown</span><span>${u.cooldown}s</span></div>`,
     );
   } else if (u.kind === 'convert') {
-    rows.push(`<div class="slot-modal-row"><span>Grants</span><span>+${formatAbbrev(slot.cost * u.ratio)}/s permanent</span></div>`);
+    rows.push(`<div class="slot-modal-row"><span>Yields</span><span>+${formatAbbrev(slot.cost * u.ratio)} Echoes/s</span></div>`);
   } else if (u.kind === 'buff') {
     rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
   } else if (u.kind === 'gift') {
-    rows.push(`<div class="slot-modal-row"><span>Grants</span><span class="cc">${COIN}+${formatAbbrev(u.reward)}</span></div>`);
+    rows.push(`<div class="slot-modal-row"><span>Returns</span><span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`);
   }
   slotModalBodyEl.innerHTML = `
-    <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${theme.label || u.kind}</span>
+    <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${kindLabel(u)}</span>
     <p class="slot-modal-desc">${u.desc}</p>
     ${rows.join('')}
   `;
@@ -81,7 +81,7 @@ state.amount = parseAmount(amountInput.value);
 state.basePerSecond = parseAmount(rateInput.value);
 
 const loaded = loadState(state);
-checkStart(state, !loaded);
+checkStart(state, !loaded, loaded ? loaded.offline : 0);
 if (loaded) {
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
@@ -156,7 +156,9 @@ function onResize() {
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(shopEl);
 
-const COIN = '<i class="ri-copper-coin-fill cc-icon"></i>';
+// Echo glyph — broadcast-fill reads as concentric arcs (a signal returning).
+// Kept tagged `.cc-icon` (warm tungsten) so it pops against the cool UI.
+const ECHO_ICON = '<i class="ri-broadcast-fill cc-icon"></i>';
 
 function fmtPct(p) {
   const v = p * 100;
@@ -196,7 +198,7 @@ function markContentFresh(el) {
 }
 function spawnCoinBurn(el) {
   const c = document.createElement('i');
-  c.className = 'ri-copper-coin-fill coin-burn';
+  c.className = 'ri-broadcast-fill coin-burn';
   el.appendChild(c);
   c.addEventListener('animationend', () => c.remove(), { once: true });
   // Safety fallback if animationend doesn't fire (reduced motion hides it).
@@ -316,25 +318,25 @@ function renderToolbar() {
   const slotCost = nextSlotUnlockCost(state);
   const slotVisible = slotCost != null;
   setTbBtn('unlock-slot', slotVisible, slotVisible && state.amount < slotCost,
-    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · <span class="cc">${COIN}${formatAbbrev(slotCost)}</span>` : '');
+    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · <span class="cc">${ECHO_ICON}${formatAbbrev(slotCost)}</span>` : '');
 
   const rerollUnlockVisible = !state.shop.rerollUnlocked && state.amount >= REROLL_UNLOCK_AT;
   const rerollVisible = state.shop.rerollUnlocked;
   setTbBtn('unlock-reroll', rerollUnlockVisible,
     rerollUnlockVisible && state.amount < REROLL_UNLOCK_COST,
-    `Unlock Reroll · <span class="cc">${COIN}${formatAbbrev(REROLL_UNLOCK_COST)}</span>`);
+    `Unlock Reroll · <span class="cc">${ECHO_ICON}${formatAbbrev(REROLL_UNLOCK_COST)}</span>`);
   if (rerollVisible) {
     const n = countRerollableForUi();
     const cost = computeRerollCost(state, nowSeconds(), n);
     setTbBtn('reroll', true, !(n > 0 && state.amount >= cost && state.amount > 0),
-      `Reroll ${n} · <span class="cc">${COIN}${formatAbbrev(cost)}</span>`);
+      `Reroll ${n} · <span class="cc">${ECHO_ICON}${formatAbbrev(cost)}</span>`);
   } else {
     setTbBtn('reroll', false, false, '');
   }
 
   const pinVisible = state.shop.rerollUnlocked && !state.shop.pinUnlocked && state.amount >= PIN_UNLOCK_AT;
   setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
-    `Unlock Pin · <span class="cc">${COIN}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
+    `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
 
   const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible;
   toolbarEl.style.display = anyVisible ? '' : 'none';
@@ -387,11 +389,11 @@ function renderShop() {
     const theme = KIND_THEME[u.kind] || {};
     el.dataset.kind = u.kind;
     el.querySelector('.kind-icon').className = `kind-icon ri ${theme.icon || ''}`;
-    el.querySelector('.rarity').textContent = `${u.rarity} · ${theme.label || u.kind}`;
+    el.querySelector('.rarity').textContent = `${u.rarity} · ${kindLabel(u)}`;
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    const costHtml = u.kind === 'gift' ? 'FREE' : `${COIN}${formatAbbrev(cost)}`;
+    const costHtml = u.kind === 'gift' ? 'FREE' : `${ECHO_ICON}${formatAbbrev(cost)}`;
     setHtmlIfChanged(el.querySelector('.cost'), costHtml);
 
     let outcomes = '';
@@ -400,12 +402,12 @@ function renderShop() {
       const winPct = fmtPct(u.chance);
       const losePct = fmtPct(1 - u.chance);
       outcomes =
-        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${COIN}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
-        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${COIN}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
+        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
+        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
     } else if (u.kind === 'convert') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
     } else if (u.kind === 'gift') {
-      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${COIN}+${formatAbbrev(u.reward)}</span></div>`;
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
     }
     setHtmlIfChanged(el.querySelector('.outcomes'), outcomes);
 
@@ -448,10 +450,10 @@ function renderBuffs(now) {
     `);
   };
   const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
-  for (const x of active(b.rateMul))       push('rate',     'Rate',     `×${x.value}`,                          x.expiresAt - now, x.duration);
-  for (const x of active(b.gambleLuck))    push('luck',     'Luck',     `+${Math.round(x.value * 100)}%`,       x.expiresAt - now, x.duration);
-  for (const x of active(b.gambleCushion)) push('cushion',  'Cushion',  `${Math.round(x.value * 100)}%`,        x.expiresAt - now, x.duration);
-  for (const x of active(b.compound))      push('compound', 'Compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration);
+  for (const x of active(b.rateMul))       push('rate',     'Carrier',   `×${x.value}`,                          x.expiresAt - now, x.duration);
+  for (const x of active(b.gambleLuck))    push('luck',     'Carry',     `+${Math.round(x.value * 100)}%`,       x.expiresAt - now, x.duration);
+  for (const x of active(b.gambleCushion)) push('cushion',  'Buffer',    `${Math.round(x.value * 100)}%`,        x.expiresAt - now, x.duration);
+  for (const x of active(b.compound))      push('compound', 'Resonance', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration);
   buffsEl.style.display = cards.length ? 'flex' : 'none';
   buffsEl.innerHTML = cards.join('');
 }

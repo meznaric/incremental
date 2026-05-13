@@ -47,6 +47,8 @@ export function makeInterstitialUi(state, onShown) {
     typing = { i: 0, full: step.text, doneAt: 0 };
     textEl.textContent = '';
     textEl.classList.add('it-typing');
+    // Anonymous-voice steps render italic; everything else stays roman.
+    textEl.classList.toggle('it-italic', !!step.italic);
   }
 
   function renderDots() {

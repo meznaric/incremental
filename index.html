@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Incremental — number display lab</title>
+  <title>Echoes Beyond the Stars</title>
   <link rel="stylesheet" href="./vendor/remixicon/remixicon.css" />
   <style>
     .cc { color: #d49a55; }
@@ -689,6 +689,11 @@
       letter-spacing: 0.005em;
       min-height: 1.45em;
     }
+    .it-text.it-italic {
+      font-style: italic;
+      color: #b9c1ff;
+      letter-spacing: 0.02em;
+    }
     .it-text.it-typing::after {
       content: '▍';
       display: inline-block;
@@ -720,6 +725,11 @@
       color: #8a8ac0;
       opacity: 0;
       transition: opacity 0.2s ease;
+    }
+    .it-hint .hint-tap { display: none; }
+    @media (hover: none), (pointer: coarse) {
+      .it-hint .hint-key { display: none; }
+      .it-hint .hint-tap { display: inline; }
     }
 
     @media (max-width: 820px) {
@@ -802,7 +812,7 @@
       <div class="menu-view" data-view="debug">
         <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Debug</div>
         <div class="row">
-          <label for="amountInput"><i class="ri-copper-coin-fill cc-icon"></i> coins</label>
+          <label for="amountInput"><i class="ri-broadcast-fill cc-icon"></i> Echoes</label>
           <input id="amountInput" type="text" autocomplete="off" spellcheck="false" />
         </div>
         <div class="row">
@@ -860,20 +870,20 @@
       </div>
       <div class="bm-body">
         <section class="bm-section kind-rate">
-          <div class="bm-section-head"><i class="ri ri-flashlight-fill"></i><span class="bm-section-name">Rate</span></div>
-          <p class="bm-section-desc">Multiplies your coin production by the shown value for the duration. Multiple Rate buffs stack multiplicatively — two ×3 buffs give ×9.</p>
+          <div class="bm-section-head"><i class="ri ri-flashlight-fill"></i><span class="bm-section-name">Carrier</span></div>
+          <p class="bm-section-desc">Multiplies Echo production by the shown value while the window holds. Carriers stack multiplicatively — two ×3 windows give ×9.</p>
         </section>
         <section class="bm-section kind-luck">
-          <div class="bm-section-head"><i class="ri ri-sparkling-2-fill"></i><span class="bm-section-name">Luck</span></div>
-          <p class="bm-section-desc">Adds the shown percent to your gamble win chance. Stacks additively across all active Luck buffs. A 1% gamble becomes 11% under a +10% Luck buff.</p>
+          <div class="bm-section-head"><i class="ri ri-sparkling-2-fill"></i><span class="bm-section-name">Carry</span></div>
+          <p class="bm-section-desc">Adds the shown percent to hail carry-chance. Stacks additively across active Carry windows. A 1% hail becomes 11% under a +10% Carry window.</p>
         </section>
         <section class="bm-section kind-cushion">
-          <div class="bm-section-head"><i class="ri ri-shield-fill"></i><span class="bm-section-name">Cushion</span></div>
-          <p class="bm-section-desc">Refunds the shown percent of your wager when a gamble loses. Stacks additively across active Cushion buffs, capped at 100% (full refund on loss).</p>
+          <div class="bm-section-head"><i class="ri ri-shield-fill"></i><span class="bm-section-name">Buffer</span></div>
+          <p class="bm-section-desc">Returns the shown percent of a failed wager. Stacks additively across active Buffers, capped at 100% (full return on miss).</p>
         </section>
         <section class="bm-section kind-compound">
-          <div class="bm-section-head"><i class="ri ri-stack-fill"></i><span class="bm-section-name">Compound</span></div>
-          <p class="bm-section-desc">Your production multiplier grows continuously over time, starting at ×1 and compounding every second. The shown value is the current multiplier — let it run longer for a bigger payoff.</p>
+          <div class="bm-section-head"><i class="ri ri-stack-fill"></i><span class="bm-section-name">Resonance</span></div>
+          <p class="bm-section-desc">The carrier finds itself. Your multiplier compounds continuously from ×1 while the window holds — the shown value is the current state. Let it run.</p>
         </section>
       </div>
     </div>
@@ -883,7 +893,7 @@
     <div class="it-card">
       <div class="it-text"></div>
       <div class="it-dots"></div>
-      <div class="it-hint">press space</div>
+      <div class="it-hint"><span class="hint-key">press space</span><span class="hint-tap">tap to continue</span></div>
     </div>
   </div>
 

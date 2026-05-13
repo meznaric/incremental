@@ -341,7 +341,11 @@ function tick(raf) {
   // Use closed-form integral over wall-clock so backgrounded tabs (where rAF
   // throttles to ~1Hz) and resumes from sleep don't undercount production.
   // Also handles buff start/expiry transitions inside the window.
-  state.amount += integrateRate(state, t - wallDt, t);
+  // Guard against non-finite accrual — JSON.stringify turns NaN/Infinity into
+  // null, so a single bad tick would wipe the balance to 0 on next load.
+  const accrual = integrateRate(state, t - wallDt, t);
+  if (Number.isFinite(accrual)) state.amount += accrual;
+  else console.warn('integrateRate produced non-finite value', accrual);
   checkAmount(state, state.amount);
 
   display.update(state.amount, rate, t, dt);

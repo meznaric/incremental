@@ -49,7 +49,9 @@ export const RATE_BUFFS = [
       const mid = (a + c) / 2;
       return xs.some((b) => mid >= b.startedAt && mid < b.expiresAt);
     },
-    // ∫ ∏_i (1+r)^(t-s_i) dt over [a, c] = (1+r)^(-Σ s_i) * ((1+r)^(N*c) - (1+r)^(N*a)) / (N * ln(1+r)).
+    // ∏_i (1+r)^(t-s_i) = (1+r)^(N*(t-mean(s))). Integrate in relative time so
+    // exponents stay bounded by buff duration — using absolute Unix seconds
+    // (~1.7e9) overflows pow() to Infinity and the difference collapses to NaN.
     // Assumes all active compound buffs share the same rate (true for the current upgrade pool).
     integral: (xs, a, c) => {
       const mid = (a + c) / 2;
@@ -57,9 +59,9 @@ export const RATE_BUFFS = [
       if (active.length === 0) return c - a;
       const r = active[0].rate;
       const n = active.length;
-      const sumS = active.reduce((s, b) => s + b.startedAt, 0);
+      const meanS = active.reduce((s, b) => s + b.startedAt, 0) / n;
       const k = n * Math.log(1 + r);
-      return Math.pow(1 + r, -sumS) * (Math.pow(1 + r, n * c) - Math.pow(1 + r, n * a)) / k;
+      return (Math.pow(1 + r, n * (c - meanS)) - Math.pow(1 + r, n * (a - meanS))) / k;
     },
   },
 ];

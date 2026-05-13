@@ -1,6 +1,6 @@
-import { integrateRate, pruneBuffs, validateSlate } from './shop.js';
+import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v4';
+export const SAVE_KEY = 'incremental.save.v5';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -16,7 +16,13 @@ export function saveState(state) {
     owned: state.owned,
     buffs: state.buffs,
     gambleCd: state.gambleCd,
-    shopSlots: state.shop.slots,
+    shop: {
+      slots: state.shop.slots,
+      slotsUnlocked: state.shop.slotsUnlocked,
+      rerollUnlocked: state.shop.rerollUnlocked,
+      pinUnlocked: state.shop.pinUnlocked,
+      pinnedSlot: state.shop.pinnedSlot,
+    },
     messages: state.messages,
     savedAt: nowSeconds(),
   };
@@ -50,15 +56,27 @@ export function loadState(state) {
     }
   }
   state.gambleCd = s.gambleCd && typeof s.gambleCd === 'object' ? s.gambleCd : {};
-  if (Array.isArray(s.shopSlots) && s.shopSlots.length === 4) {
-    state.shop.slots = s.shopSlots.map((slot) => {
-      if (!slot || typeof slot !== 'object') return null;
-      const id = typeof slot.id === 'string' ? slot.id : null;
-      const cost = Number(slot.cost);
-      const dropCost = Number(slot.dropCost);
-      if (!id || !Number.isFinite(cost) || !Number.isFinite(dropCost)) return null;
-      return { id, cost, dropCost };
-    });
+  if (s.shop && typeof s.shop === 'object') {
+    const unlocked = Number(s.shop.slotsUnlocked);
+    state.shop.slotsUnlocked = Number.isFinite(unlocked)
+      ? Math.max(DEFAULT_SLOTS, Math.min(MAX_SLOTS, unlocked))
+      : DEFAULT_SLOTS;
+    state.shop.rerollUnlocked = !!s.shop.rerollUnlocked;
+    state.shop.pinUnlocked = !!s.shop.pinUnlocked;
+    const pinRaw = s.shop.pinnedSlot;
+    state.shop.pinnedSlot = Number.isInteger(pinRaw) && pinRaw >= 0 && pinRaw < state.shop.slotsUnlocked
+      ? pinRaw
+      : null;
+    if (Array.isArray(s.shop.slots)) {
+      state.shop.slots = s.shop.slots.slice(0, state.shop.slotsUnlocked).map((slot) => {
+        if (!slot || typeof slot !== 'object') return null;
+        const id = typeof slot.id === 'string' ? slot.id : null;
+        const cost = Number(slot.cost);
+        if (!id || !Number.isFinite(cost)) return null;
+        return { id, cost };
+      });
+      while (state.shop.slots.length < state.shop.slotsUnlocked) state.shop.slots.push(null);
+    }
   }
   if (s.messages && typeof s.messages === 'object') {
     state.messages.shown = s.messages.shown && typeof s.messages.shown === 'object' ? s.messages.shown : {};

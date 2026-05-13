@@ -38,6 +38,7 @@
       left: 16px;
       padding: 0;
       overflow: hidden;
+      z-index: 50;
     }
     .menu-toggle {
       display: flex;
@@ -204,14 +205,48 @@
       bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      display: grid;
-      grid-template-columns: repeat(4, 188px);
-      gap: 10px;
-      padding: 10px;
+      width: min(1232px, calc(100vw - 32px));
+      box-sizing: border-box;
+      padding: 8px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    #slots { display: contents; }
+    #shopToolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .tb-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(120, 140, 255, 0.35);
+      color: #e8e8f0;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+    .tb-btn:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.7); }
+    .tb-btn .ri { font-size: 13px; line-height: 1; color: #8aa0ff; }
+    .tb-btn.locked { opacity: 0.5; cursor: not-allowed; }
+    .tb-btn.locked:hover { border-color: rgba(120, 140, 255, 0.35); background: rgba(0, 0, 0, 0.35); }
+    #slots {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
     .slot {
       position: relative;
+      width: 188px;
+      box-sizing: border-box;
       background: rgba(28, 28, 56, 0.78);
       border: 1px solid rgba(120, 140, 255, 0.35);
       border-radius: 8px;
@@ -223,11 +258,48 @@
     .slot:hover { border-color: #8aa0ff; background: rgba(40, 40, 80, 0.85); }
     .slot:active { transform: translateY(1px); }
     .slot.locked { cursor: not-allowed; }
-    .slot.locked > :not(.drop) { opacity: 0.45; }
+    .slot.locked > :not(.pin) { opacity: 0.45; }
     .slot.locked:hover { border-color: var(--kind-border, rgba(120, 140, 255, 0.35)); background: rgba(28, 28, 56, 0.78); }
-    .slot .drop.locked { opacity: 0.45; cursor: not-allowed; }
-    .slot .drop.locked:hover { color: #aab0d0; border-color: rgba(120, 140, 255, 0.3); }
-    .slot .head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+    .slot .pin {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: #6a6a90;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 0;
+      z-index: 2;
+      transition: color 0.12s, transform 0.12s;
+    }
+    .slot .pin::before {
+      content: '';
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(120, 140, 255, 0.3);
+      border-radius: 4px;
+      transform: rotate(45deg);
+      transition: border-color 0.12s, background 0.12s, transform 0.12s;
+    }
+    .slot .pin > i { position: relative; z-index: 1; transform: rotate(45deg); transition: transform 0.12s; }
+    .slot .pin:hover { color: #f5d34a; }
+    .slot .pin:hover::before { border-color: #f5d34a; }
+    .slot.pinned { border-color: #f5d34a; box-shadow: 0 0 12px -2px rgba(245, 211, 74, 0.45); }
+    .slot.pinned .pin { color: #f5d34a; }
+    .slot.pinned .pin::before { border-color: #f5d34a; background: rgba(245, 211, 74, 0.18); transform: rotate(0deg); }
+    .slot.pinned .pin > i { transform: rotate(0deg); }
+    .slot .head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; padding-right: 28px; }
     .slot .kind-icon { font-size: 16px; line-height: 1; color: var(--kind-color, #8aa0ff); }
     .slot .rarity {
       font-size: 9px;
@@ -244,31 +316,17 @@
     .slot .outcome.win  { color: #4cd07d; }
     .slot .outcome.lose { color: #ff7a8c; }
     .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
-    .slot .foot { display: flex; gap: 6px; margin-top: 6px; }
-    .slot .drop {
-      display: block;
+    .slot .foot { display: none; gap: 6px; margin-top: 6px; }
+    .slot .slot-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex: 1;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(120, 140, 255, 0.3);
       color: #aab0d0;
       border-radius: 4px;
-      padding: 3px 6px;
-      font-size: 10px;
-      font-family: inherit;
-      cursor: pointer;
-      text-align: center;
-    }
-    .slot .drop:hover { color: #fff; border-color: #8aa0ff; }
-    .slot .drop .cc-icon { color: #d49a55; }
-    .slot .slot-info {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(120, 140, 255, 0.3);
-      color: #aab0d0;
-      border-radius: 4px;
-      padding: 0 8px;
+      padding: 3px 8px;
       font-size: 13px;
       font-family: inherit;
       cursor: pointer;
@@ -631,11 +689,23 @@
         left: 8px;
         right: 8px;
         transform: none;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: none;
         padding: 8px;
         gap: 8px;
       }
-      .slot { padding: 8px; }
+      #slots {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        margin: 0 -8px;
+        padding: 0 8px 4px;
+      }
+      #slots::-webkit-scrollbar { display: none; }
+      .slot { flex: 0 0 168px; scroll-snap-align: start; padding: 8px; }
       .slot .name { font-size: 12px; }
       .slot .desc { font-size: 10px; min-height: 28px; }
       .slot .cost { font-size: 12px; margin-top: 4px; }
@@ -666,7 +736,7 @@
     @media (max-width: 460px) {
       .slot .desc { display: none; }
       .slot .meta { font-size: 9px; }
-      .slot .slot-info { display: inline-flex; }
+      .slot .foot { display: flex; }
     }
   </style>
   <script type="importmap">
@@ -726,7 +796,8 @@
   </div>
 
   <div id="shop" class="panel">
-    <div id="slots" style="display: contents;"></div>
+    <div id="shopToolbar"></div>
+    <div id="slots"></div>
   </div>
 
   <div id="buffs"></div>

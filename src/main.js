@@ -3,7 +3,13 @@ import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
 import { getUpgrade, KIND_THEME } from './upgrades.js';
-import { makeShopState, effectiveRate, integrateRate, tryBuy, tryDrop, validateSlate } from './shop.js';
+import {
+  makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
+  tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
+  nextSlotUnlockCost,
+  REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
+  REROLL_PCT_PER_SLOT,
+} from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
@@ -59,7 +65,6 @@ function openSlotModal(idx) {
   } else if (u.kind === 'buff') {
     rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
   }
-  rows.push(`<div class="slot-modal-row"><span>Drop cost</span><span>${COIN}${formatAbbrev(slot.dropCost)}</span></div>`);
   slotModalBodyEl.innerHTML = `
     <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${theme.label || u.kind}</span>
     <p class="slot-modal-desc">${u.desc}</p>
@@ -193,57 +198,148 @@ slotsEl.addEventListener('animationend', (e) => {
   if (e.animationName === 'slot-drop' || e.animationName === 'slot-flash') slot.classList.remove('fx-drop');
   if (e.animationName === 'slot-reject' || e.animationName === 'slot-flash') slot.classList.remove('fx-reject');
   if (e.animationName === 'slot-content-in') {
-    // Only strip the parent fx-content once all inner content animations have finished.
-    // Simpler: clear after a short delay since all run in parallel with identical duration.
     slot.classList.remove('fx-content');
   }
 });
 
+const toolbarEl = document.getElementById('shopToolbar');
+
 const slotEls = [];
-for (let i = 0; i < 4; i++) {
-  const el = document.createElement('div');
-  el.className = 'slot';
-  el.innerHTML = `
-    <div class="head">
-      <i class="kind-icon"></i>
-      <div class="rarity"></div>
-    </div>
-    <div class="name"></div>
-    <div class="desc"></div>
-    <div class="cost"></div>
-    <div class="outcomes"></div>
-    <div class="meta"></div>
-    <div class="foot">
-      <button class="drop" type="button"></button>
-      <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
-    </div>
-  `;
-  el.addEventListener('click', (e) => {
-    if (e.target.closest('.drop')) return;
-    if (e.target.closest('.slot-info')) { openSlotModal(i); return; }
-    const res = tryBuy(state, i, nowSeconds());
-    if (res.ok) { playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el); }
-    else { playSlotFx(el, 'fx-reject'); }
-  });
-  el.querySelector('.drop').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const res = tryDrop(state, i, nowSeconds());
-    if (res.ok) { playSlotFx(el, 'fx-drop'); renderShop(); markContentFresh(el); }
-    else { playSlotFx(el, 'fx-reject'); }
-  });
-  slotsEl.appendChild(el);
-  slotEls.push(el);
+function ensureSlotEls() {
+  while (slotEls.length < state.shop.slotsUnlocked) {
+    const i = slotEls.length;
+    const el = document.createElement('div');
+    el.className = 'slot';
+    el.innerHTML = `
+      <button class="pin" type="button" aria-label="Pin"><i class="ri ri-pushpin-2-fill"></i></button>
+      <div class="head">
+        <i class="kind-icon"></i>
+        <div class="rarity"></div>
+      </div>
+      <div class="name"></div>
+      <div class="desc"></div>
+      <div class="cost"></div>
+      <div class="outcomes"></div>
+      <div class="meta"></div>
+      <div class="foot">
+        <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
+      </div>
+    `;
+    el.addEventListener('click', (e) => {
+      const idx = slotEls.indexOf(el);
+      if (e.target.closest('.pin')) {
+        e.stopPropagation();
+        const r = tryTogglePin(state, idx);
+        if (r.ok) renderShop();
+        return;
+      }
+      if (e.target.closest('.slot-info')) { openSlotModal(idx); return; }
+      const res = tryBuy(state, idx, nowSeconds());
+      if (res.ok) { playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el); }
+      else { playSlotFx(el, 'fx-reject'); }
+    });
+    slotsEl.appendChild(el);
+    slotEls.push(el);
+  }
+  while (slotEls.length > state.shop.slotsUnlocked) {
+    const el = slotEls.pop();
+    el.remove();
+  }
 }
 
 const SHOP_UNLOCK_AT = 100;
 let shopUnlocked = state.amount > SHOP_UNLOCK_AT;
+
+// Stable toolbar buttons. Rewriting innerHTML every HUD tick would race with
+// mousedown/mouseup and prevent clicks from firing.
+function makeTbBtn(act, icon) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'tb-btn';
+  b.dataset.act = act;
+  b.innerHTML = `<i class="ri ${icon}"></i><span class="tb-label"></span>`;
+  toolbarEl.appendChild(b);
+  return b;
+}
+const tbButtons = {
+  'unlock-slot':   makeTbBtn('unlock-slot',   'ri-add-line'),
+  'reroll':        makeTbBtn('reroll',        'ri-refresh-line'),
+  'unlock-reroll': makeTbBtn('unlock-reroll', 'ri-refresh-line'),
+  'unlock-pin':    makeTbBtn('unlock-pin',    'ri-pushpin-2-fill'),
+};
+function setTbBtn(act, visible, locked, label) {
+  const b = tbButtons[act];
+  b.style.display = visible ? '' : 'none';
+  if (!visible) return;
+  b.classList.toggle('locked', !!locked);
+  b.querySelector('.tb-label').innerHTML = label;
+}
+
+function renderToolbar() {
+  const slotCost = nextSlotUnlockCost(state);
+  const slotVisible = slotCost != null;
+  setTbBtn('unlock-slot', slotVisible, slotVisible && state.amount < slotCost,
+    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · ${COIN}${formatAbbrev(slotCost)}` : '');
+
+  const rerollUnlockVisible = !state.shop.rerollUnlocked && state.amount >= REROLL_UNLOCK_AT;
+  const rerollVisible = state.shop.rerollUnlocked;
+  setTbBtn('unlock-reroll', rerollUnlockVisible,
+    rerollUnlockVisible && state.amount < REROLL_UNLOCK_COST,
+    `Unlock Reroll · ${COIN}${formatAbbrev(REROLL_UNLOCK_COST)}`);
+  if (rerollVisible) {
+    const n = countRerollableForUi();
+    const cost = state.amount * REROLL_PCT_PER_SLOT * n;
+    setTbBtn('reroll', true, !(n > 0 && state.amount >= cost && state.amount > 0),
+      `Reroll ${n} · ${COIN}${formatAbbrev(cost)}`);
+  } else {
+    setTbBtn('reroll', false, false, '');
+  }
+
+  const pinVisible = state.shop.rerollUnlocked && !state.shop.pinUnlocked && state.amount >= PIN_UNLOCK_AT;
+  setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
+    `Unlock Pin · ${COIN}${formatAbbrev(PIN_UNLOCK_COST)}`);
+
+  const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible;
+  toolbarEl.style.display = anyVisible ? '' : 'none';
+}
+
+function countRerollableForUi() {
+  let n = 0;
+  for (let i = 0; i < state.shop.slots.length; i++) {
+    if (state.shop.pinnedSlot === i) continue;
+    if (state.shop.slots[i]) n++;
+  }
+  return n;
+}
+
+toolbarEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  let res;
+  if (act === 'unlock-slot') res = tryUnlockSlot(state, nowSeconds());
+  else if (act === 'unlock-reroll') res = tryUnlockReroll(state);
+  else if (act === 'unlock-pin') res = tryUnlockPin(state);
+  else if (act === 'reroll') {
+    res = tryReroll(state, nowSeconds());
+    if (res.ok) {
+      for (let i = 0; i < slotEls.length; i++) {
+        if (state.shop.pinnedSlot === i) continue;
+        markContentFresh(slotEls[i]);
+      }
+    }
+  }
+  if (res && res.ok) renderShop();
+});
 
 function renderShop() {
   const now = nowSeconds();
   if (!shopUnlocked && state.amount > SHOP_UNLOCK_AT) shopUnlocked = true;
   shopEl.style.display = shopUnlocked ? '' : 'none';
   if (!shopUnlocked) return;
-  for (let i = 0; i < 4; i++) {
+  ensureSlotEls();
+  renderToolbar();
+  for (let i = 0; i < state.shop.slotsUnlocked; i++) {
     const slot = state.shop.slots[i];
     const u = slot ? getUpgrade(slot.id) : null;
     const el = slotEls[i];
@@ -277,12 +373,11 @@ function renderShop() {
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
     else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
     el.querySelector('.meta').textContent = meta;
-    const dropEl = el.querySelector('.drop');
-    dropEl.innerHTML = `drop ${COIN}${formatAbbrev(slot.dropCost)}`;
+    const pinEl = el.querySelector('.pin');
+    pinEl.style.display = state.shop.pinUnlocked ? '' : 'none';
+    el.classList.toggle('pinned', state.shop.pinnedSlot === i);
     const canAfford = state.amount >= cost;
-    const canDrop = state.amount >= slot.dropCost && state.amount > 0;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
-    dropEl.classList.toggle('locked', !canDrop);
   }
 }
 

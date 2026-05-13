@@ -216,12 +216,10 @@ export const getUpgrade = (id) => BY_ID.get(id);
 
 export const CONVERT_MIN_RATE = 100;
 
-// Fixed slot layout: [permanent, other, other, gamble].
-// "other" slots accept any non-gamble, non-permanent upgrade kind.
+// Fixed kinds for the first two slots, which the player starts with. Slots
+// beyond index 1 are unlocked over time and can hold any upgrade kind.
 export const SLOT_KINDS = [
   ['permanent'],
-  ['buff', 'convert'],
-  ['buff', 'convert'],
   ['gamble'],
 ];
 
@@ -240,7 +238,8 @@ export function isEligible(u, ctx) {
 
 export function slotMatches(u, slotIdx) {
   const kinds = SLOT_KINDS[slotIdx];
-  return !!kinds && kinds.includes(u.kind);
+  if (!kinds) return true; // slots past the fixed pair accept any kind
+  return kinds.includes(u.kind);
 }
 
 function weightedPick(pool) {
@@ -254,18 +253,17 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 
-// Each slot freezes its cost and drop-cost at the moment it was offered, so the
-// number on the card doesn't drift as the player's balance / rate change. ctx
-// must carry { balance, rate, owned, dropCost }.
+// Each slot freezes its cost at the moment it was offered, so the number on
+// the card doesn't drift as the player's balance / rate change. ctx must
+// carry { balance, rate, owned }.
 function buildSlot(u, ctx) {
   return {
     id: u.id,
     cost: costFor(u, ctx),
-    dropCost: ctx.dropCost ?? 0,
   };
 }
 
-export function rollSlate(n = SLOT_KINDS.length, ctx) {
+export function rollSlate(n, ctx) {
   const slate = [];
   const taken = new Set();
   for (let i = 0; i < n; i++) {

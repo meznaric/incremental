@@ -86,7 +86,7 @@ test('save coerces non-finite amounts on load (defense in depth)', () => {
   const snap = {
     amount: null, basePerSecond: 5, flatBonus: 0, permMul: 1,
     owned: {}, buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
-    gambleCd: {}, shopSlots: [null, null, null, null],
+    gambleCd: {}, shop: { slots: [null, null], slotsUnlocked: 2 },
     messages: { shown: {}, queue: [], stats: {} },
     savedAt: nowSeconds(),
   };
@@ -135,18 +135,21 @@ test('clearSave removes the save', () => {
   assert.equal(localStorage.getItem(SAVE_KEY), null);
 });
 
-test('loadState ignores malformed shopSlots entries', () => {
+test('loadState ignores malformed shop.slots entries', () => {
   beforeEach();
   const snap = {
     amount: 0, basePerSecond: 0, flatBonus: 0, permMul: 1, owned: {},
     buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
     gambleCd: {}, savedAt: nowSeconds(),
-    shopSlots: [
-      { id: 'caffeine', cost: 100, dropCost: 1 }, // valid
-      { id: 'caffeine', cost: 'oops', dropCost: 1 }, // invalid cost
-      'garbage', // not an object
-      null,
-    ],
+    shop: {
+      slotsUnlocked: 4,
+      slots: [
+        { id: 'caffeine', cost: 100 }, // valid
+        { id: 'caffeine', cost: 'oops' }, // invalid cost
+        'garbage', // not an object
+        null,
+      ],
+    },
     messages: { shown: {}, queue: [], stats: {} },
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(snap));

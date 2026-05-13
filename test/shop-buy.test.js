@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeShopState, tryBuy, tryDrop } from '../src/shop.js';
+import {
+  makeShopState, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll,
+  tryUnlockPin, tryTogglePin, SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST,
+  PIN_UNLOCK_COST, REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
+} from '../src/shop.js';
 import { getUpgrade } from '../src/upgrades.js';
 
 function freshState(over = {}) {
@@ -9,8 +13,12 @@ function freshState(over = {}) {
 
 // Helper: install an upgrade directly into a slot at a fixed cost, bypassing
 // the random slate. Tests stay deterministic regardless of upgrade pool changes.
-function installSlot(state, idx, upgradeId, cost, dropCost = 0) {
-  state.shop.slots[idx] = { id: upgradeId, cost, dropCost };
+function installSlot(state, idx, upgradeId, cost) {
+  while (state.shop.slots.length <= idx) {
+    state.shop.slots.push(null);
+    state.shop.slotsUnlocked = Math.max(state.shop.slotsUnlocked, idx + 1);
+  }
+  state.shop.slots[idx] = { id: upgradeId, cost };
 }
 
 test('permanent: deducts cost, increments owned, applies flat bonus', () => {
@@ -150,22 +158,84 @@ test('gamble: loss subtracts wager, returns cushion refund if buff active', () =
   }
 });
 
-test('tryDrop: refuses when balance below drop cost', () => {
-  const s = freshState({ amount: 5 });
-  installSlot(s, 0, 'plus_one', 1000, 50);
-  const res = tryDrop(s, 0, 0);
+test('tryReroll: refused when reroll is locked', () => {
+  const s = freshState({ amount: 1000 });
+  installSlot(s, 0, 'plus_one', 100);
+  const res = tryReroll(s, 0);
   assert.equal(res.ok, false);
-  assert.equal(s.amount, 5);
+  assert.equal(res.reason, 'locked');
+  assert.equal(s.amount, 1000);
 });
 
-test('tryDrop: deducts drop cost and replaces slot', () => {
+test('tryReroll: deducts 1% per non-pinned slot and replaces them', () => {
   const s = freshState({ amount: 1000, basePerSecond: 10 });
-  installSlot(s, 0, 'plus_one', 200, 50);
-  const idBefore = s.shop.slots[0].id;
-  const res = tryDrop(s, 0, 0);
+  s.shop.rerollUnlocked = true;
+  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 1, 'coin_flip', 100);
+  const res = tryReroll(s, 0);
   assert.ok(res.ok);
-  assert.equal(s.amount, 950);
-  // Slot was replaced — either same id by luck or a different one, but its
-  // contract (id is a string) holds.
+  assert.equal(res.rerolled, 2);
+  // 2 slots × 1% × 1000 = 20
+  assert.equal(s.amount, 980);
   assert.equal(typeof s.shop.slots[0]?.id, 'string');
+  assert.equal(typeof s.shop.slots[1]?.id, 'string');
+});
+
+test('tryReroll: pinned slot is preserved and not charged', () => {
+  const s = freshState({ amount: 1000, basePerSecond: 10 });
+  s.shop.rerollUnlocked = true;
+  s.shop.pinUnlocked = true;
+  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 1, 'coin_flip', 100);
+  s.shop.pinnedSlot = 0;
+  const before = s.shop.slots[0];
+  const res = tryReroll(s, 0);
+  assert.ok(res.ok);
+  assert.equal(res.rerolled, 1);
+  // 1 slot × 1% × 1000 = 10
+  assert.equal(s.amount, 990);
+  assert.equal(s.shop.slots[0], before);
+});
+
+test('tryUnlockSlot: deducts cost and grows the slate', () => {
+  const s = freshState({ amount: 5000, basePerSecond: 10 });
+  const cost = SLOT_UNLOCK_COSTS[DEFAULT_SLOTS];
+  const before = s.shop.slotsUnlocked;
+  const res = tryUnlockSlot(s, 0);
+  assert.ok(res.ok);
+  assert.equal(s.shop.slotsUnlocked, before + 1);
+  assert.equal(s.shop.slots.length, before + 1);
+  assert.equal(s.amount, 5000 - cost);
+});
+
+test('tryUnlockReroll: refused when broke; succeeds and flips flag', () => {
+  const s = freshState({ amount: REROLL_UNLOCK_COST - 1 });
+  assert.equal(tryUnlockReroll(s).ok, false);
+  assert.equal(s.shop.rerollUnlocked, false);
+
+  s.amount = REROLL_UNLOCK_COST + 500;
+  const res = tryUnlockReroll(s);
+  assert.ok(res.ok);
+  assert.equal(s.shop.rerollUnlocked, true);
+  assert.equal(s.amount, 500);
+});
+
+test('tryTogglePin: toggles only when pin is unlocked', () => {
+  const s = freshState({ amount: 0 });
+  installSlot(s, 0, 'plus_one', 50);
+  assert.equal(tryTogglePin(s, 0).ok, false);
+
+  s.amount = PIN_UNLOCK_COST;
+  tryUnlockPin(s);
+  assert.equal(s.shop.pinUnlocked, true);
+
+  tryTogglePin(s, 0);
+  assert.equal(s.shop.pinnedSlot, 0);
+  tryTogglePin(s, 0);
+  assert.equal(s.shop.pinnedSlot, null);
+});
+
+// Reference the imported constant so unused-import lint stays quiet.
+test('REROLL_PCT_PER_SLOT is 1%', () => {
+  assert.equal(REROLL_PCT_PER_SLOT, 0.01);
 });

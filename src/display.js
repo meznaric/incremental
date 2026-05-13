@@ -36,6 +36,14 @@ const COLUMN_COUNT = 5;
 const POS_LERP_K = 5.5;
 const SCALE_LERP_K = 7;
 
+const _pos = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _scl = new THREE.Vector3();
+const _euler = new THREE.Euler();
+const _mat = new THREE.Matrix4();
+const _color = new THREE.Color();
+const _hiddenMat = new THREE.Matrix4().makeScale(0, 0, 0);
+
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -71,8 +79,6 @@ function makeMaterial() {
     metalness: 0.35,
     roughness: 0.35,
     flatShading: true,
-    transparent: true,
-    opacity: 1,
   });
 }
 
@@ -90,15 +96,26 @@ class Column {
     this.outline = makeGridOutline(0x444466);
     this.root.add(this.outline);
 
+    this.material = makeMaterial();
+    this.imesh = new THREE.InstancedMesh(geometryFor(0), this.material, POOL_SIZE);
+    this.imesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.imesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(POOL_SIZE * 3), 3);
+    this.imesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    // Per-instance color carries period color × opacity; particles outside the
+    // grid still need to render so the instanced mesh can't be frustum-culled
+    // against its own (origin-anchored) bounding box.
+    this.imesh.frustumCulled = false;
+    for (let i = 0; i < POOL_SIZE; i++) this.imesh.setMatrixAt(i, _hiddenMat);
+    this.imesh.instanceMatrix.needsUpdate = true;
+    this.root.add(this.imesh);
+
+    this._periodColor = new THREE.Color(0xffffff);
+
     this.particles = [];
+    this.freeList = [];
     for (let i = 0; i < POOL_SIZE; i++) {
-      const mat = makeMaterial();
-      const mesh = new THREE.Mesh(geometryFor(0), mat);
-      mesh.visible = false;
-      this.root.add(mesh);
       this.particles.push({
-        mesh,
-        mat,
+        index: i,
         state: 'idle',
         spawnT: 0,
         spawnY: 0,
@@ -109,7 +126,14 @@ class Column {
         leaveStartY: 0,
         leaveT0: 0,
         spin: Math.random() * 6.28,
+        x: 0,
+        y: 0,
+        rotX: 0,
+        rotY: 0,
+        scale: 0,
+        opacity: 1,
       });
+      this.freeList.push(i);
     }
 
     this.m100 = -1;
@@ -142,29 +166,37 @@ class Column {
     this.cycleSpawnCount = 0;
     this.aliveCount = 0;
     this._rateEstimate = 0;
+    this.freeList.length = 0;
     for (const p of this.particles) {
       p.state = 'idle';
-      p.mesh.visible = false;
-      p.mat.opacity = 1;
+      p.scale = 0;
+      p.opacity = 1;
+      this.imesh.setMatrixAt(p.index, _hiddenMat);
+      this.freeList.push(p.index);
     }
+    this.imesh.instanceMatrix.needsUpdate = true;
+  }
+
+  _acquire() {
+    if (!this.freeList.length) return null;
+    return this.particles[this.freeList.pop()];
+  }
+
+  _release(p) {
+    if (p.state === 'idle') return;
+    p.state = 'idle';
+    p.scale = 0;
+    p.opacity = 1;
+    this.freeList.push(p.index);
   }
 
   _styleParticle(p) {
-    const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
-    p.mat.color.setHex(pDef.color);
-    p.mat.emissive.setHex(pDef.color);
-    p.mat.opacity = 1;
-    p.mesh.geometry = geometryFor(this.period);
-    p.mesh.scale.setScalar(0.32 + this.rank * 0.08);
-  }
-
-  _findIdle() {
-    for (const p of this.particles) if (p.state === 'idle') return p;
-    return null;
+    p.scale = 0.32 + this.rank * 0.08;
+    p.opacity = 1;
   }
 
   _spawnDiscrete(now) {
-    const p = this._findIdle();
+    const p = this._acquire();
     if (!p) return false;
     this._styleParticle(p);
     p.slotIndex = this.cycleSpawnCount;
@@ -173,9 +205,8 @@ class Column {
     p.slotY = slot.y;
     p.spawnY = Math.min(slot.y + SPAWN_DISTANCE, COLUMN_TOP_Y);
     p.spawnT = now;
-    p.mesh.position.set(slot.x, p.spawnY, 0);
-    p.mesh.visible = true;
-    p.mat.opacity = 1;
+    p.x = slot.x;
+    p.y = p.spawnY;
     p.state = 'flying';
     this.cycleSpawnCount++;
     this.processed++;
@@ -188,7 +219,7 @@ class Column {
   }
 
   _spawnContinuous(now) {
-    const p = this._findIdle();
+    const p = this._acquire();
     if (!p) return false;
     this._styleParticle(p);
     const x = (Math.random() - 0.5) * COLUMN_WIDTH * 0.85;
@@ -196,9 +227,8 @@ class Column {
     p.slotY = 0;
     p.spawnY = COLUMN_TOP_Y;
     p.spawnT = now;
-    p.mesh.position.set(x, p.spawnY, 0);
-    p.mesh.visible = true;
-    p.mat.opacity = 1;
+    p.x = x;
+    p.y = p.spawnY;
     p.velY = -this._streamSpeed;
     p.state = 'streaming';
     this.aliveCount++;
@@ -212,14 +242,15 @@ class Column {
       if (p.state === 'settled') {
         p.state = 'leaving';
         p.leaveT0 = now;
-        p.leaveStartY = p.mesh.position.y;
+        p.leaveStartY = p.y;
         p.velY = OVERFLOW_INITIAL_VEL + (Math.random() - 0.5) * 0.6;
       }
     }
   }
 
   _onArrive(p, now) {
-    p.mesh.position.set(p.slotX, p.slotY, 0);
+    p.x = p.slotX;
+    p.y = p.slotY;
     if (this.mode === 'discrete' && this.phase === 'filling') {
       p.state = 'settled';
     } else {
@@ -237,21 +268,23 @@ class Column {
     this.aliveCount = this.cycleSpawnCount;
     this.phase = 'filling';
     this.lastSpawnT = now - SPAWN_INTERVAL;
+    this.freeList.length = 0;
     for (const p of this.particles) {
       p.state = 'idle';
-      p.mesh.visible = false;
-      p.mat.opacity = 1;
+      p.scale = 0;
+      p.opacity = 1;
+      this.freeList.push(p.index);
     }
     for (let i = 0; i < this.cycleSpawnCount; i++) {
-      const p = this._findIdle();
+      const p = this._acquire();
       if (!p) break;
       this._styleParticle(p);
       const slot = slotPos(i);
       p.slotX = slot.x;
       p.slotY = slot.y;
       p.slotIndex = i;
-      p.mesh.position.set(slot.x, slot.y, 0);
-      p.mesh.visible = true;
+      p.x = slot.x;
+      p.y = slot.y;
       p.state = 'settled';
     }
   }
@@ -269,7 +302,7 @@ class Column {
         if (p.slotIndex >= this.cycleSpawnCount) {
           p.state = 'leaving';
           p.leaveT0 = now;
-          p.leaveStartY = p.mesh.position.y;
+          p.leaveStartY = p.y;
           p.velY = OVERFLOW_INITIAL_VEL + (Math.random() - 0.5) * 0.6;
         } else {
           occupied.add(p.slotIndex);
@@ -277,13 +310,13 @@ class Column {
       } else if (p.state === 'streaming') {
         p.state = 'leaving';
         p.leaveT0 = now;
-        p.leaveStartY = p.mesh.position.y;
+        p.leaveStartY = p.y;
       }
     }
 
     for (let i = 0; i < this.cycleSpawnCount; i++) {
       if (occupied.has(i)) continue;
-      const p = this._findIdle();
+      const p = this._acquire();
       if (!p) break;
       this._styleParticle(p);
       p.slotIndex = i;
@@ -292,9 +325,8 @@ class Column {
       p.slotY = slot.y;
       p.spawnY = Math.min(slot.y + SPAWN_DISTANCE, COLUMN_TOP_Y);
       p.spawnT = now + Math.random() * 0.2;
-      p.mesh.position.set(slot.x, p.spawnY, 0);
-      p.mesh.visible = true;
-      p.mat.opacity = 1;
+      p.x = slot.x;
+      p.y = p.spawnY;
       p.state = 'flying';
       this.aliveCount++;
     }
@@ -308,7 +340,7 @@ class Column {
       if (p.state === 'settled') {
         p.state = 'leaving';
         p.leaveT0 = now;
-        p.leaveStartY = p.mesh.position.y;
+        p.leaveStartY = p.y;
         p.velY = OVERFLOW_INITIAL_VEL + (Math.random() - 0.5) * 0.6;
       }
     }
@@ -327,6 +359,8 @@ class Column {
     this.rank = pr.rank;
     const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
     this.outline.material.color.setHex(pDef.color);
+    this._periodColor.setHex(pDef.color);
+    this.imesh.geometry = geometryFor(this.period);
     this.mode = 'discrete';
     this._rateEstimate = 0;
     this._snapHard(amount, now);
@@ -334,6 +368,11 @@ class Column {
 
   update(now, dt, amount, rate) {
     if (this.m100 < 0) return;
+    // Skip the entire column update when it's effectively invisible (fading
+    // out and already tiny). assignMagnitude will repaint instances when the
+    // column is brought back to life.
+    if (this.scaleTarget < 0.02 && this.root.scale.x < 0.02) return;
+
     const target = Math.floor(amount / this._magFactor);
     const localRate = (rate || 0) / this._magFactor;
     this._rateEstimate = this._rateEstimate * 0.85 + localRate * 0.15;
@@ -372,33 +411,31 @@ class Column {
           this._onArrive(p, now);
         } else {
           const e = easeOutCubic(t);
-          p.mesh.position.set(p.slotX, p.spawnY + (p.slotY - p.spawnY) * e, 0);
-          p.mesh.rotation.x = now * 2 + p.spin;
-          p.mesh.rotation.y = now * 3 + p.spin;
+          p.x = p.slotX;
+          p.y = p.spawnY + (p.slotY - p.spawnY) * e;
+          p.rotX = now * 2 + p.spin;
+          p.rotY = now * 3 + p.spin;
         }
       } else if (p.state === 'settled') {
-        p.mesh.rotation.x += dt * 0.3;
-        p.mesh.rotation.y += dt * 0.45;
+        p.rotX += dt * 0.3;
+        p.rotY += dt * 0.45;
       } else if (p.state === 'streaming') {
-        p.mesh.position.y -= this._streamSpeed * dt;
-        p.mesh.rotation.x += dt * 2.5;
-        p.mesh.rotation.y += dt * 3.5;
-        if (p.mesh.position.y < BOTTOM_EXIT_Y) {
-          p.state = 'idle';
-          p.mesh.visible = false;
+        p.y -= this._streamSpeed * dt;
+        p.rotX += dt * 2.5;
+        p.rotY += dt * 3.5;
+        if (p.y < BOTTOM_EXIT_Y) {
+          this._release(p);
           this.aliveCount = Math.max(0, this.aliveCount - 1);
         }
       } else if (p.state === 'leaving') {
         p.velY -= OVERFLOW_GRAVITY * dt;
-        p.mesh.position.y += p.velY * dt;
+        p.y += p.velY * dt;
         const fallRange = Math.max(0.5, p.leaveStartY - BOTTOM_EXIT_Y);
-        p.mat.opacity = Math.max(0, (p.mesh.position.y - BOTTOM_EXIT_Y) / fallRange);
-        p.mesh.rotation.x += dt * 2.5;
-        p.mesh.rotation.y += dt * 3.5;
-        if (p.mesh.position.y < BOTTOM_EXIT_Y) {
-          p.state = 'idle';
-          p.mesh.visible = false;
-          p.mat.opacity = 1;
+        p.opacity = Math.max(0, (p.y - BOTTOM_EXIT_Y) / fallRange);
+        p.rotX += dt * 2.5;
+        p.rotY += dt * 3.5;
+        if (p.y < BOTTOM_EXIT_Y) {
+          this._release(p);
           this.aliveCount = Math.max(0, this.aliveCount - 1);
         }
       }
@@ -418,8 +455,32 @@ class Column {
         this.aliveCount = 0;
       }
     }
+
+    this._writeInstances();
   }
 
+  _writeInstances() {
+    const im = this.imesh;
+    for (const p of this.particles) {
+      if (p.state === 'idle') {
+        im.setMatrixAt(p.index, _hiddenMat);
+        continue;
+      }
+      _pos.set(p.x, p.y, 0);
+      _euler.set(p.rotX, p.rotY, 0);
+      _quat.setFromEuler(_euler);
+      _scl.setScalar(p.scale);
+      _mat.compose(_pos, _quat, _scl);
+      im.setMatrixAt(p.index, _mat);
+      // Bake opacity into the per-instance color. Against the dark fog
+      // background this fades particles to invisible without needing a
+      // per-instance alpha attribute (which InstancedMesh doesn't ship).
+      _color.copy(this._periodColor).multiplyScalar(p.opacity);
+      im.setColorAt(p.index, _color);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.instanceColor.needsUpdate = true;
+  }
 }
 
 export class MagnitudeDisplay {

@@ -156,13 +156,47 @@ test('gamble: loss subtracts wager, returns cushion refund if buff active', () =
   try {
     const s = freshState({ amount: 1000 });
     installSlot(s, 3, 'coin_flip', 100);
-    s.buffs.gambleCushion.push({ value: 0.5, duration: 60, expiresAt: 60 });
+    s.buffs.gambleCushion.push({ value: 0.05, duration: 60, expiresAt: 60 });
     tryBuy(s, 3, 0);
-    // lose 100, refund 50% → balance = 1000 - 100 + 50 = 950
-    assert.equal(s.amount, 950);
+    // lose 100, refund 5% → balance = 1000 - 100 + 5 = 905
+    assert.equal(s.amount, 905);
   } finally {
     Math.random = origRandom;
   }
+});
+
+test('gamble: cushion stacks with diminishing returns, capped at 10%', () => {
+  const origRandom = Math.random;
+  Math.random = () => 0.999;
+  try {
+    const s = freshState({ amount: 1000 });
+    installSlot(s, 3, 'coin_flip', 100);
+    // five 50% buffs would be 100% additively, but diminishing gives 1 - 0.5^5 ≈ 0.969, capped at 0.10
+    for (let i = 0; i < 5; i++) s.buffs.gambleCushion.push({ value: 0.5, duration: 60, expiresAt: 60 });
+    tryBuy(s, 3, 0);
+    assert.equal(s.amount, 1000 - 100 + 10);
+  } finally {
+    Math.random = origRandom;
+  }
+});
+
+test('gamble: single cushion keeps coin_flip EV negative', () => {
+  const u = getUpgrade('insurance'); // common: refund 0.03
+  const cf = getUpgrade('coin_flip');
+  // EV/cost = p*(M-1) - (1-p)*(1-c). With c=0.03: 0.5*0.95 - 0.5*0.97 = -0.01
+  const ev = cf.chance * (cf.payout - 1) - (1 - cf.chance) * (1 - u.refund);
+  assert.ok(ev < 0, `expected negative EV, got ${ev}`);
+});
+
+test('gamble: max-stacked cushions keep EV below tiny edge', () => {
+  // worst case for the house: every cushion buff stacked
+  const cushionIds = ['insurance', 'steady', 'iron_will', 'bastion', 'last_stand'];
+  let lose = 1;
+  for (const id of cushionIds) lose *= 1 - getUpgrade(id).refund;
+  const c = Math.min(0.1, 1 - lose);
+  const cf = getUpgrade('coin_flip');
+  const ev = cf.chance * (cf.payout - 1) - (1 - cf.chance) * (1 - c);
+  assert.ok(ev > 0 && ev < 0.06, `expected tiny positive edge, got ${ev}`);
 });
 
 test('tryReroll: refused when reroll is locked', () => {

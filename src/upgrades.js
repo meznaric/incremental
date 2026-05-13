@@ -1,6 +1,6 @@
 import { formatAbbrev } from './bignum.js';
 
-const RARITY_WEIGHTS = { common: 50, uncommon: 22, rare: 8, legendary: 2 };
+const RARITY_WEIGHTS = { common: 50, uncommon: 22, rare: 8, legendary: 2, mythic: 0.3 };
 // Per-kind multiplier on top of rarity weight. Gambles are noisy and crowd out
 // other kinds when they share weight equally — drop them to 25% so non-gamble
 // kinds dominate any-kind slots. The fixed gamble slot (idx 1) is unaffected
@@ -71,6 +71,9 @@ export const UPGRADES = [
   { id: 'wheel_jackpot', kind: 'gamble', rarity: 'rare',
     name: 'Wheel Jackpot',   desc: 'Wager 4% — 60× on 1/75',
     wagerPct: 0.04, payout: 60,   chance: 1 / 75,  cooldown: 18 },
+  { id: 'friend_bet', kind: 'gamble', rarity: 'rare',
+    name: "Friend's Bet",    desc: 'Wager 25% — fair 2× on 50%',
+    wagerPct: 0.25, payout: 2,    chance: 0.5,     cooldown: 8 },
 
   { id: 'caffeine',  kind: 'buff', rarity: 'common', buffType: 'rateMul',
     name: 'Caffeine',     desc: '2× rate for 5 min',
@@ -82,14 +85,14 @@ export const UPGRADES = [
     name: 'Fortune Cookie', desc: '+5% gamble win chance, 5 min',
     bonus: 0.05, duration: 300, costSec: 120 },
   { id: 'insurance', kind: 'buff', rarity: 'common', buffType: 'gambleCushion',
-    name: 'Insurance',    desc: 'Losses return 25% wager, 3 min',
-    refund: 0.25, duration: 180, costSec: 100 },
+    name: 'Insurance',    desc: 'Losses return 3% wager, 3 min',
+    refund: 0.03, duration: 180, costSec: 100 },
   { id: 'lucky',     kind: 'buff', rarity: 'uncommon', buffType: 'gambleLuck',
     name: 'Lucky Hour',   desc: '+10% gamble win chance, 10 min',
     bonus: 0.1, duration: 600, costSec: 200 },
   { id: 'steady',    kind: 'buff', rarity: 'uncommon', buffType: 'gambleCushion',
-    name: 'Steady Hand',  desc: 'Losses return 50% wager, 5 min',
-    refund: 0.5, duration: 300, costSec: 200 },
+    name: 'Steady Hand',  desc: 'Losses return 5% wager, 5 min',
+    refund: 0.05, duration: 300, costSec: 200 },
   { id: 'overdrive', kind: 'buff', rarity: 'uncommon', buffType: 'rateMul',
     name: 'Overdrive',    desc: '5× rate for 90 sec',
     mult: 5,  duration: 90,  costSec: 150 },
@@ -109,8 +112,8 @@ export const UPGRADES = [
     name: 'Four-Leaf Clover', desc: '+25% gamble win chance, 5 min',
     bonus: 0.25, duration: 300, costSec: 600 },
   { id: 'iron_will', kind: 'buff', rarity: 'rare', buffType: 'gambleCushion',
-    name: 'Iron Will',    desc: 'Losses return 80% wager, 5 min',
-    refund: 0.8, duration: 300, costSec: 400 },
+    name: 'Iron Will',    desc: 'Losses return 7% wager, 5 min',
+    refund: 0.07, duration: 300, costSec: 400 },
   { id: 'berserker', kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Berserker',    desc: '100× rate for 10 sec',
     mult: 100, duration: 10, costSec: 500 },
@@ -131,8 +134,8 @@ export const UPGRADES = [
     name: 'Ember',        desc: 'Rate +0.02%/s compounding, 6 hours',
     rate: 0.0002, duration: 21600, costSec: 5000 },
   { id: 'bastion',   kind: 'buff', rarity: 'rare', buffType: 'gambleCushion',
-    name: 'Bastion',      desc: 'Losses return 60% wager, 12 hours',
-    refund: 0.6, duration: 43200, costSec: 3000 },
+    name: 'Bastion',      desc: 'Losses return 5% wager, 12 hours',
+    refund: 0.05, duration: 43200, costSec: 3000 },
   { id: 'dynasty',   kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Dynasty',      desc: '1.3× rate for 1 day',
     mult: 1.3, duration: 86400, costSec: 7200 },
@@ -158,8 +161,25 @@ export const UPGRADES = [
     name: 'Divine Fortune', desc: '+50% gamble win chance, 60 sec',
     bonus: 0.5, duration: 60, costSec: 800 },
   { id: 'last_stand', kind: 'buff', rarity: 'legendary', buffType: 'gambleCushion',
-    name: 'Last Stand',   desc: 'Losses fully refunded, 60 sec',
-    refund: 1.0, duration: 60, costSec: 800 },
+    name: 'Last Stand',   desc: 'Losses return 8% wager, 60 sec',
+    refund: 0.08, duration: 60, costSec: 800 },
+
+  // Mythic-only long haulers — week-plus durations, modest multipliers.
+  { id: 'epoch',     kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
+    name: 'Epoch',        desc: '1.25× rate for 2 weeks',
+    mult: 1.25, duration: 1209600, costSec: 36000 },
+  { id: 'monolith',  kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
+    name: 'Monolith',     desc: '1.4× rate for 1 week',
+    mult: 1.4,  duration: 604800,  costSec: 30000 },
+  { id: 'forever',   kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
+    name: 'Forever Sunrise', desc: '1.1× rate for 6 weeks',
+    mult: 1.1,  duration: 3628800, costSec: 30000 },
+  { id: 'ancestral', kind: 'buff', rarity: 'mythic', buffType: 'compound',
+    name: 'Ancestral Tide', desc: 'Rate +0.001%/s compounding, 2 weeks',
+    rate: 0.00001, duration: 1209600, costSec: 48000 },
+  { id: 'oracle',    kind: 'buff', rarity: 'mythic', buffType: 'gambleLuck',
+    name: 'Oracle Sight', desc: '+20% gamble win chance, 1 week',
+    bonus: 0.2, duration: 604800, costSec: 24000 },
 
   // Additive permanents are generated dynamically per slate via genBaseAdd —
   // see the _dyn:'add' virtual entries below. The static list grew unwieldy
@@ -169,13 +189,15 @@ export const UPGRADES = [
   { kind: 'permanent', rarity: 'uncommon',  _dyn: 'add' },
   { kind: 'permanent', rarity: 'rare',      _dyn: 'add' },
   { kind: 'permanent', rarity: 'legendary', _dyn: 'add' },
+  { kind: 'permanent', rarity: 'mythic',    _dyn: 'add' },
 
   // One-shot coin gifts, scaled to current rate. Common/uncommon/rare are
-  // modest top-ups; legendary is a noticeable jump.
+  // modest top-ups; legendary is a noticeable jump; mythic is a windfall.
   { kind: 'gift', rarity: 'common',    _dyn: 'gift' },
   { kind: 'gift', rarity: 'uncommon',  _dyn: 'gift' },
   { kind: 'gift', rarity: 'rare',      _dyn: 'gift' },
   { kind: 'gift', rarity: 'legendary', _dyn: 'gift' },
+  { kind: 'gift', rarity: 'mythic',    _dyn: 'gift' },
 
   // Multiplicative permanents — weak mults phase out, strong ones unlock later.
   { id: 'mult_starter',   kind: 'permanent', rarity: 'common',    permType: 'mul',
@@ -205,6 +227,9 @@ export const UPGRADES = [
   { id: 'mult_three',     kind: 'permanent', rarity: 'legendary', permType: 'mul',
     name: '×3 Multiplier',       desc: 'Permanent ×3 to rate',
     value: 3,    baseCost: 1e10,   growth: 8,      minRate: 1e9 },
+  { id: 'mult_five',      kind: 'permanent', rarity: 'mythic',    permType: 'mul',
+    name: '×5 Multiplier',       desc: 'Permanent ×5 to rate',
+    value: 5,    baseCost: 1e13,   growth: 10,     minRate: 1e11 },
 
   { id: 'tip_jar',   kind: 'convert', rarity: 'common',
     name: 'Tip Jar',    desc: 'Burn 5% balance — perm +0.02% of spent /s',
@@ -299,7 +324,7 @@ function niceRound(x) {
 // Dynamic additive permanent. Scales the +X/s value to a fraction of the
 // player's current rate by rarity; cost is a multiple of value with a mild
 // log bump so late-game tiers stay meaningful but not free.
-export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 6 };
+export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 6, mythic: 25 };
 export function genBaseAdd(rarity, ctx) {
   const r = Math.max(ctx?.rate || 0, 1);
   const value = Math.max(1, niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1)));
@@ -321,7 +346,7 @@ export function genBaseAdd(rarity, ctx) {
 
 // Dynamic gift. Reward is a fixed multiple of current rate by rarity: small
 // for common/uncommon/rare, much bigger for legendary. Cost is always 0.
-export const GIFT_SECONDS = { common: 30, uncommon: 90, rare: 240, legendary: 1800 };
+export const GIFT_SECONDS = { common: 30, uncommon: 90, rare: 240, legendary: 1800, mythic: 10800 };
 export function genGift(rarity, ctx) {
   const r = Math.max(ctx?.rate || 0, 1);
   const reward = niceRound(r * (GIFT_SECONDS[rarity] || 30));
@@ -394,11 +419,28 @@ export function rerollSlot(slate, idx, ctx) {
   return buildSlot(weightedPick(pool), ctx);
 }
 
+// Category-wide ramp on mul permanents: every mul ever bought (across any id)
+// makes the next one cost more. Stops "+5% Multiplier" from staying trivial
+// after stacking dozens of them.
+export const MUL_CATEGORY_GROWTH = 1.4;
+export function totalMulOwned(owned) {
+  let n = 0;
+  for (const id of Object.keys(owned || {})) {
+    const u = BY_ID.get(id);
+    if (u && u.permType === 'mul') n += owned[id] || 0;
+  }
+  return n;
+}
+
 export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
     case 'buff':      return Math.max(1, ctx.rate * upgrade.costSec);
-    case 'permanent': return upgrade.baseCost * Math.pow(upgrade.growth, ctx.owned[upgrade.id] || 0);
+    case 'permanent': {
+      let c = upgrade.baseCost * Math.pow(upgrade.growth, ctx.owned[upgrade.id] || 0);
+      if (upgrade.permType === 'mul') c *= Math.pow(MUL_CATEGORY_GROWTH, totalMulOwned(ctx.owned));
+      return c;
+    }
     case 'convert':   return ctx.balance * upgrade.pctCost;
   }
   return 0;

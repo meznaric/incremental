@@ -177,7 +177,9 @@ export function tryBuy(state, slotIdx, now) {
       state.amount += payout;
       result = { id: slot.id, won: true, delta: payout - cost };
     } else {
-      const cushion = Math.min(1, state.buffs.gambleCushion.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0));
+      let lose = 1;
+      for (const b of state.buffs.gambleCushion) if (now < b.expiresAt) lose *= 1 - Math.max(0, Math.min(1, b.value));
+      const cushion = Math.min(0.1, 1 - lose);
       const refund = cost * cushion;
       state.amount += refund;
       result = { id: slot.id, won: false, delta: -(cost - refund) };

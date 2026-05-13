@@ -728,12 +728,8 @@
         padding: 8px;
         gap: 8px;
       }
-      #slots {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
-      }
-      .slot { width: auto; padding: 8px; }
+      #slots { gap: 8px; }
+      .slot { width: 150px; padding: 8px; }
       .slot .name { font-size: 12px; }
       .slot .desc { font-size: 10px; min-height: 28px; }
       .slot .cost { font-size: 12px; margin-top: 4px; }
@@ -761,11 +757,6 @@
       #menu { top: 8px; left: 8px; }
     }
 
-    @media (max-width: 460px) {
-      .slot .desc { display: none; }
-      .slot .meta { font-size: 9px; }
-      .slot .foot { display: flex; }
-    }
   </style>
   <script type="importmap">
     {

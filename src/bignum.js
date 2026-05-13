@@ -1,4 +1,4 @@
-import { PERIODS } from './periods.js';
+import { PERIODS } from './periods-data.js';
 
 const LOG10 = Math.log(10);
 const log10 = (x) => Math.log(x) / LOG10;

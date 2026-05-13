@@ -29,7 +29,7 @@ Add new modules under `src/` and import them from `main.js`. Keep `vendor/` for 
 
 ## Constraints (non-negotiable)
 
-- No build tooling. No `package.json`. No `node_modules`.
+- No build tooling. No `node_modules`. The only `package.json` is a 1-line `{ "type": "module" }` so Node treats `src/*.js` as ESM for tests — no deps, no scripts.
 - No CDN imports at runtime. All deps vendored under `vendor/`.
 - Three.js stays pinned. To upgrade: download both `three.module.min.js` and `three.core.min.js` from the same version, commit together.
 - ES modules only. No globals on `window`.
@@ -43,8 +43,13 @@ Add new modules under `src/` and import them from `main.js`. Keep `vendor/` for 
 
 ## Testing
 
-Playwright via MCP. Start the server, navigate to the page, check `browser_console_messages` for errors, screenshot to verify visuals. There is no test suite — visual + console check is the contract.
-Only do this when user asks.
+```
+node --test test/
+```
+
+Uses Node's built-in test runner (no deps). Covers the pure logic that's likely to break: `integrateRate` math, `save`/`load` round-trips, `tryBuy` flows, `bignum` format/parse. Anything that touches three.js / DOM / `window` is out of scope here.
+
+For visual / rendering regressions: Playwright via MCP — start the server, navigate to the page, check `browser_console_messages`, screenshot to verify. Only run this when the user asks.
 
 ## Save compatibility
 

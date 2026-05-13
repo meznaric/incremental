@@ -5,7 +5,7 @@ import {
   tryUnlockPin, tryTogglePin, SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST,
   PIN_UNLOCK_COST, REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
 } from '../src/shop.js';
-import { getUpgrade } from '../src/upgrades.js';
+import { getUpgrade, genBaseAdd } from '../src/upgrades.js';
 
 function freshState(over = {}) {
   return { amount: 0, basePerSecond: 0, ...makeShopState(), ...over };
@@ -13,26 +13,33 @@ function freshState(over = {}) {
 
 // Helper: install an upgrade directly into a slot at a fixed cost, bypassing
 // the random slate. Tests stay deterministic regardless of upgrade pool changes.
-function installSlot(state, idx, upgradeId, cost) {
+function installSlot(state, idx, upgradeId, cost, dyn = null) {
   while (state.shop.slots.length <= idx) {
     state.shop.slots.push(null);
     state.shop.slotsUnlocked = Math.max(state.shop.slotsUnlocked, idx + 1);
   }
-  state.shop.slots[idx] = { id: upgradeId, cost };
+  const slot = { id: upgradeId, cost };
+  if (dyn) slot.dyn = dyn;
+  state.shop.slots[idx] = slot;
+}
+
+// Install a freshly generated dynamic additive permanent at a known cost.
+function installDynAdd(state, idx, rarity, ctx, cost) {
+  const { upgrade } = genBaseAdd(rarity, ctx);
+  installSlot(state, idx, upgrade.id, cost, upgrade);
+  return upgrade;
 }
 
 test('permanent: deducts cost, increments owned, applies flat bonus', () => {
   const s = freshState({ amount: 1000 });
-  // plus_one: permanent, permType=add, value=1
-  installSlot(s, 0, 'plus_one', 100);
-  const u = getUpgrade('plus_one');
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 1000, owned: {} }, 100);
   assert.equal(u.kind, 'permanent');
   const before = s.flatBonus;
 
   const res = tryBuy(s, 0, 0);
   assert.ok(res.ok);
   assert.equal(s.amount, 900);
-  assert.equal(s.owned.plus_one, 1);
+  assert.equal(s.owned[u.id], 1);
   assert.equal(s.flatBonus, before + u.value);
 });
 
@@ -49,12 +56,12 @@ test('permanent: applies mul to permMul', () => {
 
 test('permanent: refused when balance < cost', () => {
   const s = freshState({ amount: 10 });
-  installSlot(s, 0, 'plus_one', 100);
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 10, owned: {} }, 100);
   const res = tryBuy(s, 0, 0);
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'broke');
   assert.equal(s.amount, 10); // untouched
-  assert.equal(s.owned.plus_one || 0, 0);
+  assert.equal(s.owned[u.id] || 0, 0);
 });
 
 test('buff: deducts cost and pushes a buff entry', () => {
@@ -160,7 +167,7 @@ test('gamble: loss subtracts wager, returns cushion refund if buff active', () =
 
 test('tryReroll: refused when reroll is locked', () => {
   const s = freshState({ amount: 1000 });
-  installSlot(s, 0, 'plus_one', 100);
+  installSlot(s, 0, 'mult5', 100);
   const res = tryReroll(s, 0);
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'locked');
@@ -171,7 +178,7 @@ test('tryReroll: deducts cost (max of pct and 60s of rate) and replaces slots', 
   // basePerSecond 0 → 60s × rate × N collapses to 0, so pct dominates: 2 × 3% × 100000 = 6000
   const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
-  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
@@ -185,7 +192,7 @@ test('tryReroll: pinned slot is preserved and not charged', () => {
   const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
   s.shop.pinUnlocked = true;
-  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
   s.shop.pinnedSlot = 0;
   const before = s.shop.slots[0];
@@ -197,16 +204,31 @@ test('tryReroll: pinned slot is preserved and not charged', () => {
   assert.equal(s.shop.slots[0], before);
 });
 
-test('tryReroll: cost floor is 60s of production per non-pinned slot', () => {
-  // High rate, small balance: 60s × 100/s × 2 slots = 12000 > 3% × 2 × 1000 = 60
+test('tryReroll: cost floor is 30s of offered rate per non-pinned slot', () => {
+  // offeredRate frozen at 100/s: 30s × 100/s × 2 slots = 6000 > 3% × 2 × 1000 = 60
   const s = freshState({ amount: 1000, basePerSecond: 100 });
   s.shop.rerollUnlocked = true;
-  installSlot(s, 0, 'plus_one', 50);
+  s.shop.offeredRate = 100;
+  installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
-  // Cost would be 12000 but balance is 1000 — reroll refused.
+  // Cost would be 6000 but balance is 1000 — reroll refused.
   const res = tryReroll(s, 0);
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'broke');
+});
+
+test('tryReroll: cost uses offered rate, not live rate', () => {
+  // Live rate explodes (basePerSecond=10000) but offeredRate was frozen at 10/s.
+  // Floor = 30s × 10/s × 2 = 600, pct = 3% × 2 × 1000 = 60 → cost 600.
+  const s = freshState({ amount: 1000, basePerSecond: 10000 });
+  s.shop.rerollUnlocked = true;
+  s.shop.offeredRate = 10;
+  installSlot(s, 0, 'mult5', 50);
+  installSlot(s, 1, 'coin_flip', 100);
+  const res = tryReroll(s, 0);
+  assert.ok(res.ok);
+  assert.equal(res.cost, 600);
+  assert.equal(s.amount, 400);
 });
 
 test('tryUnlockSlot: deducts cost and grows the slate', () => {
@@ -234,7 +256,7 @@ test('tryUnlockReroll: refused when broke; succeeds and flips flag', () => {
 
 test('tryTogglePin: toggles only when pin is unlocked', () => {
   const s = freshState({ amount: 0 });
-  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 0, 'mult5', 50);
   assert.equal(tryTogglePin(s, 0).ok, false);
 
   s.amount = PIN_UNLOCK_COST;

@@ -1,6 +1,6 @@
 import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v5';
+export const SAVE_KEY = 'incremental.save.v7';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -22,6 +22,7 @@ export function saveState(state) {
       rerollUnlocked: state.shop.rerollUnlocked,
       pinUnlocked: state.shop.pinUnlocked,
       pinnedSlot: state.shop.pinnedSlot,
+      offeredRate: state.shop.offeredRate,
     },
     messages: state.messages,
     savedAt: nowSeconds(),
@@ -63,6 +64,8 @@ export function loadState(state) {
       : DEFAULT_SLOTS;
     state.shop.rerollUnlocked = !!s.shop.rerollUnlocked;
     state.shop.pinUnlocked = !!s.shop.pinUnlocked;
+    const offered = Number(s.shop.offeredRate);
+    state.shop.offeredRate = Number.isFinite(offered) ? offered : 0;
     const pinRaw = s.shop.pinnedSlot;
     state.shop.pinnedSlot = Number.isInteger(pinRaw) && pinRaw >= 0 && pinRaw < state.shop.slotsUnlocked
       ? pinRaw
@@ -73,7 +76,9 @@ export function loadState(state) {
         const id = typeof slot.id === 'string' ? slot.id : null;
         const cost = Number(slot.cost);
         if (!id || !Number.isFinite(cost)) return null;
-        return { id, cost };
+        const out = { id, cost };
+        if (slot.dyn && typeof slot.dyn === 'object') out.dyn = slot.dyn;
+        return out;
       });
       while (state.shop.slots.length < state.shop.slotsUnlocked) state.shop.slots.push(null);
     }

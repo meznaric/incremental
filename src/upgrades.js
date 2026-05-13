@@ -1,4 +1,11 @@
+import { formatAbbrev } from './bignum.js';
+
 const RARITY_WEIGHTS = { common: 50, uncommon: 22, rare: 8, legendary: 2 };
+// Per-kind multiplier on top of rarity weight. Gambles are noisy and crowd out
+// other kinds when they share weight equally — drop them to 25% so non-gamble
+// kinds dominate any-kind slots. The fixed gamble slot (idx 1) is unaffected
+// since its pool is entirely gambles and relative weights cancel.
+export const KIND_WEIGHT = { gamble: 0.25 };
 
 export const UPGRADES = [
   { id: 'red_black',  kind: 'gamble', rarity: 'common',
@@ -154,62 +161,14 @@ export const UPGRADES = [
     name: 'Last Stand',   desc: 'Losses fully refunded, 60 sec',
     refund: 1.0, duration: 60, costSec: 800 },
 
-  // Additive permanent upgrades, with rate windows so weak tiers stop appearing
-  // once the player's production outgrows them.
-  { id: 'plus_one',       kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+1 per second',       desc: 'Permanent +1 to base rate',
-    value: 1,    baseCost: 10,     growth: 1.15,                       maxRate: 20 },
-  { id: 'plus_two',       kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+2 per second',       desc: 'Permanent +2 to base rate',
-    value: 2,    baseCost: 25,     growth: 1.18,                       maxRate: 35 },
-  { id: 'plus_five',      kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+5 per second',       desc: 'Permanent +5 to base rate',
-    value: 5,    baseCost: 80,     growth: 1.2,    minRate: 3,         maxRate: 80 },
-  { id: 'plus_ten',       kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+10 per second',      desc: 'Permanent +10 to base rate',
-    value: 10,   baseCost: 250,    growth: 1.22,   minRate: 10,        maxRate: 200 },
-  { id: 'plus_twentyfive', kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+25 per second',      desc: 'Permanent +25 to base rate',
-    value: 25,   baseCost: 800,    growth: 1.25,   minRate: 30,        maxRate: 500 },
-  { id: 'plus_fifty',     kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+50 per second',      desc: 'Permanent +50 to base rate',
-    value: 50,   baseCost: 2500,   growth: 1.3,    minRate: 80,        maxRate: 1500 },
-  { id: 'plus_hundred',   kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+100 per second',     desc: 'Permanent +100 to base rate',
-    value: 100,  baseCost: 7000,   growth: 1.3,    minRate: 200,       maxRate: 4000 },
-  { id: 'plus_twofifty',  kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+250 per second',     desc: 'Permanent +250 to base rate',
-    value: 250,  baseCost: 22000,  growth: 1.35,   minRate: 600,       maxRate: 12000 },
-  { id: 'plus_fivehundred', kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+500 per second',     desc: 'Permanent +500 to base rate',
-    value: 500,  baseCost: 60000,  growth: 1.35,   minRate: 1500,      maxRate: 35000 },
-  { id: 'plus_thousand',  kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+1k per second',      desc: 'Permanent +1k to base rate',
-    value: 1000, baseCost: 180000, growth: 1.4,    minRate: 4000,      maxRate: 1e5 },
-  { id: 'plus_fivek',     kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+5k per second',      desc: 'Permanent +5k to base rate',
-    value: 5000, baseCost: 1e6,    growth: 1.4,    minRate: 15000,     maxRate: 4e5 },
-  { id: 'plus_tenk',      kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+10k per second',     desc: 'Permanent +10k to base rate',
-    value: 10000, baseCost: 2.5e6, growth: 1.45,   minRate: 50000,     maxRate: 1.5e6 },
-  { id: 'plus_fiftyk',    kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+50k per second',     desc: 'Permanent +50k to base rate',
-    value: 50000, baseCost: 15e6, growth: 1.45,    minRate: 2e5,       maxRate: 6e6 },
-  { id: 'plus_twofiftyk', kind: 'permanent', rarity: 'rare',     permType: 'add',
-    name: '+250k per second',    desc: 'Permanent +250k to base rate',
-    value: 250000, baseCost: 80e6, growth: 1.5,    minRate: 8e5,       maxRate: 3e7 },
-  { id: 'plus_mil',       kind: 'permanent', rarity: 'common',   permType: 'add',
-    name: '+1M per second',      desc: 'Permanent +1M to base rate',
-    value: 1e6,  baseCost: 4e8,   growth: 1.5,     minRate: 3e6,       maxRate: 1.2e8 },
-  { id: 'plus_tenm',      kind: 'permanent', rarity: 'uncommon', permType: 'add',
-    name: '+10M per second',     desc: 'Permanent +10M to base rate',
-    value: 1e7,  baseCost: 4e9,   growth: 1.55,    minRate: 3e7,       maxRate: 1.2e9 },
-  { id: 'plus_hundredm',  kind: 'permanent', rarity: 'rare',     permType: 'add',
-    name: '+100M per second',    desc: 'Permanent +100M to base rate',
-    value: 1e8,  baseCost: 5e10,  growth: 1.55,    minRate: 3e8,       maxRate: 1.2e10 },
-  { id: 'plus_bil',       kind: 'permanent', rarity: 'legendary', permType: 'add',
-    name: '+1B per second',      desc: 'Permanent +1B to base rate',
-    value: 1e9,  baseCost: 6e11,  growth: 1.6,     minRate: 3e9 },
+  // Additive permanents are generated dynamically per slate via genBaseAdd —
+  // see the _dyn:'add' virtual entries below. The static list grew unwieldy
+  // and trailed off into "only legendary" once production passed the last
+  // hard-coded tier. Generated tiers stay relevant at any rate.
+  { kind: 'permanent', rarity: 'common',    _dyn: 'add' },
+  { kind: 'permanent', rarity: 'uncommon',  _dyn: 'add' },
+  { kind: 'permanent', rarity: 'rare',      _dyn: 'add' },
+  { kind: 'permanent', rarity: 'legendary', _dyn: 'add' },
 
   // Multiplicative permanents — weak mults phase out, strong ones unlock later.
   { id: 'mult5',          kind: 'permanent', rarity: 'common',    permType: 'mul',
@@ -260,8 +219,11 @@ export const UPGRADES = [
     pctCost: 0.5,  ratio: 0.0075 },
 ];
 
-const BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
+const BY_ID = new Map(UPGRADES.filter((u) => u.id).map((u) => [u.id, u]));
 export const getUpgrade = (id) => BY_ID.get(id);
+// Slots may carry a `dyn` payload for dynamically generated upgrades whose
+// id isn't in the static table. Prefer it over the registry.
+export const resolveUpgrade = (slot) => slot && (slot.dyn || BY_ID.get(slot.id)) || null;
 
 export const CONVERT_MIN_RATE = 100;
 
@@ -282,6 +244,7 @@ export const KIND_THEME = {
 
 export function isEligible(u, ctx) {
   const r = ctx?.rate || 0;
+  if (u._dyn) return true; // virtual generators are always eligible
   if (u.kind === 'convert' && r <= CONVERT_MIN_RATE) return false;
   if (u.minRate != null && r < u.minRate) return false;
   if (u.maxRate != null && r >= u.maxRate) return false;
@@ -295,7 +258,7 @@ export function slotMatches(u, slotIdx) {
 }
 
 function weightedPick(pool) {
-  const weights = pool.map((u) => RARITY_WEIGHTS[u.rarity] || 1);
+  const weights = pool.map((u) => (RARITY_WEIGHTS[u.rarity] || 1) * (KIND_WEIGHT[u.kind] ?? 1));
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < pool.length; i++) {
@@ -305,32 +268,89 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 
-// Each slot freezes its cost at the moment it was offered, so the number on
-// the card doesn't drift as the player's balance / rate change. ctx must
-// carry { balance, rate, owned }.
-function buildSlot(u, ctx) {
+// Round to a 1/2/5 mantissa so generated tiers read like the old hand-tuned
+// ones (+5/s, +200/s, +1B/s) instead of +6.3471e7/s.
+function niceRound(x) {
+  if (!isFinite(x) || x <= 0) return 1;
+  const exp = Math.floor(Math.log10(x));
+  const m = x / Math.pow(10, exp);
+  const nice = m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10;
+  return nice * Math.pow(10, exp);
+}
+
+// Dynamic additive permanent. Scales the +X/s value to a fraction of the
+// player's current rate by rarity; cost is a multiple of value with a mild
+// log bump so late-game tiers stay meaningful but not free.
+export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 6 };
+export function genBaseAdd(rarity, ctx) {
+  const r = Math.max(ctx?.rate || 0, 1);
+  const value = niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1));
+  const cost = Math.max(10, value * (40 + Math.log10(Math.max(value, 10)) * 30));
+  const label = formatAbbrev(value);
   return {
-    id: u.id,
-    cost: costFor(u, ctx),
+    upgrade: {
+      id: `dyn_add_${rarity}_${value}`,
+      kind: 'permanent',
+      rarity,
+      permType: 'add',
+      name: `+${label} per second`,
+      desc: `Permanent +${label} to base rate`,
+      value,
+    },
+    cost,
   };
+}
+
+// Materialize a virtual generator into a concrete upgrade + cost.
+function materialize(u, ctx) {
+  if (u._dyn === 'add') return genBaseAdd(u.rarity, ctx);
+  return { upgrade: u, cost: costFor(u, ctx) };
+}
+
+// Each slot freezes its cost at the moment it was offered, so the number on
+// the card doesn't drift as the player's balance / rate change. For dynamic
+// upgrades the full definition rides along on the slot under `dyn`.
+function buildSlot(u, ctx) {
+  const m = materialize(u, ctx);
+  const slot = { id: m.upgrade.id, cost: m.cost };
+  if (u._dyn) slot.dyn = m.upgrade;
+  return slot;
 }
 
 export function rollSlate(n, ctx) {
   const slate = [];
-  const taken = new Set();
+  const takenKinds = new Set(); // dynamic entries share no id, so de-dupe by (kind, _dyn)
+  const takenIds = new Set();
   for (let i = 0; i < n; i++) {
-    const pool = UPGRADES.filter((u) => !taken.has(u.id) && slotMatches(u, i) && isEligible(u, ctx));
+    const pool = UPGRADES.filter((u) => {
+      if (u._dyn && takenKinds.has(`${u.kind}:${u._dyn}`)) return false;
+      if (u.id && takenIds.has(u.id)) return false;
+      return slotMatches(u, i) && isEligible(u, ctx);
+    });
     if (!pool.length) { slate.push(null); continue; }
     const pick = weightedPick(pool);
     slate.push(buildSlot(pick, ctx));
-    taken.add(pick.id);
+    if (pick._dyn) takenKinds.add(`${pick.kind}:${pick._dyn}`);
+    if (pick.id) takenIds.add(pick.id);
   }
   return slate;
 }
 
 export function rerollSlot(slate, idx, ctx) {
-  const exclude = new Set(slate.map((s) => s?.id).filter(Boolean));
-  const pool = UPGRADES.filter((u) => !exclude.has(u.id) && slotMatches(u, idx) && isEligible(u, ctx));
+  const excludeIds = new Set();
+  const excludeDyn = new Set();
+  for (let i = 0; i < slate.length; i++) {
+    if (i === idx) continue;
+    const s = slate[i];
+    if (!s) continue;
+    if (s.dyn) excludeDyn.add(`${s.dyn.kind}:add`);
+    else if (s.id) excludeIds.add(s.id);
+  }
+  const pool = UPGRADES.filter((u) => {
+    if (u._dyn && excludeDyn.has(`${u.kind}:${u._dyn}`)) return false;
+    if (u.id && excludeIds.has(u.id)) return false;
+    return slotMatches(u, idx) && isEligible(u, ctx);
+  });
   if (!pool.length) return slate[idx];
   return buildSlot(weightedPick(pool), ctx);
 }

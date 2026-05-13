@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MagnitudeDisplay } from './display.js';
 import { HeroDisplay } from './hero.js';
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { getUpgrade, KIND_THEME } from './upgrades.js';
+import { resolveUpgrade, KIND_THEME } from './upgrades.js';
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
@@ -48,7 +48,7 @@ slotModalEl.addEventListener('click', (e) => {
 });
 function openSlotModal(idx) {
   const slot = state.shop.slots[idx];
-  const u = slot ? getUpgrade(slot.id) : null;
+  const u = slot ? resolveUpgrade(slot) : null;
   if (!u || !slot) return;
   const theme = KIND_THEME[u.kind] || {};
   slotModalTitleEl.textContent = u.name;
@@ -95,6 +95,12 @@ if (loaded) {
     duration: STARTUP_BUFF_DURATION,
     expiresAt: initNow + STARTUP_BUFF_DURATION,
   });
+  // Start the player with one base additive and one strong multiplier already
+  // applied, so the early game isn't dead air before the first upgrade lands.
+  state.flatBonus += 2;
+  state.permMul *= 3;
+  state.owned['startup_add'] = 1;
+  state.owned['startup_mul'] = 1;
 }
 
 // Fill any empty slots and reroll any items that no longer fit (kind/rate gate).
@@ -348,7 +354,7 @@ function renderShop() {
   renderToolbar();
   for (let i = 0; i < state.shop.slotsUnlocked; i++) {
     const slot = state.shop.slots[i];
-    const u = slot ? getUpgrade(slot.id) : null;
+    const u = slot ? resolveUpgrade(slot) : null;
     const el = slotEls[i];
     if (!u || !slot) { el.style.display = 'none'; continue; }
     el.style.display = '';

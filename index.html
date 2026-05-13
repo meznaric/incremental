@@ -694,18 +694,11 @@
         gap: 8px;
       }
       #slots {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x proximity;
-        scrollbar-width: none;
-        margin: 0 -8px;
-        padding: 0 8px 4px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
       }
-      #slots::-webkit-scrollbar { display: none; }
-      .slot { flex: 0 0 168px; scroll-snap-align: start; padding: 8px; }
+      .slot { width: auto; padding: 8px; }
       .slot .name { font-size: 12px; }
       .slot .desc { font-size: 10px; min-height: 28px; }
       .slot .cost { font-size: 12px; margin-top: 4px; }

@@ -1,4 +1,4 @@
-import { getUpgrade, rollSlate, rerollSlot, isEligible, slotMatches } from './upgrades.js';
+import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade } from './upgrades.js';
 import { checkGamble } from './interstitial.js';
 
 export const DEFAULT_SLOTS = 2;
@@ -18,11 +18,15 @@ export const REROLL_UNLOCK_AT = 1000;
 export const PIN_UNLOCK_COST = 5000;
 export const PIN_UNLOCK_AT = 5000;
 export const REROLL_PCT_PER_SLOT = 0.03;
-export const REROLL_FLOOR_SECONDS = 60;
+export const REROLL_FLOOR_SECONDS = 30;
 
+// Reroll cost is based on the rate captured at the time the slate was rolled
+// (state.shop.offeredRate), not the live rate. This keeps the displayed price
+// stable as production grows. Fall back to live rate if no offered rate is set.
 export function computeRerollCost(state, now, nonPinnedCount) {
   const pct = REROLL_PCT_PER_SLOT * nonPinnedCount * state.amount;
-  const floor = REROLL_FLOOR_SECONDS * effectiveRate(state, now) * nonPinnedCount;
+  const rate = state.shop.offeredRate != null ? state.shop.offeredRate : effectiveRate(state, now);
+  const floor = REROLL_FLOOR_SECONDS * rate * nonPinnedCount;
   return Math.max(pct, floor);
 }
 
@@ -44,6 +48,7 @@ export function makeShopState() {
       rerollUnlocked: false,
       pinUnlocked: false,
       pinnedSlot: null,
+      offeredRate: 0,
     },
     lastResult: null,
     messages: {
@@ -156,7 +161,7 @@ export function rollContext(state, now) {
 export function tryBuy(state, slotIdx, now) {
   const slot = state.shop.slots[slotIdx];
   if (!slot) return { ok: false, reason: 'invalid' };
-  const u = getUpgrade(slot.id);
+  const u = resolveUpgrade(slot);
   if (!u) return { ok: false, reason: 'invalid' };
   const cost = slot.cost;
 
@@ -216,7 +221,9 @@ export function tryBuy(state, slotIdx, now) {
 // (since the bought upgrade is gone); we keep the pin pointing at the same
 // index so the new upgrade lands pre-pinned.
 function replaceSlot(state, slotIdx, now) {
-  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, rollContext(state, now));
+  const ctx = rollContext(state, now);
+  state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, ctx);
+  state.shop.offeredRate = ctx.rate;
 }
 
 export function pruneBuffs(state, now) {
@@ -244,16 +251,19 @@ export function validateSlate(state, now) {
   const target = state.shop.slotsUnlocked;
   while (state.shop.slots.length < target) state.shop.slots.push(null);
   if (state.shop.slots.length > target) state.shop.slots.length = target;
+  let rerolled = false;
   for (let i = 0; i < state.shop.slots.length; i++) {
     const slot = state.shop.slots[i];
-    const u = slot ? getUpgrade(slot.id) : null;
+    const u = slot ? resolveUpgrade(slot) : null;
     if (!u || !isEligible(u, ctx) || !slotMatches(u, i)) {
       state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
+      rerolled = true;
     }
   }
   if (state.shop.pinnedSlot != null && state.shop.pinnedSlot >= state.shop.slots.length) {
     state.shop.pinnedSlot = null;
   }
+  if (rerolled || state.shop.offeredRate == null) state.shop.offeredRate = ctx.rate;
 }
 
 export function rerollCost(state, now) {
@@ -281,6 +291,7 @@ export function tryReroll(state, now) {
     if (state.shop.pinnedSlot === i) continue;
     state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
   }
+  state.shop.offeredRate = ctx.rate;
   return { ok: true, cost, rerolled: n };
 }
 

@@ -6,9 +6,9 @@
 export const INTERSTITIALS = {
   welcome: {
     steps: [
-      { text: 'A number begins at zero.' },
-      { text: 'It can end at vigintillion. Crowned. Unfathomable.' },
-      { text: 'Everything between is yours to shape — patient, reckless, brilliant. The choice is recorded.' },
+      { text: 'This is a long game.' },
+      { text: 'You won\'t finish today. Maybe not this year.' },
+      { text: 'Close the tab whenever. Come back tomorrow — the number keeps climbing.' },
     ],
   },
 
@@ -23,9 +23,9 @@ export const INTERSTITIALS = {
 
   tenth_loss: {
     steps: [
-      { text: 'I told you gambling is bad.' },
-      { text: 'Ten losses now. That isn\'t noise.' },
-      { text: 'That is math, doing what math does.' },
+      { text: 'I told you.' },
+      { text: 'Ten losses. That isn\'t bad luck.' },
+      { text: 'It\'s just math.' },
     ],
   },
 
@@ -33,53 +33,53 @@ export const INTERSTITIALS = {
     steps: [
       { text: 'You really shouldn\'t gamble.' },
       { text: 'Everything you built — gone in one coin.' },
-      { text: 'Begin again. Or don\'t. The seat is still warm.' },
+      { text: 'Begin again. Or don\'t.' },
     ],
   },
 
   end_vigintillion: {
     steps: [
-      { text: 'You reached the crown.' },
-      { text: 'Vigintillion. The number cannot grow further here.' },
-      { text: 'What did the climb cost you? What did it teach you?' },
-      { text: 'Begin again, with everything you now know.' },
+      { text: 'Vigintillion.' },
+      { text: 'That\'s the top number this game tracks.' },
+      { text: 'However long it took, that\'s how long it took.' },
+      { text: 'Begin again. Or don\'t.' },
     ],
   },
 
   milestone_1k: {
     steps: [
       { text: 'First thousand.', autoMs: 1400 },
-      { text: 'A small number. The first one with a name.', autoMs: 2200 },
+      { text: 'Long way to go.', autoMs: 2000 },
     ],
   },
   milestone_1m: {
     steps: [
       { text: 'First million.', autoMs: 1400 },
-      { text: 'From here, digits stop counting and start naming themselves.', autoMs: 2400 },
+      { text: 'Still early.', autoMs: 2000 },
     ],
   },
   milestone_1b: {
     steps: [
       { text: 'Billion.', autoMs: 1200 },
-      { text: 'Three more zeroes than a moment ago.', autoMs: 2200 },
+      { text: 'Keep coming back.', autoMs: 2000 },
     ],
   },
   milestone_1t: {
     steps: [
       { text: 'Trillion.', autoMs: 1200 },
-      { text: 'National-budget scale. Casual now.', autoMs: 2400 },
+      { text: 'Weeks in, probably.', autoMs: 2200 },
     ],
   },
   milestone_1qa: {
     steps: [
       { text: 'Quadrillion.', autoMs: 1200 },
-      { text: 'More than the grains of sand on most beaches.', autoMs: 2400 },
+      { text: 'Months now.', autoMs: 2000 },
     ],
   },
   milestone_1qi: {
     steps: [
       { text: 'Quintillion.', autoMs: 1200 },
-      { text: 'Star-counting territory.', autoMs: 2200 },
+      { text: 'Still a long way.', autoMs: 2000 },
     ],
   },
 };

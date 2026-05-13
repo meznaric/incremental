@@ -167,22 +167,22 @@ test('tryReroll: refused when reroll is locked', () => {
   assert.equal(s.amount, 1000);
 });
 
-test('tryReroll: deducts 1% per non-pinned slot and replaces them', () => {
-  const s = freshState({ amount: 1000, basePerSecond: 10 });
+test('tryReroll: deducts cost (max of pct and 60s of rate) and replaces slots', () => {
+  // basePerSecond 0 → 60s × rate × N collapses to 0, so pct dominates: 2 × 3% × 100000 = 6000
+  const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
   installSlot(s, 0, 'plus_one', 50);
   installSlot(s, 1, 'coin_flip', 100);
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
   assert.equal(res.rerolled, 2);
-  // 2 slots × 1% × 1000 = 20
-  assert.equal(s.amount, 980);
+  assert.equal(s.amount, 100000 - 6000);
   assert.equal(typeof s.shop.slots[0]?.id, 'string');
   assert.equal(typeof s.shop.slots[1]?.id, 'string');
 });
 
 test('tryReroll: pinned slot is preserved and not charged', () => {
-  const s = freshState({ amount: 1000, basePerSecond: 10 });
+  const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
   s.shop.pinUnlocked = true;
   installSlot(s, 0, 'plus_one', 50);
@@ -192,9 +192,21 @@ test('tryReroll: pinned slot is preserved and not charged', () => {
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
   assert.equal(res.rerolled, 1);
-  // 1 slot × 1% × 1000 = 10
-  assert.equal(s.amount, 990);
+  // 1 slot × 3% × 100000 = 3000
+  assert.equal(s.amount, 100000 - 3000);
   assert.equal(s.shop.slots[0], before);
+});
+
+test('tryReroll: cost floor is 60s of production per non-pinned slot', () => {
+  // High rate, small balance: 60s × 100/s × 2 slots = 12000 > 3% × 2 × 1000 = 60
+  const s = freshState({ amount: 1000, basePerSecond: 100 });
+  s.shop.rerollUnlocked = true;
+  installSlot(s, 0, 'plus_one', 50);
+  installSlot(s, 1, 'coin_flip', 100);
+  // Cost would be 12000 but balance is 1000 — reroll refused.
+  const res = tryReroll(s, 0);
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'broke');
 });
 
 test('tryUnlockSlot: deducts cost and grows the slate', () => {
@@ -236,6 +248,6 @@ test('tryTogglePin: toggles only when pin is unlocked', () => {
 });
 
 // Reference the imported constant so unused-import lint stays quiet.
-test('REROLL_PCT_PER_SLOT is 1%', () => {
-  assert.equal(REROLL_PCT_PER_SLOT, 0.01);
+test('REROLL_PCT_PER_SLOT is 3%', () => {
+  assert.equal(REROLL_PCT_PER_SLOT, 0.03);
 });

@@ -6,9 +6,8 @@ import { getUpgrade, KIND_THEME } from './upgrades.js';
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
-  nextSlotUnlockCost,
+  nextSlotUnlockCost, computeRerollCost,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
-  REROLL_PCT_PER_SLOT,
 } from './shop.js';
 import { loadState, saveState, nowSeconds } from './save.js';
 import { checkStart, checkAmount } from './interstitial.js';
@@ -169,6 +168,14 @@ function fmtDuration(s) {
   return `${d.toFixed(1)} day${d >= 2 ? 's' : ''}`;
 }
 
+// Skip innerHTML assignment when content is unchanged. Avoids tearing down
+// child nodes between mousedown and mouseup, which would silently eat clicks.
+function setHtmlIfChanged(el, html) {
+  if (el._lastHtml === html) return;
+  el._lastHtml = html;
+  el.innerHTML = html;
+}
+
 // Re-trigger a one-shot animation class. Strip stale fx classes, force reflow, re-add.
 function playSlotFx(el, cls) {
   el.classList.remove('fx-buy', 'fx-drop', 'fx-reject');
@@ -272,7 +279,7 @@ function setTbBtn(act, visible, locked, label) {
   b.style.display = visible ? '' : 'none';
   if (!visible) return;
   b.classList.toggle('locked', !!locked);
-  b.querySelector('.tb-label').innerHTML = label;
+  setHtmlIfChanged(b.querySelector('.tb-label'), label);
 }
 
 function renderToolbar() {
@@ -288,7 +295,7 @@ function renderToolbar() {
     `Unlock Reroll · ${COIN}${formatAbbrev(REROLL_UNLOCK_COST)}`);
   if (rerollVisible) {
     const n = countRerollableForUi();
-    const cost = state.amount * REROLL_PCT_PER_SLOT * n;
+    const cost = computeRerollCost(state, nowSeconds(), n);
     setTbBtn('reroll', true, !(n > 0 && state.amount >= cost && state.amount > 0),
       `Reroll ${n} · ${COIN}${formatAbbrev(cost)}`);
   } else {
@@ -354,7 +361,8 @@ function renderShop() {
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    el.querySelector('.cost').innerHTML = `${COIN}${formatAbbrev(cost)}`;
+    const costHtml = `${COIN}${formatAbbrev(cost)}`;
+    setHtmlIfChanged(el.querySelector('.cost'), costHtml);
 
     let outcomes = '';
     if (u.kind === 'gamble') {
@@ -367,7 +375,7 @@ function renderShop() {
     } else if (u.kind === 'convert') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
     }
-    el.querySelector('.outcomes').innerHTML = outcomes;
+    setHtmlIfChanged(el.querySelector('.outcomes'), outcomes);
 
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;

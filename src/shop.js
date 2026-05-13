@@ -17,7 +17,14 @@ export const REROLL_UNLOCK_COST = 1000;
 export const REROLL_UNLOCK_AT = 1000;
 export const PIN_UNLOCK_COST = 5000;
 export const PIN_UNLOCK_AT = 5000;
-export const REROLL_PCT_PER_SLOT = 0.01;
+export const REROLL_PCT_PER_SLOT = 0.03;
+export const REROLL_FLOOR_SECONDS = 60;
+
+export function computeRerollCost(state, now, nonPinnedCount) {
+  const pct = REROLL_PCT_PER_SLOT * nonPinnedCount * state.amount;
+  const floor = REROLL_FLOOR_SECONDS * effectiveRate(state, now) * nonPinnedCount;
+  return Math.max(pct, floor);
+}
 
 export function makeShopState() {
   return {
@@ -249,9 +256,8 @@ export function validateSlate(state, now) {
   }
 }
 
-export function rerollCost(state) {
-  const n = countRerollable(state);
-  return state.amount * REROLL_PCT_PER_SLOT * n;
+export function rerollCost(state, now) {
+  return computeRerollCost(state, now, countRerollable(state));
 }
 
 function countRerollable(state) {
@@ -267,7 +273,7 @@ export function tryReroll(state, now) {
   if (!state.shop.rerollUnlocked) return { ok: false, reason: 'locked' };
   const n = countRerollable(state);
   if (n === 0) return { ok: false, reason: 'empty' };
-  const cost = state.amount * REROLL_PCT_PER_SLOT * n;
+  const cost = computeRerollCost(state, now, n);
   if (state.amount < cost || state.amount <= 0) return { ok: false, reason: 'broke' };
   state.amount -= cost;
   const ctx = rollContext(state, now);

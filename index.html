@@ -1621,6 +1621,10 @@
       background: rgba(6, 6, 14, 0.78);
       backdrop-filter: blur(6px);
     }
+    /* Briefly transparent to input right after opening so rapid taps from the
+       purchase that triggered the interstitial reach the card behind instead
+       of being eaten as advance/dismiss. */
+    #interstitial.it-guard { pointer-events: none; }
     .it-card {
       max-width: 620px;
       padding: 36px 40px 28px;

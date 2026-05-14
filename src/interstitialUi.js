@@ -19,6 +19,13 @@ export function makeInterstitialUi(state, onShown) {
   let typing = null;       // { i, full, raf, doneAt }
   let waitingInput = false;
   let autoTimer = 0;
+  // Input-guard window after open: the overlay sets pointer-events:none so
+  // rapid taps queued from the purchase that triggered it pass through to the
+  // card behind instead of being eaten as "advance" taps. Longer than the
+  // 180ms backdrop fade so the user has clearly seen the overlay arrive
+  // before it starts catching input.
+  const INPUT_GUARD_MS = 400;
+  let guardTimer = 0;
 
   // first_contact uses the *next* contact-bearing id parked on stats so the
   // portrait matches the milestone we're framing.
@@ -65,6 +72,9 @@ export function makeInterstitialUi(state, onShown) {
     active = { id, def, stepIdx: 0 };
     applyContactFrame(id);
     root.style.display = 'flex';
+    root.classList.add('it-guard');
+    if (guardTimer) clearTimeout(guardTimer);
+    guardTimer = setTimeout(() => { root.classList.remove('it-guard'); guardTimer = 0; }, INPUT_GUARD_MS);
     requestAnimationFrame(() => root.classList.add('it-visible'));
     showStep();
   }
@@ -76,7 +86,8 @@ export function makeInterstitialUi(state, onShown) {
     typing = null;
     waitingInput = false;
     autoTimer = 0;
-    root.classList.remove('it-visible');
+    if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
+    root.classList.remove('it-visible', 'it-guard');
     setTimeout(() => { if (!active) root.style.display = 'none'; }, 180);
     state.messages.shown[id] = true;
     const i = state.messages.queue.indexOf(id);

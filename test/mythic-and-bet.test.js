@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  UPGRADES, getUpgrade, costFor, totalMulOwned,
-  ADD_VALUE_MULT, GIFT_SECONDS, MUL_CATEGORY_GROWTH, genBaseAdd, genGift,
+  UPGRADES, getUpgrade, costFor, totalMulOwned, isEligible,
+  ADD_VALUE_MULT, GIFT_SECONDS, MUL_CATEGORY_GROWTH, CONVERT_BOOST_CAP,
+  genBaseAdd, genGift,
 } from '../src/upgrades.js';
 
 test('mythic exists in rarity-indexed tables', () => {
@@ -85,4 +86,48 @@ test('mul cost ramp does not affect non-mul permanents', () => {
   const a = costFor(fakeAdd, { balance: 0, rate: 0, owned: {} });
   const b = costFor(fakeAdd, { balance: 0, rate: 0, owned: { mult5: 5 } });
   assert.equal(a, b, 'add-permanent cost should not change with mul owned count');
+});
+
+test('common mul stays in the pool past its original maxRate', () => {
+  // mult_starter used to be filtered out at rate ≥ 500. It now stays eligible
+  // and switches to rate-aware pricing instead.
+  const u = getUpgrade('mult_starter');
+  assert.ok(isEligible(u, { rate: 50,    owned: {} }));
+  assert.ok(isEligible(u, { rate: 1e4,   owned: {} }));
+  assert.ok(isEligible(u, { rate: 1e10,  owned: {} }));
+});
+
+test('mul cost transitions to rate-aware floor past maxRate', () => {
+  // Below maxRate, cost uses the static baseCost ladder. Above it, the
+  // rate-aware floor kicks in so weak commons aren't trivially cheap at
+  // high production.
+  const u = getUpgrade('mult_starter'); // ×1.5, maxRate 500
+  const below = costFor(u, { balance: 0, rate: 100,  owned: {} });
+  const above = costFor(u, { balance: 0, rate: 1e8,  owned: {} });
+  // Below the threshold, baseCost (50) wins.
+  assert.equal(below, 50);
+  // Above, the floor should make the cost dwarf the static one.
+  assert.ok(above > 1e8, `expected rate-aware floor to dominate at rate 1e8, got ${above}`);
+});
+
+test('convert cost is capped by baseAdditive × CONVERT_BOOST_CAP', () => {
+  // Late-game pattern: balance is many orders of magnitude bigger than
+  // baseAdditive. Without the cap, empire would convert into a 100× rate jump.
+  const empire = getUpgrade('empire'); // legendary, pctCost 1.0, ratio 0.01
+  const ctx = { balance: 1e15, rate: 1e9, baseAdditive: 1e6, owned: {} };
+  const cost = costFor(empire, ctx);
+  const uncappedSpend = ctx.balance * empire.pctCost; // 1e15
+  const expectedCap = CONVERT_BOOST_CAP.legendary * ctx.baseAdditive / empire.ratio;
+  assert.ok(cost < uncappedSpend, 'cap should kick in when balance >> baseAdditive');
+  assert.equal(cost, expectedCap);
+  // The yield (cost × ratio) is the flatBonus delta — bounded at CAP × baseAdditive.
+  assert.equal(cost * empire.ratio, CONVERT_BOOST_CAP.legendary * ctx.baseAdditive);
+});
+
+test('convert cost stays at balance × pctCost when below the cap', () => {
+  // Early/mid game: balance is small relative to baseAdditive, so the cap
+  // shouldn't bite — the convert keeps its "burn X% of balance" identity.
+  const tipJar = getUpgrade('tip_jar'); // common, pctCost 0.05, ratio 0.0002
+  const ctx = { balance: 1000, rate: 10, baseAdditive: 10, owned: {} };
+  assert.equal(costFor(tipJar, ctx), ctx.balance * tipJar.pctCost);
 });

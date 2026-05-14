@@ -148,6 +148,84 @@ IMAGES = [
         "Cold near-black background, faint nebular dust in cool slate-blue. "
         "Painterly, simplified, ominous. No spaceships, no planets visible, no text."
     ),
+
+    # --- Contact worlds previously rendered as abstract fallback art ---
+    (
+        "tarsus-minor-fire", "16:9", False,
+        "Painted distant orbital view of an atomic-age alien continent at night. "
+        "A scatter of dim industrial cities along a coastline. One inland city is in the first instant of vanishing: "
+        "a pale near-white point of light directly at the surface with the leading edge of a fusion shockwave just beginning to bloom outward, "
+        "still small in frame, severe and clinical. Faint cloud bands across the rest of the night side. "
+        "Far horizon arcs gently against deep starfield. "
+        "Painterly soft edges, cold restrained palette, no lens flare, no readable signage, no text. "
+        "Mood: observed disaster at a great distance, witnessed not celebrated."
+    ),
+    (
+        "lehl-quiet-garden", "16:9", False,
+        "Painted wide illustration of a peaceful settled alien world at dusk. "
+        "A long terraced garden of pale slender trees runs across the middle of the frame, "
+        "with a low stone plinth in the foreground supporting a small unobtrusive radio dish facing upward. "
+        "Two distant slender robed figures walk between the tree rows, calm and unhurried, hands at their sides. "
+        "A wide pale lake beyond the garden; a soft warm horizon band fading into a deep blue sky. "
+        "Painterly stillness, simplified architectural forms, no text on any sign or banner."
+    ),
+    (
+        "designation-withheld", "16:9", False,
+        "Painted wide vista of cold deep space. "
+        "The composition is centred on a single faint cool-blue circular outline drawn on the starfield itself — "
+        "the shape of a world that should be inside the circle, but the inside of the circle holds only more distant stars. "
+        "No planet, no debris, no spacecraft. "
+        "Faint slate-blue nebular dust off to one side; the rest is near-black. "
+        "Painterly, simplified, lonely. The mood is absence. No text, no coordinate markings, no rangefinder graphics."
+    ),
+
+    # --- New intermediate contact worlds (story expansion) ---
+    (
+        "korv-stone-listeners", "16:9", False,
+        "Painted interior wide illustration of a vast subterranean alien cavern. "
+        "Pale eyeless humanoid burrower figures, low to the ground, are gathered around a small outcrop of glowing crystal "
+        "that radiates a warm tungsten light. The figures' faces are tilted up toward the cavern ceiling, listening. "
+        "Cool blue luminescent lichens trace seams in the dark stone walls. "
+        "Distant tunnel mouths recede into deeper shadow at the edges. "
+        "No surface light, no sky, no plants. Painterly simplified silhouettes, atmospheric depth, severe and quiet. "
+        "No text, no readable carvings."
+    ),
+    (
+        "mora-brae-auroras", "16:9", False,
+        "Painted wide illustration of a glacial coastline on a cold alien world at night. "
+        "Three small ice-block shelters huddled near a low fire. "
+        "A single fur-clad bipedal figure stands apart on a low rise, back to the viewer, head tilted up toward "
+        "a vast cool-blue and pale-green aurora ribbon that takes up the upper two-thirds of the frame. "
+        "Snow-flecked black water in the middle distance; the aurora's reflection a faint shimmer on the surface. "
+        "Painterly soft brushwork, simplified silhouettes, severe and lonely. No text, no banners, no readable patterns in the aurora."
+    ),
+    (
+        "theran-canopy", "16:9", False,
+        "Painted wide illustration of a forest-canopy alien city at twilight. "
+        "Three enormous tree trunks the scale of skyscrapers rise through the frame, with spiral wooden terraces winding around their bark, "
+        "each terrace dotted with small warm-lit dwellings. "
+        "Slender glowing quartz-fibre lines are strung between branches like nerve threads, faint cool-blue light along them. "
+        "One small arboreal figure stands on a high terrace, hand reaching out to touch a fibre. "
+        "Soft mist pools in the lower canopy below. "
+        "Painterly atmospheric depth, simplified silhouettes, no text on any sign."
+    ),
+    (
+        "pellan-toth-glass", "16:9", False,
+        "Painted wide illustration of an alien atomic-age city of tall slender glass towers at night. "
+        "Faint cool-blue resonance patterns shimmer across the glass surfaces of the nearest towers, as if the glass itself is humming. "
+        "A single robed Pellan figure stands on a low stone balcony in the foreground, one hand raised palm-up toward the towers, listening. "
+        "Warm tungsten street lamps at ground level; cold blue glass above. "
+        "Painterly soft edges, severe geometric architecture, no readable letters or glyphs on any tower, no text."
+    ),
+    (
+        "iyarra-vell-scholars", "16:9", False,
+        "Painted wide illustration of a long-lived scholar civilisation's observation plaza on a quiet alien world. "
+        "A great paved courtyard beside a still black-water lake at night. "
+        "Several elderly slender alien figures in plain robes sit at low stone desks, writing on faintly glowing glass slates. "
+        "Behind the plaza, the dark silhouette of an enormous deep-space dish antenna reaches up toward a clear star-strewn sky. "
+        "A soft warm horizon glow from a low city in the far distance. "
+        "Painterly stillness, simplified silhouettes, restrained palette, no readable writing on the slates, no text on any sign."
+    ),
 ]
 
 

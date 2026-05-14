@@ -194,8 +194,38 @@ export function rollContext(state, now) {
   return {
     balance: state.amount,
     rate: effectiveRate(state, now),
+    baseAdditive: (state.basePerSecond || 0) + state.flatBonus,
+    permMul: state.permMul || 1,
     owned: state.owned,
   };
+}
+
+// Synchronous "what would my rate be if I bought this slot?" — mutates the
+// state in-place, reads effectiveRate, then restores. Buffs and ascent flow
+// through so the number on the card matches the immediate post-buy reality.
+export function marginalRateForPurchase(state, slot, now) {
+  if (!slot) return 0;
+  const u = resolveUpgrade(slot);
+  if (!u) return 0;
+  const before = effectiveRate(state, now);
+  let after = before;
+  if (u.kind === 'permanent' && u.permType === 'add') {
+    const orig = state.flatBonus;
+    state.flatBonus = orig + u.value;
+    after = effectiveRate(state, now);
+    state.flatBonus = orig;
+  } else if (u.kind === 'permanent' && u.permType === 'mul') {
+    const orig = state.permMul;
+    state.permMul = orig * u.value;
+    after = effectiveRate(state, now);
+    state.permMul = orig;
+  } else if (u.kind === 'convert') {
+    const orig = state.flatBonus;
+    state.flatBonus = orig + slot.cost * u.ratio;
+    after = effectiveRate(state, now);
+    state.flatBonus = orig;
+  }
+  return Math.max(0, after - before);
 }
 
 export function tryBuy(state, slotIdx, now) {

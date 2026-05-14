@@ -7,6 +7,7 @@ import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
+  marginalRateForPurchase,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
 } from './shop.js';
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
@@ -113,7 +114,24 @@ function openSlotModal(idx) {
       `<div class="slot-modal-row"><span>Cooldown</span><span>${u.cooldown}s</span></div>`,
     );
   } else if (u.kind === 'convert') {
-    rows.push(`<div class="slot-modal-row"><span>Yields</span><span>+${formatAbbrev(slot.cost * u.ratio)} Echoes/s</span></div>`);
+    const eff = marginalRateForPurchase(state, slot, nowSeconds());
+    const baseGain = slot.cost * u.ratio;
+    rows.push(
+      `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
+      `<div class="slot-modal-row"><span>Base added</span><span>+${formatAbbrev(baseGain)}/s before multipliers</span></div>`,
+    );
+  } else if (u.kind === 'permanent' && u.permType === 'add') {
+    const eff = marginalRateForPurchase(state, slot, nowSeconds());
+    rows.push(
+      `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
+      `<div class="slot-modal-row"><span>Base added</span><span>+${formatAbbrev(u.value)}/s before multipliers</span></div>`,
+    );
+  } else if (u.kind === 'permanent' && u.permType === 'mul') {
+    const eff = marginalRateForPurchase(state, slot, nowSeconds());
+    rows.push(
+      `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
+      `<div class="slot-modal-row"><span>Multiplier</span><span>×${u.value}</span></div>`,
+    );
   } else if (u.kind === 'buff') {
     rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
   } else if (u.kind === 'gift') {
@@ -423,20 +441,51 @@ function ensureSlotEls() {
         <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
       </div>
     `;
-    el.addEventListener('click', (e) => {
+    // Use pointerdown/pointerup with a movement threshold instead of `click`.
+    // Why: on iOS, `renderShop` rewrites `.outcomes` innerHTML every 100ms,
+    // and if a tap lands on that child between mousedown/mouseup the
+    // synthesized click is silently dropped (target ancestry changed).
+    // Pointer events resolve at pointerdown's target, immune to DOM churn,
+    // and also sidestep iOS's sticky-:hover delay.
+    let tap = null;
+    const fireTap = (target) => {
       const idx = slotEls.indexOf(el);
-      if (e.target.closest('.pin')) {
-        e.stopPropagation();
+      if (target.closest('.pin')) {
         const r = tryTogglePin(state, idx);
         if (r.ok) renderShop();
         return;
       }
-      if (e.target.closest('.slot-info')) { openSlotModal(idx); return; }
+      if (target.closest('.slot-info')) { openSlotModal(idx); return; }
       const res = tryBuy(state, idx, nowSeconds());
       if (res.ok) {
         playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el);
         scheduleFreeRerollCheck();
       } else { playSlotFx(el, 'fx-reject'); }
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      tap = { id: e.pointerId, target: e.target, x: e.clientX, y: e.clientY, moved: false };
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!tap || e.pointerId !== tap.id) return;
+      if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+    });
+    el.addEventListener('pointercancel', (e) => {
+      if (tap && e.pointerId === tap.id) tap = null;
+    });
+    el.addEventListener('pointerup', (e) => {
+      if (!tap || e.pointerId !== tap.id) return;
+      const s = tap; tap = null;
+      if (s.moved) return;
+      // Suppress the synthetic click that follows on touch — we already acted.
+      el._tapAt = performance.now();
+      fireTap(s.target);
+    });
+    // Fallback click for environments without PointerEvent (and to keep
+    // keyboard / a11y simulated clicks working). Deduped against pointerup.
+    el.addEventListener('click', (e) => {
+      if (el._tapAt && performance.now() - el._tapAt < 700) return;
+      fireTap(e.target);
     });
     slotsEl.appendChild(el);
     slotEls.push(el);
@@ -581,8 +630,13 @@ function renderShop() {
       outcomes =
         `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
         `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
-    } else if (u.kind === 'convert') {
-      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(cost * u.ratio)}/s permanent</div>`;
+    } else if (u.kind === 'convert' || (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul'))) {
+      // Show the *effective* rate change at current multipliers. This is what
+      // actually lands on the HUD pulse the instant the player taps buy —
+      // hiding the multiplier stack behind the upgrade's spec sheet has been
+      // confusing players ("+100 base" silently becoming +2000/s effective).
+      const eff = marginalRateForPurchase(state, slot, now);
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
     } else if (u.kind === 'gift') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
     }

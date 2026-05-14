@@ -299,7 +299,10 @@ export function isEligible(u, ctx) {
   if (u._dyn) return true; // virtual generators are always eligible
   if (u.kind === 'convert' && r <= CONVERT_MIN_RATE) return false;
   if (u.minRate != null && r < u.minRate) return false;
-  if (u.maxRate != null && r >= u.maxRate) return false;
+  // maxRate is *not* a hard filter for mul perms — it acts as a cost-mode
+  // transition in costFor instead, so cheap commons stay in the pool past
+  // their original rate band rather than vanishing once production climbs.
+  if (u.maxRate != null && u.permType !== 'mul' && r >= u.maxRate) return false;
   return true;
 }
 
@@ -340,17 +343,34 @@ const RELAY_TIER = {
   mythic:    'Quiet Relay',
 };
 
-// Dynamic additive permanent. Scales the +X/s value to a fraction of the
-// player's current rate by rarity; cost is a multiple of value with a mild
-// log bump so late-game tiers stay meaningful but not free.
+// Dynamic additive permanent. Scaling is in terms of *base additive* (the raw
+// per-second number before any multiplier) so the listed +X really is a +X%
+// step on the additive base — once the player's multipliers re-apply, the
+// effective gain matches the rarity's percentage, instead of being amplified
+// by permMul a second time.
+//
+// ADD_VALUE_MULT[rarity] is the target *effective* fraction of current rate
+// this tier adds when fresh. A log decay on top makes late-game tiers feel
+// progressively smaller: each decade of additive base shaves the percentage.
 export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 6, mythic: 25 };
+// At base=10 (game start) decay is 1. Each decade above adds 0.25 to the
+// denominator: base=100 → 0.8×, base=1e4 → 0.57×, base=1e8 → 0.36×, base=1e12 → 0.27×.
+function addValueDecay(base) {
+  const decades = Math.max(0, Math.log10(Math.max(base, 1)) - 1);
+  return 1 / (1 + 0.25 * decades);
+}
 export function genBaseAdd(rarity, ctx) {
-  const r = Math.max(ctx?.rate || 0, 1);
-  const value = Math.max(1, niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1)));
-  // Stacked-exponential: linear-in-value times 1.5^log10(value) so late-tier
-  // additive relays cost meaningfully more than their per-second payout.
-  const L = Math.log10(Math.max(value, 10));
-  const cost = Math.max(10, value * (40 + L * 30) * Math.pow(1.5, L));
+  const base = Math.max(ctx?.baseAdditive || 0, 1);
+  const permMul = Math.max(ctx?.permMul || 1, 1);
+  const rarityMul = (ADD_VALUE_MULT[rarity] || 0.1) * addValueDecay(base);
+  const value = Math.max(1, niceRound(base * rarityMul));
+  // Cost scales with the *effective* gain (value × permMul), not the raw value.
+  // Without this the shop would offer huge effective rate jumps for trivial
+  // costs once permMul stacks: the value-vs-cost ratio must stay honest in
+  // effective-rate space.
+  const effGain = value * permMul;
+  const L = Math.log10(Math.max(effGain, 10));
+  const cost = Math.max(10, effGain * (40 + L * 30) * Math.pow(1.5, L));
   const label = formatAbbrev(value);
   const tier = RELAY_TIER[rarity] || 'Field Antenna';
   return {
@@ -360,7 +380,7 @@ export function genBaseAdd(rarity, ctx) {
       rarity,
       permType: 'add',
       name: `${tier} +${label}`,
-      desc: `Patch a new relay into the array. +${label} Echoes/s, permanent.`,
+      desc: `Patch a new relay into the array. +${label} base · multipliers re-apply on top.`,
       value,
     },
     cost,
@@ -465,6 +485,24 @@ export function totalMulOwned(owned) {
   return n;
 }
 
+// Convert cap: caps a single convert's *yield* (and matching spend) so its
+// flatBonus delta can never exceed CAP × baseAdditive. Without this, late-game
+// idle balance trivially converts into 100× rate jumps via empire/conglomerate
+// — burning balance is supposed to be a meaningful trade, not a tap-to-win.
+// Caps mirror ADD_VALUE_MULT so a convert's per-purchase rate boost lives in
+// the same envelope as the same-rarity additive permanent.
+export const CONVERT_BOOST_CAP = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary: 5 };
+
+// Mul perm cost past its original maxRate band: switch from the static
+// baseCost ladder to a rate-aware floor matching the dyn-add pricing curve.
+// Keeps cheap commons in the pool but priced honestly at high production.
+function mulRateAwareCost(upgrade, rate) {
+  const effGain = rate * Math.max(upgrade.value - 1, 0);
+  if (!(effGain > 0)) return 0;
+  const L = Math.log10(Math.max(effGain, 10));
+  return effGain * (40 + L * 30) * Math.pow(1.5, L);
+}
+
 // Permanent cost: super-exponential in own count (growth^(n+n²/25)) so the Nth
 // purchase costs visibly more than the (N-1)th. Mul permanents additionally
 // pay a stacked-exponential category ramp 1.35^(N+N²/40) over total muls owned
@@ -477,12 +515,22 @@ export function costFor(upgrade, ctx) {
       const n = ctx.owned[upgrade.id] || 0;
       let c = upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
       if (upgrade.permType === 'mul') {
+        const rate = Math.max(ctx.rate || 0, 0);
+        if (upgrade.maxRate != null && rate > upgrade.maxRate) {
+          c = Math.max(c, mulRateAwareCost(upgrade, rate));
+        }
         const N = totalMulOwned(ctx.owned);
         c *= Math.pow(MUL_CATEGORY_GROWTH, N + (N * N) / 40);
       }
       return c;
     }
-    case 'convert':   return ctx.balance * upgrade.pctCost;
+    case 'convert': {
+      const balanceSpend = ctx.balance * upgrade.pctCost;
+      const baseAdd = Math.max(ctx.baseAdditive || 1, 1);
+      const cap = (CONVERT_BOOST_CAP[upgrade.rarity] ?? 0.1) * baseAdd
+        / Math.max(upgrade.ratio, 1e-12);
+      return Math.min(balanceSpend, cap);
+    }
   }
   return 0;
 }

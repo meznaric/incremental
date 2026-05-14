@@ -49,7 +49,7 @@ export class HeroDisplay {
     this.burst.scale.set(0.1, 0.1, 1);
     this.group.add(this.burst);
 
-    this.amountEl       = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount') : null;
+    this.amountMainEl   = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-main') : null;
     this.amountNumEl    = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-num') : null;
     this.amountPeriodEl = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-period') : null;
     this.rateEl         = typeof document !== 'undefined' ? document.querySelector('#topHud .th-rate') : null;
@@ -79,7 +79,7 @@ export class HeroDisplay {
     const crossed = digits > this._prevDigits && this._prevDigits > 0;
     if (crossed) {
       this._burstT = 1;
-      this._restartAnimation(this.amountEl, 'th-pulse-strong');
+      this._restartAnimation(this.amountMainEl, 'th-pulse-strong');
     }
     this._prevDigits = digits;
 
@@ -87,7 +87,7 @@ export class HeroDisplay {
     if (amtText !== this._amtText) {
       this._amtText = amtText;
       if (this.amountNumEl) this.amountNumEl.textContent = amtText;
-      if (!crossed) this._restartAnimation(this.amountEl, 'th-pulse');
+      if (!crossed) this._restartAnimation(this.amountMainEl, 'th-pulse');
     }
 
     const periodText = periodNameFor(amount);

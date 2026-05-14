@@ -168,10 +168,10 @@ if (!loaded) {
   const starterMul = getUpgrade('mult_starter');
   if (starterMul) state.shop.slots[1] = buildSlot(starterMul, ctx);
   const t0 = nowSeconds();
-  state.buffs.rateMul.push({ value: 3, duration: 20, expiresAt: t0 + 20 });
+  state.buffs.rateMul.push({ value: 3, duration: 20, expiresAt: t0 + 20, sourceId: 'wake' });
   const qw = quickWakeMul(state.contactLog);
   if (qw > 1) {
-    state.buffs.rateMul.push({ value: qw, duration: QUICK_WAKE_DURATION, expiresAt: t0 + QUICK_WAKE_DURATION });
+    state.buffs.rateMul.push({ value: qw, duration: QUICK_WAKE_DURATION, expiresAt: t0 + QUICK_WAKE_DURATION, sourceId: 'quick_wake' });
   }
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
@@ -502,12 +502,92 @@ const BUFF_ICONS = {
   compound: 'ri-stack-fill',
 };
 
+// Kind → category copy reused by the per-buff detail modal. Voice: Narrator —
+// observational, no second-person commentary. Mirrors the static blurbs in
+// #buffModal so the collapsed-tile tap surfaces the same answers.
+const BUFF_KIND_DESC = {
+  rate:     'A carrier window. Production multiplies for the duration.',
+  luck:     'A carry window. Hail chance lifts for the duration.',
+  cushion:  'A buffer window. A fraction of a failed wager returns.',
+  compound: 'A resonance window. The multiplier compounds while it holds.',
+};
+
+// Named provenance for distinctive buffs minted outside the upgrade-purchase
+// path. Keyed by the `sourceId` we stamp onto the buff record at spawn time.
+// Falls back to the kind-category labels.
+const BUFF_SOURCES = {
+  wake:       { name: 'Wake',       desc: 'A standing nudge at every cycle open — the rig pings itself awake.' },
+  quick_wake: { name: 'Quick Wake', desc: 'A Carrier Engraving. Each new cycle opens with the carrier already warm.' },
+};
+
+function kindName(kind) {
+  if (kind === 'rate') return 'Carrier';
+  if (kind === 'luck') return 'Carry';
+  if (kind === 'cushion') return 'Buffer';
+  if (kind === 'compound') return 'Resonance';
+  return '';
+}
+function buffDescriptor(kind, source) {
+  if (source && BUFF_SOURCES[source]) return BUFF_SOURCES[source];
+  return { name: kindName(kind), desc: BUFF_KIND_DESC[kind] || '' };
+}
+
+const buffDetailModalEl = document.getElementById('buffDetailModal');
+const buffDetailTitleEl = document.getElementById('buffDetailTitle');
+const buffDetailBodyEl = document.getElementById('buffDetailBody');
+const closeBuffDetailModal = () => buffDetailModalEl.classList.remove('open');
+buffDetailModalEl.addEventListener('click', (e) => {
+  if (e.target === buffDetailModalEl || e.target.closest('.bm-close')) closeBuffDetailModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && buffDetailModalEl.classList.contains('open')) closeBuffDetailModal();
+});
+
+// Snapshots of the active buffs in the order they were rendered. A tap on
+// a collapsed tile reads its `data-idx` and pulls the matching record.
+let renderedBuffs = [];
+
+function openBuffDetail(idx) {
+  const b = renderedBuffs[idx];
+  if (!b) return;
+  const remain = Math.max(0, b.expiresAt - nowSeconds());
+  const dur = b.duration;
+  const pct = Math.max(0, Math.min(1, remain / dur));
+  buffDetailTitleEl.textContent = b.title;
+  buffDetailBodyEl.innerHTML = `
+    <section class="bm-section kind-${b.kind}">
+      <div class="bm-section-head">
+        <i class="ri ${BUFF_ICONS[b.kind]}"></i>
+        <span class="bm-section-name">${kindName(b.kind)}</span>
+      </div>
+      <p class="bm-section-desc">${b.desc}</p>
+      <div class="slot-modal-row"><span>Current</span><span class="buff-val">${b.value}</span></div>
+      <div class="slot-modal-row"><span>Time left</span><span>${fmtDuration(remain)}</span></div>
+      <div class="slot-modal-row"><span>Duration</span><span>${fmtDuration(dur)}</span></div>
+      <div class="buff-bar" style="margin-top:10px;"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
+    </section>
+  `;
+  buffDetailModalEl.classList.add('open');
+}
+
+buffsEl.addEventListener('click', (e) => {
+  const tile = e.target.closest('.buff-tile');
+  if (!tile) return;
+  const idx = Number(tile.dataset.idx);
+  if (Number.isInteger(idx)) openBuffDetail(idx);
+});
+
 function renderBuffs(now) {
+  const items = [];
   const cards = [];
+  const tiles = [];
   const b = state.buffs;
-  const push = (kind, name, value, remain, duration) => {
+  const push = (kind, value, remain, duration, sourceId) => {
     const pct = Math.max(0, Math.min(1, remain / duration));
     const icon = BUFF_ICONS[kind] || '';
+    const { name, desc } = buffDescriptor(kind, sourceId);
+    const idx = items.length;
+    items.push({ kind, value, duration, expiresAt: now + remain, title: name, desc });
     cards.push(`
       <div class="buff-card kind-${kind}">
         <div class="buff-head">
@@ -519,14 +599,27 @@ function renderBuffs(now) {
         <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
       </div>
     `);
+    // Collapsed tile: background bar uses transform: scaleX so the fill is the
+    // tile background itself, not a stacked element. Glyph + multiplier overlay.
+    // The whole tile is the touch target.
+    tiles.push(`
+      <button type="button" class="buff-tile kind-${kind}" data-idx="${idx}" aria-label="${name} ${value}">
+        <div class="buff-tile-bar" style="transform: scaleX(${pct});"></div>
+        <div class="buff-tile-fg">
+          <i class="ri ri-fw ${icon} buff-tile-glyph"></i>
+          <span class="buff-tile-val">${value}</span>
+        </div>
+      </button>
+    `);
   };
   const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
-  for (const x of active(b.rateMul))       push('rate',     'Carrier',   `×${x.value}`,                          x.expiresAt - now, x.duration);
-  for (const x of active(b.gambleLuck))    push('luck',     'Carry',     `+${Math.round(x.value * 100)}%`,       x.expiresAt - now, x.duration);
-  for (const x of active(b.gambleCushion)) push('cushion',  'Buffer',    `${Math.round(x.value * 100)}%`,        x.expiresAt - now, x.duration);
-  for (const x of active(b.compound))      push('compound', 'Resonance', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration);
-  buffsEl.style.display = cards.length ? 'flex' : 'none';
-  buffsEl.innerHTML = cards.join('');
+  for (const x of active(b.rateMul))       push('rate',     `×${x.value}`,                                          x.expiresAt - now, x.duration, x.sourceId);
+  for (const x of active(b.gambleLuck))    push('luck',     `+${Math.round(x.value * 100)}%`,                       x.expiresAt - now, x.duration, x.sourceId);
+  for (const x of active(b.gambleCushion)) push('cushion',  `${Math.round(x.value * 100)}%`,                        x.expiresAt - now, x.duration, x.sourceId);
+  for (const x of active(b.compound))      push('compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration, x.sourceId);
+  renderedBuffs = items;
+  buffsEl.style.display = items.length ? 'flex' : 'none';
+  buffsEl.innerHTML = cards.join('') + tiles.join('');
 }
 
 function renderResult(now) {

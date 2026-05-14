@@ -128,6 +128,12 @@ const loaded = loadState(state);
 if (loaded && backfillFromShown(state.contactLog, state.messages.shown, nowSeconds()) > 0) {
   saveContactLog(state.contactLog);
 }
+// Existing players whose log already has worlds predate the First Contact
+// beat. Don't surface it retroactively — first contact already happened.
+if (state.contactLog.worlds.length > 0 && !state.contactLog.firstContactSeen) {
+  state.contactLog.firstContactSeen = true;
+  saveContactLog(state.contactLog);
+}
 checkStart(state, !loaded, loaded ? loaded.offline : 0);
 // First close beat — fires once across the player's whole history, on the
 // very first fresh boot of a cycle >= 2. The log is the gate (the gameplay

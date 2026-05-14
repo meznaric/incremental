@@ -1,22 +1,69 @@
-import { INTERSTITIALS } from './interstitial.js';
+import { INTERSTITIALS, FIRST_CONTACT_ID } from './interstitial.js';
+import { worldForInterstitial } from './contactLog.js';
 
 const TYPE_MS_PER_CHAR = 22;
 
 export function makeInterstitialUi(state, onShown) {
   const root = document.getElementById('interstitial');
+  const card = root.querySelector('.it-card');
   const textEl = root.querySelector('.it-text');
   const hintEl = root.querySelector('.it-hint');
   const dotsEl = root.querySelector('.it-dots');
+  const portraitImgEl = root.querySelector('.it-portrait-img');
+  const contactNameEl = root.querySelector('.it-contact-name');
+  const contactStatusEl = root.querySelector('.it-contact-status');
+  const contactFlavorEl = root.querySelector('.it-contact-flavor');
+  const contactTagEl = root.querySelector('.it-contact-tag');
 
   let active = null;       // { id, def, stepIdx }
   let typing = null;       // { i, full, raf, doneAt }
   let waitingInput = false;
   let autoTimer = 0;
 
+  // first_contact uses the *next* contact-bearing id parked on stats so the
+  // portrait matches the milestone we're framing.
+  function resolveContact(id) {
+    if (id === FIRST_CONTACT_ID) {
+      const next = state.messages && state.messages.stats && state.messages.stats.firstContactWorld;
+      return next ? worldForInterstitial(next) : null;
+    }
+    return worldForInterstitial(id);
+  }
+
+  function applyContactFrame(id) {
+    if (!card) return;
+    card.classList.remove('it-has-contact', 'it-first-contact', 'it-portrait-has-image');
+    if (portraitImgEl) {
+      portraitImgEl.classList.remove('loaded');
+      portraitImgEl.removeAttribute('src');
+    }
+    const def = resolveContact(id);
+    if (!def) return;
+    card.classList.add('it-has-contact');
+    if (id === FIRST_CONTACT_ID) card.classList.add('it-first-contact');
+    if (contactTagEl) contactTagEl.textContent = id === FIRST_CONTACT_ID ? 'First Contact' : 'Contact';
+    if (contactNameEl) contactNameEl.textContent = def.name;
+    if (contactStatusEl) {
+      contactStatusEl.textContent = def.status;
+      contactStatusEl.className = `it-contact-status s-${def.status.toLowerCase()}`;
+    }
+    if (contactFlavorEl) contactFlavorEl.textContent = def.flavor || '';
+    if (def.image && portraitImgEl) {
+      portraitImgEl.alt = def.name;
+      portraitImgEl.onload = () => {
+        card.classList.add('it-portrait-has-image');
+        portraitImgEl.classList.add('loaded');
+      };
+      portraitImgEl.onerror = () => { /* fallback stays visible */ };
+      portraitImgEl.src = def.image;
+    }
+  }
+
   function open(id) {
     const def = INTERSTITIALS[id];
     if (!def) return;
     active = { id, def, stepIdx: 0 };
+    applyContactFrame(id);
     root.style.display = 'flex';
     requestAnimationFrame(() => root.classList.add('it-visible'));
     showStep();

@@ -2,6 +2,11 @@ import {
   WORLD_FOR_INTERSTITIAL, recordContact, saveContactLog, getRun,
 } from './contactLog.js';
 
+// Staging id for the one-shot First Contact beat. Queued *before* the very
+// first contact-bearing interstitial in a player's history, with the same
+// world image rendered to frame what is about to happen.
+export const FIRST_CONTACT_ID = 'first_contact';
+
 // Interstitial messages — lore beats keyed to in-game triggers.
 // Voices: K (Kalen, first person), S (Sera, second person), N (Narrator, third
 // person, rare), A (Anonymous, italic, ~once per season). See
@@ -70,6 +75,19 @@ const EP1 = {
 };
 
 export const INTERSTITIALS = {
+  // voice: Narrator → Sera. Fires once *ever*, immediately before the first
+  // contact-bearing interstitial in a player's history. The moment Kalen
+  // first reaches anyone is when the loop reveals itself; we let it breathe.
+  // The UI looks up state.messages.stats.firstContactWorld to render the
+  // accompanying world image and name.
+  first_contact: {
+    steps: [
+      { text: 'First contact.',                                            autoMs: 1800 },
+      { text: 'A world returned your carrier. They heard something out there.', autoMs: 2400 },
+      { text: 'Their name goes on the log. The log does not forget.' },
+    ],
+  },
+
   // voice: Narrator (step 1), Kalen (steps 2-3). Fresh-game cold open.
   // Step 1 auto-advances — the tagline functions as the boot screen.
   welcome: {
@@ -220,7 +238,7 @@ export const INTERSTITIALS = {
   },
 };
 
-const MILESTONE_THRESHOLDS = [
+export const MILESTONE_THRESHOLDS = [
   { id: 'milestone_1k',  at: 1e3 },
   { id: 'milestone_1m',  at: 1e6 },
   { id: 'milestone_1b',  at: 1e9 },
@@ -228,6 +246,18 @@ const MILESTONE_THRESHOLDS = [
   { id: 'milestone_1qa', at: 1e15 },
   { id: 'milestone_1qi', at: 1e18 },
 ];
+
+// Returns the next contact-bearing milestone the player has not yet hit, or
+// null if every one has fired. Contact Log UI surfaces this as a clear
+// "next contact at X Echoes" indicator at the top of the panel.
+export function nextContactMilestone(state) {
+  const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || 0;
+  for (const m of MILESTONE_THRESHOLDS) {
+    if (!WORLD_FOR_INTERSTITIAL[m.id]) continue;
+    if (peak < m.at) return m;
+  }
+  return null;
+}
 
 const END_THRESHOLD = 1e63;
 
@@ -244,11 +274,25 @@ export function enqueue(state, id) {
   if (!INTERSTITIALS[id]) return false;
   if (m.shown[id] && !INTERSTITIALS[id].repeat) return false;
   if (m.queue.includes(id)) return false;
+  const isContact = !!(state.contactLog && WORLD_FOR_INTERSTITIAL[id]);
+  // Stage the one-shot First Contact beat just *before* the very first
+  // contact-bearing interstitial in the player's history. It announces what
+  // the loop is. After this fires once, the flag persists in the contact log
+  // (which survives save resets), so it never replays.
+  if (isContact && !state.contactLog.firstContactSeen && !m.shown[FIRST_CONTACT_ID]
+      && !m.queue.includes(FIRST_CONTACT_ID)) {
+    state.contactLog.firstContactSeen = true;
+    // The UI looks this up to render the *correct* world image for the
+    // accompanying first-contact beat — it should match what's coming next.
+    m.stats.firstContactWorld = id;
+    m.queue.push(FIRST_CONTACT_ID);
+    saveContactLog(state.contactLog);
+  }
   m.queue.push(id);
   // If this interstitial corresponds to a contacted world, add it to the
   // persistent Contact Log immediately. The log is the prestige currency —
   // it must reflect the *act* of contact, not the player reading the beat.
-  if (state.contactLog && WORLD_FOR_INTERSTITIAL[id]) {
+  if (isContact) {
     if (recordContact(state.contactLog, id, Date.now() / 1000)) {
       saveContactLog(state.contactLog);
     }

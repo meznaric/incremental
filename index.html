@@ -621,6 +621,47 @@
     .tb-btn .cc { color: #d49a55; }
     .tb-btn.locked { opacity: 0.5; cursor: not-allowed; }
     .tb-btn.locked:hover { border-color: rgba(120, 140, 255, 0.35); background: rgba(0, 0, 0, 0.35); }
+    /* Free Reroll — granted on long stalls. Reads warm (Bleed orange) so it
+       sits next to the standard Reroll without looking like a duplicate. */
+    .tb-btn.tb-free {
+      background: rgba(255, 184, 74, 0.14);
+      border-color: rgba(255, 184, 74, 0.55);
+      color: #ffb84a;
+      box-shadow: 0 0 14px -4px rgba(255, 184, 74, 0.45);
+    }
+    .tb-btn.tb-free .ri { color: #ffb84a; }
+    .tb-btn.tb-free:hover { background: rgba(255, 184, 74, 0.22); border-color: #ffb84a; }
+    .tb-btn.tb-free.locked { box-shadow: none; }
+    /* Toasts — bottom-right stack. Used by the stall-help grant. */
+    #toasts {
+      position: fixed;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: calc(var(--shop-h, 200px) + 16px);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      z-index: 180;
+      pointer-events: none;
+    }
+    .toast {
+      max-width: 320px;
+      padding: 10px 14px;
+      background: rgba(20, 20, 40, 0.92);
+      border: 1px solid rgba(255, 184, 74, 0.55);
+      color: #e8e8f0;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      letter-spacing: 0.01em;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 0 18px -6px rgba(255, 184, 74, 0.55);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.24s ease, transform 0.24s ease;
+    }
+    .toast.toast-in { opacity: 1; transform: translateY(0); }
+    .toast.toast-out { opacity: 0; transform: translateY(-4px); }
     #slots {
       display: flex;
       flex-wrap: nowrap;
@@ -1644,6 +1685,8 @@
   <div id="buffs"></div>
 
   <div id="result" class="result"></div>
+
+  <div id="toasts" aria-live="polite"></div>
 
   <div id="slotModal" role="dialog" aria-modal="true" aria-label="Upgrade details">
     <div class="bm-card">

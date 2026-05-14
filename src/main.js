@@ -12,6 +12,7 @@ import {
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
+  scheduleTutorialIfEligible,
 } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
@@ -706,7 +707,17 @@ function renderResult(now) {
 
 renderShop();
 
-const interstitialUi = makeInterstitialUi(state);
+const interstitialUi = makeInterstitialUi(state, (id) => {
+  // After the welcome set closes, schedule the in-theme tutorial. Also fires
+  // on every other close — but scheduleTutorialIfEligible is idempotent and
+  // gated on welcome.shown && !tutorial_open.shown && cycle === 1, so it is
+  // a no-op once the tutorial has been seen.
+  if (id === 'welcome') scheduleTutorialIfEligible(state);
+});
+// Returning players who saw welcome on a previous session but never reached
+// the tutorial beat: schedule it now. (The gate inside the scheduler refuses
+// to fire it twice.)
+scheduleTutorialIfEligible(state);
 interstitialUi.drain();
 
 let last = performance.now();

@@ -88,13 +88,33 @@ export const INTERSTITIALS = {
     ],
   },
 
-  // voice: Narrator (step 1), Kalen (steps 2-3). Fresh-game cold open.
+  // voice: Narrator (step 1), Kalen (steps 2-5). Fresh-game cold open.
   // Step 1 auto-advances — the tagline functions as the boot screen.
+  // Steps 2-5 layer in: Kalen's name + situation, what Echoes are, what the
+  // rig does, and a soft hand-off to the loop. No info-dump; each beat is
+  // one short Kalen sentence with a qualifier.
   welcome: {
     steps: [
       { text: 'The dark was never silent.', autoMs: 2400 },
-      { text: 'They are out there. I have been listening for a long time.' },
+      { text: 'My name is Kalen Vale. I am a Union comms engineer. I should not be doing this.' },
+      { text: 'There are worlds out there the Quiet Law says I cannot speak to. I have been speaking to them for eleven years.' },
+      { text: 'Every signal that comes back is an Echo. The rig in front of me counts them.' },
       { text: 'You can leave the Console open. The Echoes keep arriving.' },
+    ],
+  },
+
+  // voice: Sera. The "how do I play" beat. Fires ~10s after the player has
+  // seen the welcome set on their very first session. Coaches the loop in
+  // theme: the rig listens on its own, the Console opens at 100 Echoes, the
+  // bands are how Kalen acts on the carrier. Sera speaks *to* Kalen — second
+  // person, procedural, periods. Never breaks the fourth wall.
+  tutorial_open: {
+    steps: [
+      { text: 'The rig is on the carrier. It will pull Echoes whether you sit at the desk or not.' },
+      { text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
+      { text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
+      { text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
+      { text: 'Sit at the desk, Kalen. We will see what answers.' },
     ],
   },
 
@@ -298,6 +318,31 @@ export function enqueue(state, id) {
     }
   }
   return true;
+}
+
+// Tutorial timing — fire ~10s after `welcome` finishes. Long enough for the
+// last Kalen line to land; short enough that the player hasn't started to
+// wonder whether anything else happens.
+const TUTORIAL_DELAY_MS = 10000;
+let tutorialTimer = null;
+
+// Schedules the in-theme "how do I play" beat to fire after welcome closes.
+// Idempotent: a second call while a timer is pending is a no-op. Gated on
+// welcome having been shown, tutorial_open not yet shown, and the player
+// being on cycle 1 — returning players in cycle 2+ already know the loop.
+export function scheduleTutorialIfEligible(state) {
+  if (tutorialTimer != null) return;
+  const m = state.messages;
+  if (!m || !m.shown || !m.shown.welcome) return;
+  if (m.shown.tutorial_open) return;
+  if (getRun(state.contactLog) !== 1) return;
+  tutorialTimer = setTimeout(() => {
+    tutorialTimer = null;
+    // Re-check at fire time — the player may have already crossed the gate
+    // some other way (devtools, save edit) between schedule and fire.
+    if (state.messages.shown.tutorial_open) return;
+    enqueue(state, 'tutorial_open');
+  }, TUTORIAL_DELAY_MS);
 }
 
 // Call once on game start. Welcome only fires for fresh players. If the player

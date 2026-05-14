@@ -3,9 +3,23 @@ import {
   memoryShards, memoryMul, ECHO_MEMORY_PER_SHARD,
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
   getMass, getEngraving, massForPeak, WORLD_FOR_INTERSTITIAL,
+  worldDetail,
 } from './contactLog.js';
 import { nextContactMilestone, MILESTONE_THRESHOLDS } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
+
+// voice: Kalen. One-line hooks keyed to the *next* milestone, pulled from
+// canonical episode beats (docs/lore/episodes.md). Surfaces what is coming
+// without spoiling S2/S3 — the lines are dry, anticipatory, never confirm a
+// mystery before its episode lands.
+const NEXT_HOOK = {
+  milestone_1k:  'There is a desert world on the carrier tonight. Their radios are oil-lit and small.',
+  milestone_1m:  'Something below the thermocline is singing. I don\'t think it knows I can hear.',
+  milestone_1b:  'The auroras over Vehrn-9 are reading me back. Someone there is doing the maths.',
+  milestone_1t:  'Two Tarsan physicists are waiting for the correction. I keep almost not sending it.',
+  milestone_1qa: 'Lehl is quiet. Long-lived. I do not want to be the thing that hurries them.',
+  milestone_1qi: 'The pattern. The pattern keeps surfacing. I am almost ready to look at it directly.',
+};
 
 // The Contact Log is the only player-facing surface for the prestige loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
@@ -18,23 +32,29 @@ export function initContactLogUi(state, opts = {}) {
   const body = modal.querySelector('.cl-body');
   const introEl = modal.querySelector('.cl-intro');
   const progressEl = modal.querySelector('.cl-progress');
+  const hookEl = modal.querySelector('.cl-hook');
   const statsEl = modal.querySelector('.cl-stats');
   const actionEl = modal.querySelector('.cl-action');
   const listEl = modal.querySelector('.cl-list');
   const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
   let armed = false;
+  // Which logged contact (by world id) has its lore panel expanded. Held in
+  // closure rather than state — a session-level UI detail, not save data.
+  let expandedId = null;
 
   function renderIntro() {
     if (!introEl) return;
     const log = state.contactLog;
     const n = (log && Array.isArray(log.worlds)) ? log.worlds.length : 0;
-    // Short lore beat — explains *what the log is*. Sera-adjacent voice:
-    // procedural, two sentences. Player sees this every time the panel opens.
-    const head = n === 0
-      ? 'Every world that hears your carrier ends up here.'
-      : `<strong>${n}</strong> world${n === 1 ? '' : 's'} have heard your carrier.`;
-    introEl.innerHTML = `${head} The log persists when the cycle does not.`;
+    const run = getRun(log);
+    // voice: Kalen. The field log framed in his hand — first person, ambient.
+    // Two short sentences, the second a small qualifier. Reframes the panel
+    // as a personal notebook rather than a UI screen.
+    const headK = n === 0
+      ? `<em>Cycle ${run}. The notebook is open. No names yet.</em>`
+      : `<em>Cycle ${run}. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log. I read them again before I sleep.</em>`;
+    introEl.innerHTML = headK;
   }
 
   function renderProgress() {
@@ -66,6 +86,21 @@ export function initContactLogUi(state, opts = {}) {
         ? 'Ready. The contact will surface on the next eligible beat.'
         : `${formatAbbrev(remaining)} to go · ${(pct * 100).toFixed(0)}%`}</div>
     `;
+  }
+
+  function renderHook() {
+    if (!hookEl) return;
+    const next = nextContactMilestone(state);
+    if (!next) {
+      // After the last contact has fired the log itself becomes the question.
+      // No spoilers — the line just acknowledges that the pattern is the next
+      // thing on the desk. Maps to Ep 7 territory; consistent with the EP1
+      // milestone_1qi beat that already exists.
+      hookEl.innerHTML = `The names are in. Tonight I look at the route they took.`;
+      return;
+    }
+    const line = NEXT_HOOK[next.id];
+    hookEl.innerHTML = line ? line : '';
   }
 
   function renderPending() {
@@ -221,23 +256,62 @@ export function initContactLogUi(state, opts = {}) {
       <li class="cl-group">
         <div class="cl-group-head">Cycle ${run}${run === currentRun ? ' · current' : ''} · ${groups.get(run).length} contact${groups.get(run).length === 1 ? '' : 's'}</div>
         <ul class="cl-group-list">
-          ${groups.get(run).map((w) => `
-            <li class="contacted">
-              <div>
-                <div class="cl-name">${w.name}</div>
-                <div class="cl-ep">ep ${w.ep}</div>
-              </div>
-              <div class="cl-status s-${w.status.toLowerCase()}">${w.status}</div>
-            </li>
-          `).join('')}
+          ${groups.get(run).map((w) => renderEntry(w)).join('')}
         </ul>
       </li>
     `).join('');
   }
 
+  // A single entry — collapsed row plus, when expanded, an in-place lore panel.
+  // The row itself is a button so it's keyboard-reachable and touch-friendly.
+  function renderEntry(w) {
+    const open = expandedId === w.id;
+    const detail = worldDetail(w.id);
+    return `
+      <li class="contacted${open ? ' is-open' : ''}">
+        <button type="button" class="cl-entry"
+          data-act="toggle-entry" data-id="${w.id}"
+          aria-expanded="${open ? 'true' : 'false'}">
+          <div>
+            <div class="cl-name">${w.name}</div>
+            <div class="cl-ep">ep ${w.ep}</div>
+          </div>
+          <div class="cl-entry-right">
+            <span class="cl-status s-${w.status.toLowerCase()}">${w.status}</span>
+            <i class="ri ${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} cl-entry-chev" aria-hidden="true"></i>
+          </div>
+        </button>
+        ${open ? renderEntryDetail(w, detail) : ''}
+      </li>
+    `;
+  }
+
+  function renderEntryDetail(w, detail) {
+    if (!detail) {
+      return `
+        <div class="cl-detail">
+          <p class="cl-detail-empty">The folder is thin. The recordings remain.</p>
+        </div>
+      `;
+    }
+    // Order: method → biology → politics → cost. Kalen's note last, italic.
+    return `
+      <div class="cl-detail">
+        <dl class="cl-detail-rows">
+          <div class="cl-detail-row"><dt>Method</dt><dd>${detail.method}</dd></div>
+          <div class="cl-detail-row"><dt>World</dt><dd>${detail.biology}</dd></div>
+          <div class="cl-detail-row"><dt>Politics</dt><dd>${detail.politics}</dd></div>
+          <div class="cl-detail-row"><dt>Consequence</dt><dd>${detail.cost}</dd></div>
+        </dl>
+        <p class="cl-detail-note"><em>${detail.note}</em></p>
+      </div>
+    `;
+  }
+
   function render() {
     renderIntro();
     renderProgress();
+    renderHook();
     renderStats();
     renderAction();
     renderEngravings();
@@ -270,6 +344,12 @@ export function initContactLogUi(state, opts = {}) {
         if (typeof opts.onBuyEngraving === 'function') opts.onBuyEngraving(id);
         render();
       }
+      return;
+    }
+    if (act === 'toggle-entry') {
+      const id = target.dataset.id;
+      expandedId = expandedId === id ? null : id;
+      renderList();
       return;
     }
   });

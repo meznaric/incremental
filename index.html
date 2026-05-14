@@ -198,6 +198,96 @@
     #diagnosticBtn { right: 64px; }
     #contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
     #contactLogBtn .ri, #diagnosticBtn .ri { line-height: 1; }
+    .cl-intro {
+      font-size: 12px;
+      color: #aab0d0;
+      line-height: 1.5;
+      padding: 4px 0 12px;
+      border-bottom: 1px solid rgba(120, 140, 255, 0.12);
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+    .cl-intro strong { color: #d49a55; font-style: normal; font-weight: 600; letter-spacing: 0.04em; }
+    .cl-progress { padding: 6px 0 14px; }
+    .cl-progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .cl-progress-label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+    }
+    .cl-progress-target {
+      font-size: 12px;
+      color: #d49a55;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+    .cl-progress-bar {
+      height: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .cl-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(212, 154, 85, 0.5), #d49a55);
+      transition: width 0.3s ease;
+    }
+    .cl-progress-foot {
+      font-size: 10px;
+      color: #6a6a90;
+      margin-top: 5px;
+      letter-spacing: 0.02em;
+    }
+    .cl-progress-done {
+      font-size: 11px;
+      color: #8aa0ff;
+      letter-spacing: 0.04em;
+      padding: 4px 0;
+    }
+    .cl-pending {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(120, 140, 255, 0.12);
+    }
+    .cl-pending-head {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #6a6a90;
+      padding: 0 0 6px;
+    }
+    .cl-pending-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .cl-pending-list li {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      gap: 8px;
+      padding: 8px 4px;
+      border-top: 1px solid rgba(120, 140, 255, 0.06);
+      opacity: 0.55;
+      font-variant-numeric: tabular-nums;
+    }
+    .cl-pending-list li:first-child { border-top: none; opacity: 0.85; }
+    .cl-pending-name {
+      font-size: 12px;
+      color: #aab0d0;
+      letter-spacing: 0.08em;
+    }
+    .cl-pending-at { font-size: 11px; color: #6a6a90; }
+    .cl-pending-list li:first-child .cl-pending-at { color: #d49a55; }
+    .cl-group-list li.contacted { background: rgba(76, 208, 125, 0.04); }
     .cl-stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -1249,7 +1339,7 @@
       backdrop-filter: blur(6px);
     }
     .it-card {
-      max-width: 560px;
+      max-width: 620px;
       padding: 36px 40px 28px;
       text-align: center;
       transform: translateY(8px);
@@ -1257,6 +1347,113 @@
       transition: transform 0.22s ease, opacity 0.22s ease;
     }
     #interstitial.it-visible .it-card { transform: translateY(0); opacity: 1; }
+    .it-contact {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin: 0 auto 22px;
+      padding: 0 0 18px;
+      border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+    }
+    .it-card.it-has-contact .it-contact { display: flex; }
+    .it-card.it-first-contact .it-contact { gap: 18px; padding-bottom: 22px; }
+    .it-portrait {
+      position: relative;
+      width: min(420px, 78vw);
+      aspect-ratio: 11 / 6;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(212, 154, 85, 0.45);
+      background:
+        radial-gradient(60% 60% at 50% 40%, rgba(212, 154, 85, 0.18), transparent 65%),
+        linear-gradient(180deg, #14142a 0%, #060614 100%);
+      box-shadow: 0 0 28px -6px rgba(212, 154, 85, 0.35);
+    }
+    .it-card.it-first-contact .it-portrait {
+      width: min(520px, 86vw);
+      box-shadow: 0 0 44px -4px rgba(212, 154, 85, 0.55);
+      animation: it-portrait-glow 3.2s ease-in-out infinite;
+    }
+    @keyframes it-portrait-glow {
+      0%, 100% { box-shadow: 0 0 32px -6px rgba(212, 154, 85, 0.45); }
+      50%      { box-shadow: 0 0 56px -2px rgba(212, 154, 85, 0.7); }
+    }
+    .it-portrait-img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.32s ease;
+    }
+    .it-portrait-img.loaded { opacity: 1; }
+    .it-portrait-fallback {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(40% 40% at 50% 50%, rgba(212, 154, 85, 0.22), transparent 70%),
+        repeating-radial-gradient(circle at 50% 50%, rgba(212, 154, 85, 0.18) 0, rgba(212, 154, 85, 0.18) 1px, transparent 1px, transparent 16px);
+    }
+    .it-portrait-fallback::before {
+      content: '';
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid rgba(212, 154, 85, 0.6);
+      box-shadow: 0 0 18px rgba(212, 154, 85, 0.45) inset, 0 0 22px rgba(212, 154, 85, 0.35);
+    }
+    .it-card.it-portrait-has-image .it-portrait-fallback { display: none; }
+    .it-contact-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      text-align: center;
+    }
+    .it-contact-tag {
+      font-size: 10px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #d49a55;
+    }
+    .it-card.it-first-contact .it-contact-tag {
+      color: #f0c080;
+      font-size: 11px;
+      letter-spacing: 0.4em;
+    }
+    .it-contact-name {
+      font-size: 18px;
+      letter-spacing: 0.12em;
+      color: #e8e8f0;
+      margin-top: 4px;
+    }
+    .it-card.it-first-contact .it-contact-name { font-size: 22px; letter-spacing: 0.16em; }
+    .it-contact-status {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+    .it-contact-status.s-triggered { color: #ff8a3a; }
+    .it-contact-status.s-collapsed { color: #ff5a6e; }
+    .it-contact-status.s-shifted   { color: #9d6ee0; }
+    .it-contact-status.s-missing   { color: #4ea8ff; }
+    .it-contact-flavor {
+      font-size: 12px;
+      color: #aab0d0;
+      margin-top: 8px;
+      max-width: 460px;
+      line-height: 1.5;
+      font-style: italic;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .it-card.it-first-contact .it-portrait { animation: none; }
+    }
     .it-text {
       font-size: 22px;
       line-height: 1.45;
@@ -1465,11 +1662,14 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body">
+        <div class="cl-intro"></div>
+        <div class="cl-progress"></div>
         <div class="cl-stats"></div>
         <div class="cl-action"></div>
         <div class="cl-engravings"></div>
         <ul class="cl-list"></ul>
         <div class="cl-empty">The log is empty. The dark is still listening.</div>
+        <div class="cl-pending"></div>
       </div>
     </div>
   </div>
@@ -1523,6 +1723,18 @@
 
   <div id="interstitial">
     <div class="it-card">
+      <div class="it-contact" aria-hidden="true">
+        <div class="it-portrait">
+          <img class="it-portrait-img" alt="" />
+          <div class="it-portrait-fallback" aria-hidden="true"></div>
+        </div>
+        <div class="it-contact-meta">
+          <div class="it-contact-tag">Contact</div>
+          <div class="it-contact-name"></div>
+          <div class="it-contact-status"></div>
+          <div class="it-contact-flavor"></div>
+        </div>
+      </div>
       <div class="it-text"></div>
       <div class="it-dots"></div>
       <div class="it-hint"><span class="hint-key">press space</span><span class="hint-tap">tap to continue</span></div>

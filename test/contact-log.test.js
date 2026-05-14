@@ -290,3 +290,13 @@ test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
   buyEngraving(log, 'first_light');
   assert.equal(firstLightAmount(log), FIRST_LIGHT_AMOUNT);
 });
+
+test('WORLD_FOR_INTERSTITIAL: every entry declares image and flavor', () => {
+  for (const [key, def] of Object.entries(WORLD_FOR_INTERSTITIAL)) {
+    assert.ok('image' in def, `${key}.image must be declared (string or null)`);
+    assert.ok(def.image === null || (typeof def.image === 'string' && def.image.endsWith('.png')),
+      `${key}.image must be a .png path or null`);
+    assert.equal(typeof def.flavor, 'string', `${key}.flavor`);
+    assert.ok(def.flavor.length > 0, `${key}.flavor non-empty`);
+  }
+});

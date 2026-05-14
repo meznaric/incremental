@@ -2,8 +2,10 @@ import {
   sortedWorlds, getRun, canCloseCycle, cycleContactCount,
   memoryShards, memoryMul, ECHO_MEMORY_PER_SHARD,
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
-  getMass, getEngraving, massForPeak,
+  getMass, getEngraving, massForPeak, WORLD_FOR_INTERSTITIAL,
 } from './contactLog.js';
+import { nextContactMilestone, MILESTONE_THRESHOLDS } from './interstitial.js';
+import { formatAbbrev } from './bignum.js';
 
 // The Contact Log is the only player-facing surface for the prestige loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
@@ -14,11 +16,80 @@ export function initContactLogUi(state, opts = {}) {
   const btn = document.getElementById('contactLogBtn');
   const modal = document.getElementById('contactLogModal');
   const body = modal.querySelector('.cl-body');
+  const introEl = modal.querySelector('.cl-intro');
+  const progressEl = modal.querySelector('.cl-progress');
   const statsEl = modal.querySelector('.cl-stats');
   const actionEl = modal.querySelector('.cl-action');
   const listEl = modal.querySelector('.cl-list');
+  const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
   let armed = false;
+
+  function renderIntro() {
+    if (!introEl) return;
+    const log = state.contactLog;
+    const n = (log && Array.isArray(log.worlds)) ? log.worlds.length : 0;
+    // Short lore beat — explains *what the log is*. Sera-adjacent voice:
+    // procedural, two sentences. Player sees this every time the panel opens.
+    const head = n === 0
+      ? 'Every world that hears your carrier ends up here.'
+      : `<strong>${n}</strong> world${n === 1 ? '' : 's'} have heard your carrier.`;
+    introEl.innerHTML = `${head} The log persists when the cycle does not.`;
+  }
+
+  function renderProgress() {
+    if (!progressEl) return;
+    const next = nextContactMilestone(state);
+    if (!next) {
+      progressEl.innerHTML = `<div class="cl-progress-done">Every catalogued world is on the log.</div>`;
+      return;
+    }
+    const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+    // Progress measured against the *previous* milestone so the bar resets at
+    // each contact and fills to the next — a single log-scale bar would feel
+    // like it never moves.
+    let prev = 0;
+    for (const m of MILESTONE_THRESHOLDS) {
+      if (m.id === next.id) break;
+      if (WORLD_FOR_INTERSTITIAL[m.id]) prev = m.at;
+    }
+    const span = Math.max(1, next.at - prev);
+    const pct = Math.max(0, Math.min(1, (peak - prev) / span));
+    const remaining = Math.max(0, next.at - peak);
+    progressEl.innerHTML = `
+      <div class="cl-progress-head">
+        <div class="cl-progress-label">Next contact</div>
+        <div class="cl-progress-target">${formatAbbrev(next.at)} Echoes</div>
+      </div>
+      <div class="cl-progress-bar"><div class="cl-progress-fill" style="width:${(pct * 100).toFixed(1)}%"></div></div>
+      <div class="cl-progress-foot">${peak >= next.at
+        ? 'Ready. The contact will surface on the next eligible beat.'
+        : `${formatAbbrev(remaining)} to go · ${(pct * 100).toFixed(0)}%`}</div>
+    `;
+  }
+
+  function renderPending() {
+    if (!pendingEl) return;
+    const log = state.contactLog;
+    const contacted = new Set((log && log.worlds || []).map((w) => w.id));
+    const rows = [];
+    for (const m of MILESTONE_THRESHOLDS) {
+      const def = WORLD_FOR_INTERSTITIAL[m.id];
+      if (!def) continue;
+      if (contacted.has(def.id)) continue;
+      rows.push(`
+        <li>
+          <div class="cl-pending-name">${def.name}</div>
+          <div class="cl-pending-at">at ${formatAbbrev(m.at)}</div>
+        </li>
+      `);
+    }
+    if (!rows.length) { pendingEl.innerHTML = ''; return; }
+    pendingEl.innerHTML = `
+      <div class="cl-pending-head">Awaiting contact</div>
+      <ul class="cl-pending-list">${rows.join('')}</ul>
+    `;
+  }
 
   function renderStats() {
     const log = state.contactLog;
@@ -148,10 +219,10 @@ export function initContactLogUi(state, opts = {}) {
     const currentRun = getRun(log);
     listEl.innerHTML = runs.map((run) => `
       <li class="cl-group">
-        <div class="cl-group-head">Cycle ${run}${run === currentRun ? ' · current' : ''}</div>
+        <div class="cl-group-head">Cycle ${run}${run === currentRun ? ' · current' : ''} · ${groups.get(run).length} contact${groups.get(run).length === 1 ? '' : 's'}</div>
         <ul class="cl-group-list">
           ${groups.get(run).map((w) => `
-            <li>
+            <li class="contacted">
               <div>
                 <div class="cl-name">${w.name}</div>
                 <div class="cl-ep">ep ${w.ep}</div>
@@ -165,10 +236,13 @@ export function initContactLogUi(state, opts = {}) {
   }
 
   function render() {
+    renderIntro();
+    renderProgress();
     renderStats();
     renderAction();
     renderEngravings();
     renderList();
+    renderPending();
   }
 
   const open = () => { armed = false; render(); modal.classList.add('open'); };

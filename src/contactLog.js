@@ -27,17 +27,38 @@ export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 // World ↔ interstitial mapping. The status comes from docs/lore/episodes.md.
 // Keys are interstitial ids; values describe the world recorded when that
 // interstitial first fires.
+//
+// `image` is a path relative to index.html — the contact interstitial loads
+// it as a hero portrait. Worlds without a dedicated portrait fall back to a
+// stylised placeholder (see .it-portrait-fallback in index.html).
+// `flavor` is one short in-world line shown beneath the world name on contact.
 export const WORLD_FOR_INTERSTITIAL = {
-  milestone_1k:  { id: 'ahn_tar_3',    name: 'AHN-TAR-3',    ep: 1, status: 'TRIGGERED' },
-  milestone_1m:  { id: 'solunn',       name: 'SOLUNN',       ep: 2, status: 'TRIGGERED' },
-  milestone_1b:  { id: 'vehrn_9',      name: 'VEHRN-9',      ep: 3, status: 'TRIGGERED' },
-  milestone_1t:  { id: 'tarsus_minor', name: 'TARSUS MINOR', ep: 4, status: 'COLLAPSED' },
-  milestone_1qa: { id: 'lehl',         name: 'LEHL',         ep: 5, status: 'SHIFTED' },
+  milestone_1k:  { id: 'ahn_tar_3',    name: 'AHN-TAR-3',    ep: 1, status: 'TRIGGERED',
+    image: './docs/lore/images/desert-ahn-tar.png',
+    flavor: 'A desert world. Theocratic. Lit by oil. The sky-listeners heard you first.' },
+  milestone_1m:  { id: 'solunn',       name: 'SOLUNN',       ep: 2, status: 'TRIGGERED',
+    image: './docs/lore/images/sea-choir-solunn.png',
+    flavor: 'A water world. Cetacean choir. Your carrier rode the deep sound channel.' },
+  milestone_1b:  { id: 'vehrn_9',      name: 'VEHRN-9',      ep: 3, status: 'TRIGGERED',
+    image: './docs/lore/images/sky-language-vehrn.png',
+    flavor: 'Industrial. Aurora-bright. Your message resolved as glyphs in their sky.' },
+  milestone_1t:  { id: 'tarsus_minor', name: 'TARSUS MINOR', ep: 4, status: 'COLLAPSED',
+    image: null,
+    flavor: 'Atomic-age. Hungry for power. Eight seconds of fusion, then no return tone.' },
+  milestone_1qa: { id: 'lehl',         name: 'LEHL',         ep: 5, status: 'SHIFTED',
+    image: null,
+    flavor: 'A long-lived, settled world. You only listened. Something still landed.' },
   // Ep 6 — the world Kalen was contacting when he was caught. He cannot
   // find it. The status reads MISSING, the name reads as a placeholder. The
   // offline-returner beat is what surfaces it.
-  offline_returner: { id: 'designation_withheld', name: '[DESIGNATION WITHHELD]', ep: 6, status: 'MISSING' },
+  offline_returner: { id: 'designation_withheld', name: '[DESIGNATION WITHHELD]', ep: 6, status: 'MISSING',
+    image: null,
+    flavor: 'The folder is intact. The star-charts no longer match anything in Union records.' },
 };
+
+export function worldForInterstitial(id) {
+  return WORLD_FOR_INTERSTITIAL[id] || null;
+}
 
 export const STATUS_COLOR = {
   TRIGGERED: '#ff8a3a',
@@ -70,7 +91,8 @@ export function loadContactLog() {
   const bestPeak = Number.isFinite(s.bestPeak) && s.bestPeak >= 0 ? s.bestPeak : 0;
   const firstCloseBeatShown = !!s.firstCloseBeatShown;
   const firstEngravingSeen = !!s.firstEngravingSeen;
-  return { run, worlds, mass, engravings, bestPeak, firstCloseBeatShown, firstEngravingSeen };
+  const firstContactSeen = !!s.firstContactSeen;
+  return { run, worlds, mass, engravings, bestPeak, firstCloseBeatShown, firstEngravingSeen, firstContactSeen };
 }
 
 export function saveContactLog(log) {
@@ -88,6 +110,10 @@ export function backfillFromShown(log, shown, now) {
   for (const id of Object.keys(WORLD_FOR_INTERSTITIAL)) {
     if (shown[id] && recordContact(log, id, now)) added++;
   }
+  // A backfill means the player already crossed at least one contact in the
+  // past; the First Contact beat would have nothing to introduce. Flip the
+  // flag so it never surfaces retroactively.
+  if (added > 0 && !log.firstContactSeen) log.firstContactSeen = true;
   return added;
 }
 

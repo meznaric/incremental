@@ -1,5 +1,10 @@
 import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade, SLOT_FILTERS } from './upgrades.js';
 import { checkGamble, checkPurchase } from './interstitial.js';
+import {
+  patternBaseRateMul, patternRerollCostMul, patternBuffDurationMul,
+  patternBuffRateMulStrength, patternGambleLuckBonus,
+  patternFreeLeft, consumePatternFreePurchase,
+} from './cyclePatterns.js';
 
 export const DEFAULT_SLOTS = 2;
 export const MAX_SLOTS = 10;
@@ -27,7 +32,7 @@ export function computeRerollCost(state, now, nonPinnedCount) {
   const pct = REROLL_PCT_PER_SLOT * nonPinnedCount * state.amount;
   const rate = state.shop.offeredRate != null ? state.shop.offeredRate : effectiveRate(state, now);
   const floor = REROLL_FLOOR_SECONDS * rate * nonPinnedCount;
-  return Math.max(pct, floor);
+  return Math.max(pct, floor) * patternRerollCostMul(state);
 }
 
 export function makeShopState() {
@@ -122,6 +127,7 @@ function applyAscent(rate, exp) {
 
 export function effectiveRate(state, now) {
   let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
+  rate *= patternBaseRateMul(state);
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
   rate *= memoryFactor(state);
   return applyAscent(rate, ascentExp(state));
@@ -143,7 +149,8 @@ export function integrateRate(state, t0, t1) {
     }
   }
   const sorted = [...transitions].sort((x, y) => x - y);
-  const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul * memoryFactor(state);
+  const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul
+    * patternBaseRateMul(state) * memoryFactor(state);
   const exp = ascentExp(state);
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -197,13 +204,18 @@ export function tryBuy(state, slotIdx, now) {
   const u = resolveUpgrade(slot);
   if (!u) return { ok: false, reason: 'invalid' };
   const cost = slot.cost;
+  // Pattern: free-purchase charges cover any non-hail, non-bleed purchase.
+  // Gambles and gifts are excluded — gambles take a real wager, gifts are
+  // already free.
+  const isCharged = u.kind !== 'gamble' && u.kind !== 'gift';
+  const usePatternFree = isCharged && patternFreeLeft(state) > 0;
 
   if (u.kind === 'gamble') {
     if (now < (state.gambleCd[slot.id] || 0)) return { ok: false, reason: 'cooldown' };
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     const luck = state.buffs.gambleLuck.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
-    const won = Math.random() < Math.min(1, u.chance + luck);
+    const won = Math.random() < Math.min(1, u.chance + luck + patternGambleLuckBonus(state));
     let result;
     if (won) {
       const payout = cost * u.payout;
@@ -225,8 +237,9 @@ export function tryBuy(state, slotIdx, now) {
   }
 
   if (u.kind === 'buff') {
-    if (state.amount < cost) return { ok: false, reason: 'broke' };
-    state.amount -= cost;
+    if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
     applyBuff(state, u, now);
     checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
@@ -234,8 +247,9 @@ export function tryBuy(state, slotIdx, now) {
   }
 
   if (u.kind === 'permanent') {
-    if (state.amount < cost) return { ok: false, reason: 'broke' };
-    state.amount -= cost;
+    if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
     if (u.permType === 'add') state.flatBonus += u.value;
     if (u.permType === 'mul') state.permMul *= u.value;
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
@@ -245,8 +259,11 @@ export function tryBuy(state, slotIdx, now) {
   }
 
   if (u.kind === 'convert') {
-    if (cost <= 0 || state.amount < cost) return { ok: false, reason: 'broke' };
-    state.amount -= cost;
+    // Convert burns the *current cost* into flatBonus. A free-purchase charge
+    // covers the spend but the planted yield still scales with the slot's cost.
+    if (!usePatternFree && (cost <= 0 || state.amount < cost)) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
     state.flatBonus += cost * u.ratio;
     checkPurchase(state, u.kind, u.rarity);
     replaceSlot(state, slotIdx, now);
@@ -280,14 +297,17 @@ export function pruneBuffs(state, now) {
 function applyBuff(state, u, now) {
   pruneBuffs(state, now);
   const b = state.buffs;
+  const dMul = patternBuffDurationMul(state);
+  const sMul = patternBuffRateMulStrength(state);
+  const duration = u.duration * dMul;
   if (u.buffType === 'rateMul') {
-    b.rateMul.push({ value: u.mult, duration: u.duration, expiresAt: now + u.duration });
+    b.rateMul.push({ value: u.mult * sMul, duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleLuck') {
-    b.gambleLuck.push({ value: u.bonus, duration: u.duration, expiresAt: now + u.duration });
+    b.gambleLuck.push({ value: u.bonus, duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleCushion') {
-    b.gambleCushion.push({ value: u.refund, duration: u.duration, expiresAt: now + u.duration });
+    b.gambleCushion.push({ value: u.refund, duration, expiresAt: now + duration });
   } else if (u.buffType === 'compound') {
-    b.compound.push({ rate: u.rate, duration: u.duration, startedAt: now, expiresAt: now + u.duration });
+    b.compound.push({ rate: u.rate, duration, startedAt: now, expiresAt: now + duration });
   }
 }
 

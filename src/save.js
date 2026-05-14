@@ -17,6 +17,7 @@ export function saveState(state) {
     flatBonus: state.flatBonus,
     permMul: state.permMul,
     freeRerolls: state.freeRerolls || 0,
+    patternFreeLeft: state.patternFreeLeft || 0,
     owned: state.owned,
     buffs: state.buffs,
     gambleCd: state.gambleCd,
@@ -56,6 +57,8 @@ export function loadState(state) {
   state.permMul = Number(s.permMul) || 1;
   const fr = Number(s.freeRerolls);
   state.freeRerolls = Number.isFinite(fr) && fr > 0 ? Math.floor(fr) : 0;
+  const pfl = Number(s.patternFreeLeft);
+  state.patternFreeLeft = Number.isFinite(pfl) && pfl > 0 ? Math.floor(pfl) : 0;
   state.owned = s.owned && typeof s.owned === 'object' ? s.owned : {};
   if (s.buffs && typeof s.buffs === 'object') {
     for (const k of Object.keys(state.buffs)) {

@@ -798,6 +798,67 @@
     .kind-compound .buff-bar-fill { background: #ff4ad0; }
     .kind-compound .buff-val      { color: #ff4ad0; }
 
+    /* Collapsed mobile-only tile. The progress bar fills the tile background
+       left-to-right; glyph + multiplier overlay it. Visible only below 640px —
+       the desktop card markup above stays the source of truth on wider HUDs. */
+    .buff-tile {
+      position: relative;
+      flex: 0 0 auto;
+      width: 72px;
+      height: 44px;
+      border-radius: 8px;
+      background: rgba(20, 20, 40, 0.78);
+      border: 1px solid rgba(120, 140, 255, 0.3);
+      overflow: hidden;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
+      padding: 0;
+      font-family: inherit;
+      color: #e8e8f0;
+      display: none;
+    }
+    .buff-tile .buff-tile-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      transform-origin: left center;
+      opacity: 0.32;
+      transition: transform 0.1s linear;
+    }
+    .buff-tile .buff-tile-fg {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 100%;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .buff-tile .buff-tile-glyph {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+    .buff-tile .buff-tile-val {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .buff-tile.kind-rate     .buff-tile-bar { background: #ff8a3a; }
+    .buff-tile.kind-rate     .buff-tile-glyph, .buff-tile.kind-rate     .buff-tile-val { color: #ff8a3a; }
+    .buff-tile.kind-luck     .buff-tile-bar { background: #f5d34a; }
+    .buff-tile.kind-luck     .buff-tile-glyph, .buff-tile.kind-luck     .buff-tile-val { color: #f5d34a; }
+    .buff-tile.kind-cushion  .buff-tile-bar { background: #4ea8ff; }
+    .buff-tile.kind-cushion  .buff-tile-glyph, .buff-tile.kind-cushion  .buff-tile-val { color: #4ea8ff; }
+    .buff-tile.kind-compound .buff-tile-bar { background: #ff4ad0; }
+    .buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #ff4ad0; }
+    .buff-tile:active { transform: scale(0.97); }
+
     #result {
       position: fixed;
       bottom: 200px;
@@ -814,7 +875,7 @@
     .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
     .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
 
-    #buffModal, #slotModal, #contactLogModal, #diagnosticModal {
+    #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal {
       position: fixed;
       inset: 0;
       display: none;
@@ -826,7 +887,7 @@
       padding: 20px;
       box-sizing: border-box;
     }
-    #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open { display: flex; }
+    #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open { display: flex; }
     .diag-intro, .diag-foot {
       font-size: 11px;
       color: #aab0d0;
@@ -1300,6 +1361,14 @@
       #result { top: calc(max(12px, env(safe-area-inset-top)) + 56px); right: max(12px, env(safe-area-inset-right)); }
     }
 
+    /* Phone-width: collapse buff cards into tappable tiles. The expanded
+       cards still render but are hidden — the same DOM tree powers both
+       layouts and the tile carries the data-idx the modal looks up. */
+    @media (max-width: 640px) {
+      #buffs .buff-card { display: none; }
+      #buffs .buff-tile { display: inline-flex; scroll-snap-align: start; }
+    }
+
   </style>
   <script type="importmap">
     {
@@ -1439,6 +1508,16 @@
           <p class="bm-section-desc">The carrier finds itself. Your multiplier compounds continuously from ×1 while the window holds — the shown value is the current state. Let it run.</p>
         </section>
       </div>
+    </div>
+  </div>
+
+  <div id="buffDetailModal" role="dialog" aria-modal="true" aria-label="Active effect">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title" id="buffDetailTitle">Effect</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body" id="buffDetailBody"></div>
     </div>
   </div>
 

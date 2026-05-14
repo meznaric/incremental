@@ -72,6 +72,8 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Open Frame** | An Engraving. A third band, permanently patched into the rig's chassis. |
 | **Ascent** | An Engraving, and the name of the new mathematical axis it opens. The carrier no longer just gets stronger — it climbs a new dimension. Each level adds +0.02 to the exponent on effective rate. |
 | **accretion** | The in-world physical model for Carrier Mass: every push leaves a residue. Sera's word, used straight-faced. |
+| **Signal Diagnostic** | The breakdown panel. A live, ordered read of the terms that produce the current pulse — base listening yield, decode efficiency, active carrier windows, resonance builds, Echo Memory, and (if cut) the Ascent exponent. Sera-voiced UI; she is showing Kalen the math of his own carrier. |
+| **current pulse** | The Sera-voiced label for the final, post-everything Echoes/s figure on the Signal Diagnostic. "Pulse" reads as one observable signal rather than a rate, which is how Sera would name it. |
 
 ## Names you should NOT use (IP / Trek overlap)
 
@@ -104,3 +106,4 @@ If a term in this file ever needs to change:
 
 - 2026-05-13 — Initial glossary committed.
 - 2026-05-14 — Added Carrier Mass, Carrier Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the rig literally carries the weight of past cycles.
+- 2026-05-14 — Added Signal Diagnostic and current pulse. Names the breakdown screen and the final rate figure; Sera-voiced UI surface.

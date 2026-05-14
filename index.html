@@ -179,9 +179,8 @@
       line-height: 1.45;
       max-width: 220px;
     }
-    #contactLogBtn {
+    #contactLogBtn, #diagnosticBtn {
       top: 16px;
-      right: 16px;
       padding: 0;
       width: 40px;
       height: 40px;
@@ -195,8 +194,10 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-    #contactLogBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
-    #contactLogBtn .ri { line-height: 1; }
+    #contactLogBtn { right: 16px; }
+    #diagnosticBtn { right: 64px; }
+    #contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
+    #contactLogBtn .ri, #diagnosticBtn .ri { line-height: 1; }
     .cl-stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -813,7 +814,7 @@
     .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
     .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
 
-    #buffModal, #slotModal, #contactLogModal {
+    #buffModal, #slotModal, #contactLogModal, #diagnosticModal {
       position: fixed;
       inset: 0;
       display: none;
@@ -825,7 +826,69 @@
       padding: 20px;
       box-sizing: border-box;
     }
-    #buffModal.open, #slotModal.open, #contactLogModal.open { display: flex; }
+    #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open { display: flex; }
+    .diag-intro, .diag-foot {
+      font-size: 11px;
+      color: #aab0d0;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .diag-intro { padding: 4px 0 12px; }
+    .diag-foot {
+      padding: 12px 0 4px;
+      color: #6a6a90;
+      border-top: 1px solid rgba(120, 140, 255, 0.12);
+      margin-top: 8px;
+    }
+    .diag-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .diag-row {
+      background: rgba(20, 20, 40, 0.55);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .diag-row-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .diag-row-label {
+      font-size: 13px;
+      color: #e8e8f0;
+      letter-spacing: 0.02em;
+    }
+    .diag-row-factor {
+      font-size: 14px;
+      color: #c0c0d8;
+      font-weight: 600;
+    }
+    .diag-row-note {
+      font-size: 10px;
+      color: #6a6a90;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+    }
+    .diag-row.diag-base { border-color: rgba(76, 208, 125, 0.4); }
+    .diag-row.diag-base .diag-row-factor { color: #4cd07d; }
+    .diag-row.diag-mul .diag-row-factor { color: #8aa0ff; }
+    .diag-row.diag-exp { border-color: rgba(245, 211, 74, 0.4); }
+    .diag-row.diag-exp .diag-row-factor { color: #f5d34a; }
+    .diag-row.diag-total {
+      border-color: rgba(212, 154, 85, 0.55);
+      background: rgba(212, 154, 85, 0.08);
+      margin-top: 4px;
+    }
+    .diag-row.diag-total .diag-row-label { color: #d49a55; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; }
+    .diag-row.diag-total .diag-row-factor { color: #d49a55; font-size: 16px; }
     .slot-modal-tag {
       display: inline-block;
       font-size: 10px;
@@ -1044,6 +1107,7 @@
       #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
       #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
       #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+      #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
       /* Push the win/loss flash below the contact-log button so they don't overlap. */
       #result { top: calc(max(12px, env(safe-area-inset-top)) + 56px); right: max(12px, env(safe-area-inset-right)); }
     }
@@ -1106,6 +1170,10 @@
     </div>
   </div>
 
+  <button id="diagnosticBtn" class="panel" type="button" aria-label="Open Signal Diagnostic">
+    <i class="ri ri-pulse-line"></i>
+  </button>
+
   <button id="contactLogBtn" class="panel cl-btn" type="button" aria-label="Open Contact Log">
     <i class="ri ri-radar-line"></i>
   </button>
@@ -1146,6 +1214,16 @@
         <ul class="cl-list"></ul>
         <div class="cl-empty">The log is empty. The dark is still listening.</div>
       </div>
+    </div>
+  </div>
+
+  <div id="diagnosticModal" role="dialog" aria-modal="true" aria-label="Signal Diagnostic">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Signal Diagnostic</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body diag-body"></div>
     </div>
   </div>
 

@@ -1,6 +1,6 @@
 import { formatAbbrev } from './bignum.js';
 
-const RARITY_WEIGHTS = { common: 50, uncommon: 22, rare: 8, legendary: 2, mythic: 0.3 };
+const RARITY_WEIGHTS = { common: 50, uncommon: 22, rare: 8, legendary: 1, mythic: 0.1 };
 // Per-kind multiplier on top of rarity weight. Gambles are noisy and crowd out
 // other kinds when they share weight equally — drop them to 25% so non-gamble
 // kinds dominate any-kind slots. The fixed gamble slot (idx 1) is unaffected
@@ -211,16 +211,16 @@ export const UPGRADES = [
     value: 1.1,  baseCost: 1500,   growth: 4,      minRate: 200,       maxRate: 50000 },
   { id: 'mult25',         kind: 'permanent', rarity: 'uncommon',  permType: 'mul',
     name: 'Spread-Spectrum',     desc: 'Signal is everywhere; the decoder is patient. ×1.25 rate.',
-    value: 1.25, baseCost: 8000,   growth: 4,      minRate: 2000,      maxRate: 1e6 },
+    value: 1.25, baseCost: 8000,   growth: 4,      minRate: 2000 },
   { id: 'mult33',         kind: 'permanent', rarity: 'rare',      permType: 'mul',
     name: 'Phase Lock',          desc: 'The carrier holds. ×1.33 rate.',
-    value: 1.33, baseCost: 25000,  growth: 4.5,    minRate: 8000,      maxRate: 1e7 },
+    value: 1.33, baseCost: 25000,  growth: 4.5,    minRate: 8000 },
   { id: 'mult50',         kind: 'permanent', rarity: 'rare',      permType: 'mul',
     name: 'Compression Codec',   desc: 'Same line, half the bandwidth. ×1.5 rate.',
-    value: 1.5,  baseCost: 150000, growth: 5,      minRate: 50000,     maxRate: 1e9 },
+    value: 1.5,  baseCost: 150000, growth: 5,      minRate: 50000 },
   { id: 'mult75',         kind: 'permanent', rarity: 'rare',      permType: 'mul',
     name: 'Predictive Decode',   desc: 'The system finishes the sentence for you. ×1.75 rate.',
-    value: 1.75, baseCost: 1.5e6,  growth: 5,      minRate: 1e6,       maxRate: 1e10 },
+    value: 1.75, baseCost: 1.5e6,  growth: 5,      minRate: 1e6 },
   { id: 'mult_two',       kind: 'permanent', rarity: 'legendary', permType: 'mul',
     name: 'Subspace Tap',        desc: 'The grid leaks. You drink. ×1.75 rate.',
     value: 1.75, baseCost: 1e8,    growth: 7,      minRate: 1e7 },
@@ -228,8 +228,8 @@ export const UPGRADES = [
     name: 'FTL Sideband',        desc: 'The fast lane, half-legal. ×2.2 rate.',
     value: 2.2,  baseCost: 1e10,   growth: 9,      minRate: 1e9 },
   { id: 'mult_five',      kind: 'permanent', rarity: 'mythic',    permType: 'mul',
-    name: 'Forbidden Codec',     desc: 'Whoever wrote this codec was not Union. ×3 rate.',
-    value: 3,    baseCost: 1e13,   growth: 12,     minRate: 1e11 },
+    name: 'Forbidden Codec',     desc: 'Whoever wrote this codec was not Union. ×2.5 rate.',
+    value: 2.5,  baseCost: 1e13,   growth: 12,     minRate: 1e11 },
 
   { id: 'tip_jar',   kind: 'convert', rarity: 'common',
     name: 'Loose Cable', desc: 'Burn 5% balance — bury a cheap antenna. +0.02% of spent /s.',

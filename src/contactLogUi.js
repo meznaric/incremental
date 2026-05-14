@@ -6,6 +6,7 @@ import {
 } from './contactLog.js';
 import { nextContactMilestone, MILESTONE_THRESHOLDS } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
+import { getPattern } from './cyclePatterns.js';
 
 // The Contact Log is the only player-facing surface for the prestige loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
@@ -99,6 +100,13 @@ export function initContactLogUi(state, opts = {}) {
     const mul = memoryMul(log);
     const memoryPct = Math.round((mul - 1) * 100);
     const mass = getMass(log);
+    const pat = getPattern(log && log.pattern);
+    const patternRow = pat ? `
+      <div class="cl-stat">
+        <div class="cl-stat-label">Pattern</div>
+        <div class="cl-stat-value">${pat.name}</div>
+      </div>
+    ` : '';
     statsEl.innerHTML = `
       <div class="cl-stat">
         <div class="cl-stat-label">Cycle</div>
@@ -116,6 +124,7 @@ export function initContactLogUi(state, opts = {}) {
         <div class="cl-stat-label">Carrier Mass</div>
         <div class="cl-stat-value cl-mass">${mass} kg</div>
       </div>
+      ${patternRow}
     `;
   }
 

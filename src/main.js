@@ -22,11 +22,14 @@ import {
 import { initContactLogUi } from './contactLogUi.js';
 import { showWelcomeBack } from './welcomeBack.js';
 import { initBreakdownUi } from './breakdownUi.js';
+import { hasPendingPatternChoice } from './cyclePatterns.js';
+import { showPatternSelect } from './patternUi.js';
 
 const state = {
   amount: 0,
   basePerSecond: 0,
   freeRerolls: 0,
+  patternFreeLeft: 0,
   ...makeShopState(),
   // The Contact Log persists across save resets — it is the run-accumulating
   // narrative state, separate from the gameplay save.
@@ -193,6 +196,16 @@ if (!loaded) {
   }
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
+  // Cycle Pattern — only on a fresh boot that the player owes a choice. The
+  // chooser modal calls applyPatternOnFreshBoot inside its click handler, so
+  // we don't seed pattern buffs/charges here.
+  if (hasPendingPatternChoice(state.contactLog)) {
+    showPatternSelect(state, () => {
+      // After the pick, render the shop so the free-purchase banner appears
+      // (if any) and the surge buff shows on the next HUD tick.
+      saveState(state);
+    });
+  }
 }
 
 amountInput.addEventListener('input', () => {
@@ -534,7 +547,15 @@ function renderShop() {
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;
     el.querySelector('.desc').textContent = u.desc;
-    const costHtml = u.kind === 'gift' ? 'FREE' : `${ECHO_ICON}${formatAbbrev(cost)}`;
+    // Pattern free-purchase coverage applies to any non-hail, non-bleed slot.
+    // Surface it as "FREE" on the cost cell so the player sees the charge being
+    // used before they tap.
+    const patternFree = (state.patternFreeLeft || 0) > 0 && u.kind !== 'gamble' && u.kind !== 'gift';
+    const costHtml = u.kind === 'gift'
+      ? 'FREE'
+      : patternFree
+        ? `<span class="cc">FREE</span> <span class="cc-strike">${ECHO_ICON}${formatAbbrev(cost)}</span>`
+        : `${ECHO_ICON}${formatAbbrev(cost)}`;
     setHtmlIfChanged(el.querySelector('.cost'), costHtml);
 
     let outcomes = '';

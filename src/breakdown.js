@@ -4,6 +4,7 @@
 // Pure logic, no DOM. Keeps strict parity with src/shop.js effectiveRate():
 //
 //   rate = (basePerSecond + flatBonus) * permMul
+//        * patternBaseRateMul
 //        * (rateMul buff product)
 //        * (compound buff product at t=now)
 //        * memoryFactor
@@ -15,6 +16,8 @@
 //   'exp'     — exponent applied to the running rate
 //   'total'   — final rate after everything
 // `op` is the display operator for the leftmost column ('+ /s', '×', '^', '=').
+
+import { patternBaseRateMul, getActivePattern } from './cyclePatterns.js';
 
 const MEMORY_PER_SHARD = 0.10; // mirror of contactLog.ECHO_MEMORY_PER_SHARD
 
@@ -60,6 +63,18 @@ export function breakdownRate(state, now) {
       op: '×',
       factor: permMul,
       note: 'Every decode upgrade ever cut into the stack',
+    });
+  }
+
+  const patternMul = patternBaseRateMul(state);
+  if (patternMul !== 1) {
+    const p = getActivePattern(state);
+    rows.push({
+      kind: 'mul',
+      label: 'Cycle Pattern',
+      op: '×',
+      factor: patternMul,
+      note: p ? `${p.name} — base carrier reshaped for this cycle` : 'Pattern modifier active',
     });
   }
 

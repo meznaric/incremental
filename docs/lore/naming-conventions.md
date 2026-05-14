@@ -76,6 +76,11 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Signal Diagnostic** | The breakdown panel. A live, ordered read of the terms that produce the current pulse — base listening yield, decode efficiency, active carrier windows, resonance builds, Echo Memory, and (if cut) the Ascent exponent. Sera-voiced UI; she is showing Kalen the math of his own carrier. |
 | **current pulse** | The Sera-voiced label for the final, post-everything Echoes/s figure on the Signal Diagnostic. "Pulse" reads as one observable signal rather than a rate, which is how Sera would name it. |
 | **Wake** | The standing 3× rate window seeded at every cycle open — the rig pings itself awake. Distinct from the Quick Wake Engraving, which extends and amplifies the same opening beat. |
+| **Cycle Pattern** | A single strategy modifier the player picks at the start of every cycle from cycle 2 onward. Each Pattern skews the run in one direction (front-loading, sharper windows, free starting bands, halved base with deeper hails) and is cleared the next time the cycle closes. |
+| **Surge Tide** | A Cycle Pattern. The carrier pours hot for the first five minutes of the cycle, then runs lean for the rest of the run. |
+| **Cold Sky** | A Cycle Pattern. Carrier windows arrive shorter than usual but every one of them runs at twice the strength. |
+| **Patched Frame** | A Cycle Pattern. Three bands ride free at cycle open; every re-tune after that bills double. |
+| **Bare Wire** | A Cycle Pattern. Base listening runs half-strength, but windows hold twice as long and hail carry-chance climbs five points. |
 
 ## Names you should NOT use (IP / Trek overlap)
 
@@ -111,3 +116,4 @@ If a term in this file ever needs to change:
 - 2026-05-14 — Added Signal Lock — the name for the welcome-back screen.
 - 2026-05-14 — Added Signal Diagnostic and current pulse. Names the breakdown screen and the final rate figure; Sera-voiced UI surface.
 - 2026-05-14 — Added Wake. Names the starter rate-mul beat at every cycle open so the mobile collapsed-buff detail modal has a clear provenance label.
+- 2026-05-14 — Added Cycle Pattern + the four canonical Pattern names (Surge Tide, Cold Sky, Patched Frame, Bare Wire). Each is a per-cycle strategy modifier the player picks the moment the rig boots into a new cycle.

@@ -67,7 +67,10 @@ export const STATUS_COLOR = {
   MISSING:   '#4ea8ff',
 };
 
-const fresh = () => ({ run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0 });
+const fresh = () => ({
+  run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
+  pattern: null, pendingPatternChoice: false, patternUsed: {},
+});
 
 // Returns a plain object always — never null. Defensive against corrupted or
 // missing localStorage entries (which can happen if a user wipes site data
@@ -92,7 +95,17 @@ export function loadContactLog() {
   const firstCloseBeatShown = !!s.firstCloseBeatShown;
   const firstEngravingSeen = !!s.firstEngravingSeen;
   const firstContactSeen = !!s.firstContactSeen;
-  return { run, worlds, mass, engravings, bestPeak, firstCloseBeatShown, firstEngravingSeen, firstContactSeen };
+  const pattern = typeof s.pattern === 'string' && s.pattern.length > 0 ? s.pattern : null;
+  const pendingPatternChoice = !!s.pendingPatternChoice;
+  const patternUsed = s.patternUsed && typeof s.patternUsed === 'object'
+    ? Object.fromEntries(Object.entries(s.patternUsed).filter(
+        ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
+    : {};
+  return {
+    run, worlds, mass, engravings, bestPeak,
+    firstCloseBeatShown, firstEngravingSeen, firstContactSeen,
+    pattern, pendingPatternChoice, patternUsed,
+  };
 }
 
 export function saveContactLog(log) {
@@ -197,6 +210,11 @@ export function closeCycle(log, peakAmount) {
   log.mass = (log.mass || 0) + banked;
   if ((peakAmount || 0) > (log.bestPeak || 0)) log.bestPeak = peakAmount || 0;
   advanceRun(log);
+  // Patterns are per-cycle. Clear the previous pick and flag the next run as
+  // owing the player a fresh choice. The chooser modal in main.js gates play
+  // until they pick one.
+  log.pattern = null;
+  log.pendingPatternChoice = true;
   return banked;
 }
 

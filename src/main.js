@@ -255,6 +255,7 @@ function onResize() {
   canvas.style.height = h + 'px';
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  display.setVisibleColumns(w <= 820 ? 3 : 5);
 }
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(shopEl);

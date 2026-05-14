@@ -500,10 +500,16 @@ export class MagnitudeDisplay {
     for (let i = 0; i < COLUMN_COUNT; i++) {
       this.columns.push(new Column(this.group, 0));
     }
+    this.visibleColumns = COLUMN_COUNT;
+  }
+
+  setVisibleColumns(n) {
+    const clamped = Math.max(1, Math.min(COLUMN_COUNT, n | 0));
+    this.visibleColumns = clamped;
   }
 
   update(amount, rate, now, dt) {
-    const { cols } = decomposeByBase100(amount, COLUMN_COUNT);
+    const { cols } = decomposeByBase100(amount, this.visibleColumns);
     const desired = cols.map((c) => c.m).filter((m) => m >= 0);
     const desiredSet = new Set(desired);
 

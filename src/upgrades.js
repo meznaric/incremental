@@ -222,14 +222,14 @@ export const UPGRADES = [
     name: 'Predictive Decode',   desc: 'The system finishes the sentence for you. ×1.75 rate.',
     value: 1.75, baseCost: 1.5e6,  growth: 5,      minRate: 1e6,       maxRate: 1e10 },
   { id: 'mult_two',       kind: 'permanent', rarity: 'legendary', permType: 'mul',
-    name: 'Subspace Tap',        desc: 'The grid leaks. You drink. ×2 rate.',
-    value: 2,    baseCost: 1e8,    growth: 6,      minRate: 1e7 },
+    name: 'Subspace Tap',        desc: 'The grid leaks. You drink. ×1.75 rate.',
+    value: 1.75, baseCost: 1e8,    growth: 7,      minRate: 1e7 },
   { id: 'mult_three',     kind: 'permanent', rarity: 'legendary', permType: 'mul',
-    name: 'FTL Sideband',        desc: 'The fast lane, half-legal. ×3 rate.',
-    value: 3,    baseCost: 1e10,   growth: 8,      minRate: 1e9 },
+    name: 'FTL Sideband',        desc: 'The fast lane, half-legal. ×2.2 rate.',
+    value: 2.2,  baseCost: 1e10,   growth: 9,      minRate: 1e9 },
   { id: 'mult_five',      kind: 'permanent', rarity: 'mythic',    permType: 'mul',
-    name: 'Forbidden Codec',     desc: 'Whoever wrote this codec was not Union. ×5 rate.',
-    value: 5,    baseCost: 1e13,   growth: 10,     minRate: 1e11 },
+    name: 'Forbidden Codec',     desc: 'Whoever wrote this codec was not Union. ×3 rate.',
+    value: 3,    baseCost: 1e13,   growth: 12,     minRate: 1e11 },
 
   { id: 'tip_jar',   kind: 'convert', rarity: 'common',
     name: 'Loose Cable', desc: 'Burn 5% balance — bury a cheap antenna. +0.02% of spent /s.',
@@ -347,7 +347,10 @@ export const ADD_VALUE_MULT = { common: 0.1, uncommon: 0.4, rare: 1.5, legendary
 export function genBaseAdd(rarity, ctx) {
   const r = Math.max(ctx?.rate || 0, 1);
   const value = Math.max(1, niceRound(r * (ADD_VALUE_MULT[rarity] || 0.1)));
-  const cost = Math.max(10, value * (40 + Math.log10(Math.max(value, 10)) * 30));
+  // Stacked-exponential: linear-in-value times 1.5^log10(value) so late-tier
+  // additive relays cost meaningfully more than their per-second payout.
+  const L = Math.log10(Math.max(value, 10));
+  const cost = Math.max(10, value * (40 + L * 30) * Math.pow(1.5, L));
   const label = formatAbbrev(value);
   const tier = RELAY_TIER[rarity] || 'Field Antenna';
   return {
@@ -452,7 +455,7 @@ export function rerollSlot(slate, idx, ctx) {
 // Category-wide ramp on mul permanents: every mul ever bought (across any id)
 // makes the next one cost more. Stops "+5% Multiplier" from staying trivial
 // after stacking dozens of them.
-export const MUL_CATEGORY_GROWTH = 1.4;
+export const MUL_CATEGORY_GROWTH = 1.35;
 export function totalMulOwned(owned) {
   let n = 0;
   for (const id of Object.keys(owned || {})) {
@@ -462,13 +465,21 @@ export function totalMulOwned(owned) {
   return n;
 }
 
+// Permanent cost: super-exponential in own count (growth^(n+n²/25)) so the Nth
+// purchase costs visibly more than the (N-1)th. Mul permanents additionally
+// pay a stacked-exponential category ramp 1.35^(N+N²/40) over total muls owned
+// — the wall steepens late, prestige is meant to break through.
 export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
     case 'buff':      return Math.max(1, ctx.rate * upgrade.costSec);
     case 'permanent': {
-      let c = upgrade.baseCost * Math.pow(upgrade.growth, ctx.owned[upgrade.id] || 0);
-      if (upgrade.permType === 'mul') c *= Math.pow(MUL_CATEGORY_GROWTH, totalMulOwned(ctx.owned));
+      const n = ctx.owned[upgrade.id] || 0;
+      let c = upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
+      if (upgrade.permType === 'mul') {
+        const N = totalMulOwned(ctx.owned);
+        c *= Math.pow(MUL_CATEGORY_GROWTH, N + (N * N) / 40);
+      }
       return c;
     }
     case 'convert':   return ctx.balance * upgrade.pctCost;

@@ -63,9 +63,12 @@ test('mul cost scales with total mul owned (category-wide ramp)', () => {
   // own growth; the test scopes to siblings to isolate the category effect.
   assert.ok(withOne > base, `cost should rise after owning one other mul, ${withOne} vs ${base}`);
   assert.ok(withThree > withOne, 'cost rises with more siblings owned');
+  // Stacked-exponential category ramp: factor at N total muls is GROWTH^(N+N²/40).
+  // N=1 → 1.35^(1 + 1/40) = 1.35^1.025.
+  const expected = Math.pow(MUL_CATEGORY_GROWTH, 1 + 1 / 40);
   const ratio = withOne / base;
-  assert.ok(Math.abs(ratio - MUL_CATEGORY_GROWTH) < 1e-9,
-    `ratio ${ratio} should equal MUL_CATEGORY_GROWTH ${MUL_CATEGORY_GROWTH}`);
+  assert.ok(Math.abs(ratio - expected) < 1e-9,
+    `ratio ${ratio} should equal ${expected}`);
 });
 
 test('totalMulOwned counts only mul permanents', () => {

@@ -21,6 +21,7 @@ import {
 } from './contactLog.js';
 import { initContactLogUi } from './contactLogUi.js';
 import { showWelcomeBack } from './welcomeBack.js';
+import { initBreakdownUi } from './breakdownUi.js';
 
 const state = {
   amount: 0,
@@ -61,6 +62,7 @@ initContactLogUi(state, {
     saveContactLog(state.contactLog);
   },
 });
+initBreakdownUi(state);
 
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');

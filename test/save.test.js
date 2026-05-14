@@ -46,6 +46,7 @@ test('save/load round-trips numbers and counters', () => {
   a.basePerSecond = 50;
   a.flatBonus = 100;
   a.permMul = 4;
+  a.freeRerolls = 2;
   a.owned = { plus_one: 3, mult25: 2 };
   saveState(a);
 
@@ -55,9 +56,21 @@ test('save/load round-trips numbers and counters', () => {
   assert.equal(b.basePerSecond, 50);
   assert.equal(b.flatBonus, 100);
   assert.equal(b.permMul, 4);
+  assert.equal(b.freeRerolls, 2);
   assert.deepEqual(b.owned, { plus_one: 3, mult25: 2 });
   // Amount can be inflated by integrateRate's offline earnings; floor at the saved value.
   assert.ok(b.amount >= 12345.67 - 1e-6);
+});
+
+test('save/load: freeRerolls defaults to 0 when absent', () => {
+  beforeEach();
+  const a = freshState();
+  a.amount = 5;
+  // Don't set freeRerolls — should round-trip as 0.
+  saveState(a);
+  const b = freshState();
+  loadState(b);
+  assert.equal(b.freeRerolls, 0);
 });
 
 test('loadState credits offline earnings at the current rate', () => {

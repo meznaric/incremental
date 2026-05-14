@@ -332,16 +332,82 @@ export function tryReroll(state, now) {
   if (!state.shop.rerollUnlocked) return { ok: false, reason: 'locked' };
   const n = countRerollable(state);
   if (n === 0) return { ok: false, reason: 'empty' };
-  const cost = computeRerollCost(state, now, n);
-  if (state.amount < cost || state.amount <= 0) return { ok: false, reason: 'broke' };
-  state.amount -= cost;
+  // Free rerolls bypass the Echo cost. Consumed before charging.
+  const usingFree = (state.freeRerolls || 0) > 0;
+  let cost = 0;
+  if (!usingFree) {
+    cost = computeRerollCost(state, now, n);
+    if (state.amount < cost || state.amount <= 0) return { ok: false, reason: 'broke' };
+    state.amount -= cost;
+  } else {
+    state.freeRerolls = Math.max(0, (state.freeRerolls || 0) - 1);
+  }
   const ctx = rollContext(state, now);
   for (let i = 0; i < state.shop.slots.length; i++) {
     if (state.shop.pinnedSlot === i) continue;
     state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
   }
   state.shop.offeredRate = ctx.rate;
-  return { ok: true, cost, rerolled: n };
+  return { ok: true, cost, rerolled: n, free: usingFree };
+}
+
+// Seconds until the cheapest currently-offered slot becomes affordable at the
+// live effective rate. Returns 0 if any slot is already affordable, Infinity
+// if rate <= 0 or no slot has a positive cost. Gambles and gifts (whose cost
+// scales with balance, or is zero) are skipped — the player isn't "stuck"
+// behind them.
+export function etaToNextPurchase(state, now) {
+  const rate = effectiveRate(state, now);
+  let minCost = Infinity;
+  for (const slot of state.shop.slots) {
+    if (!slot) continue;
+    const u = resolveUpgrade(slot);
+    if (!u) continue;
+    if (u.kind === 'gamble' || u.kind === 'gift' || u.kind === 'convert') continue;
+    const cost = slot.cost;
+    if (!(cost > 0)) continue;
+    if (cost < minCost) minCost = cost;
+  }
+  if (!isFinite(minCost)) return Infinity;
+  const deficit = minCost - state.amount;
+  if (deficit <= 0) return 0;
+  if (!(rate > 0)) return Infinity;
+  return deficit / rate;
+}
+
+// How many free rerolls to grant for a given ETA-to-next-purchase. Capped at
+// MAX_FREE_REROLL_GRANT so a single check can't dump dozens on the player.
+export const FREE_REROLL_TIERS = [
+  { atSeconds: 24 * 3600, grant: 3 },
+  { atSeconds:  6 * 3600, grant: 2 },
+  { atSeconds:      3600, grant: 1 },
+];
+export const MAX_FREE_REROLLS = 9;
+
+export function freeRerollGrant(etaSeconds) {
+  if (Number.isNaN(etaSeconds) || etaSeconds <= 0) return 0;
+  // Infinity = no priceable slot, or rate=0 and broke — most-stuck case.
+  // Granting the top tier lets a re-tune potentially produce a cheap slot.
+  if (!isFinite(etaSeconds)) return FREE_REROLL_TIERS[0].grant;
+  for (const t of FREE_REROLL_TIERS) {
+    if (etaSeconds >= t.atSeconds) return t.grant;
+  }
+  return 0;
+}
+
+// Bumps state.freeRerolls by the grant for the current ETA. Returns the
+// number actually added (0 if no grant or already at cap). Pure-ish: mutates
+// state.freeRerolls; no scheduling, no UI.
+export function grantFreeRerollsForStall(state, now) {
+  if (!state.shop.rerollUnlocked) return 0;
+  const eta = etaToNextPurchase(state, now);
+  const want = freeRerollGrant(eta);
+  if (want <= 0) return 0;
+  const current = state.freeRerolls || 0;
+  const next = Math.min(MAX_FREE_REROLLS, current + want);
+  const added = next - current;
+  state.freeRerolls = next;
+  return added;
 }
 
 export function nextSlotUnlockCost(state) {

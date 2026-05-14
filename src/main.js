@@ -6,7 +6,7 @@ import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade, buildSlot } from './
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
-  nextSlotUnlockCost, computeRerollCost,
+  nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
 } from './shop.js';
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
@@ -26,6 +26,7 @@ import { initBreakdownUi } from './breakdownUi.js';
 const state = {
   amount: 0,
   basePerSecond: 0,
+  freeRerolls: 0,
   ...makeShopState(),
   // The Contact Log persists across save resets — it is the run-accumulating
   // narrative state, separate from the gameplay save.
@@ -286,6 +287,48 @@ function spawnCoinBurn(el) {
   // Safety fallback if animationend doesn't fire (reduced motion hides it).
   setTimeout(() => { if (c.parentNode) c.remove(); }, 600);
 }
+
+// Lightweight toast — used by the stall-help grant. Stacks bottom-right; each
+// row fades itself out after a few seconds. No queue, no priority, no state.
+const toastsEl = document.getElementById('toasts');
+function showToast(text) {
+  if (!toastsEl) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = text;
+  toastsEl.appendChild(t);
+  // Trigger the entrance transition on the next frame.
+  requestAnimationFrame(() => t.classList.add('toast-in'));
+  setTimeout(() => { t.classList.remove('toast-in'); t.classList.add('toast-out'); }, 4200);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 5000);
+}
+
+// After a purchase, wait 5–10s and check whether the cheapest next slot is
+// far enough out to warrant a free Re-tune. The delay is deliberate: the
+// grant should *feel* like Sera reaching across the gap rather than a reward
+// dispensed by the click.
+let pendingFreeRerollTimer = null;
+function scheduleFreeRerollCheck() {
+  if (!state.shop.rerollUnlocked) return;
+  if (pendingFreeRerollTimer != null) {
+    clearTimeout(pendingFreeRerollTimer);
+    pendingFreeRerollTimer = null;
+  }
+  const delay = 5000 + Math.floor(Math.random() * 5000);
+  pendingFreeRerollTimer = setTimeout(() => {
+    pendingFreeRerollTimer = null;
+    const added = grantFreeRerollsForStall(state, nowSeconds());
+    if (added > 0) {
+      // voice: Sera. Second person, procedural, periods only. She has read
+      // the wait off the rig; the grant is an observation, not a reward.
+      const msg = added === 1
+        ? 'Your carrier is sitting on a long wait. One free reroll is on the file.'
+        : `Your carrier is sitting on a long wait. ${added} free rerolls are on the file.`;
+      showToast(msg);
+      renderShop();
+    }
+  }, delay);
+}
 // Single delegated handler to clear fx classes after they finish so they don't leak.
 slotsEl.addEventListener('animationend', (e) => {
   const slot = e.target.closest('.slot');
@@ -356,8 +399,10 @@ function ensureSlotEls() {
       }
       if (e.target.closest('.slot-info')) { openSlotModal(idx); return; }
       const res = tryBuy(state, idx, nowSeconds());
-      if (res.ok) { playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el); }
-      else { playSlotFx(el, 'fx-reject'); }
+      if (res.ok) {
+        playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el);
+        scheduleFreeRerollCheck();
+      } else { playSlotFx(el, 'fx-reject'); }
     });
     slotsEl.appendChild(el);
     slotEls.push(el);
@@ -384,10 +429,12 @@ function makeTbBtn(act, icon) {
 }
 const tbButtons = {
   'unlock-slot':   makeTbBtn('unlock-slot',   'ri-add-line'),
+  'free-reroll':   makeTbBtn('free-reroll',   'ri-refresh-line'),
   'reroll':        makeTbBtn('reroll',        'ri-refresh-line'),
   'unlock-reroll': makeTbBtn('unlock-reroll', 'ri-refresh-line'),
   'unlock-pin':    makeTbBtn('unlock-pin',    'ri-pushpin-2-fill'),
 };
+tbButtons['free-reroll'].classList.add('tb-free');
 function setTbBtn(act, visible, locked, label) {
   const b = tbButtons[act];
   b.style.display = visible ? '' : 'none';
@@ -416,11 +463,17 @@ function renderToolbar() {
     setTbBtn('reroll', false, false, '');
   }
 
+  const freeCount = state.freeRerolls || 0;
+  const freeVisible = rerollVisible && freeCount > 0;
+  const freeN = freeVisible ? countRerollableForUi() : 0;
+  setTbBtn('free-reroll', freeVisible, freeVisible && freeN === 0,
+    `<i class="ri ri-gift-fill"></i> Free Reroll (${freeCount})`);
+
   const pinVisible = state.shop.rerollUnlocked && !state.shop.pinUnlocked && state.amount >= PIN_UNLOCK_AT;
   setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
     `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
 
-  const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible;
+  const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible || freeVisible;
   toolbarEl.style.display = anyVisible ? '' : 'none';
 }
 
@@ -441,7 +494,7 @@ toolbarEl.addEventListener('click', (e) => {
   if (act === 'unlock-slot') res = tryUnlockSlot(state, nowSeconds());
   else if (act === 'unlock-reroll') res = tryUnlockReroll(state);
   else if (act === 'unlock-pin') res = tryUnlockPin(state);
-  else if (act === 'reroll') {
+  else if (act === 'reroll' || act === 'free-reroll') {
     res = tryReroll(state, nowSeconds());
     if (res.ok) {
       for (let i = 0; i < slotEls.length; i++) {

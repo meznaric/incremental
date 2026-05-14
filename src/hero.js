@@ -60,6 +60,7 @@ export class HeroDisplay {
     this._burstT = 0;
     this._prevRate = 0;
     this._prevDigits = 0;
+    this._lastSoftPulse = 0;
   }
 
   _digitsOf(amount) {
@@ -87,7 +88,15 @@ export class HeroDisplay {
     if (amtText !== this._amtText) {
       this._amtText = amtText;
       if (this.amountNumEl) this.amountNumEl.textContent = amtText;
-      if (!crossed) this._restartAnimation(this.amountMainEl, 'th-pulse');
+      // Throttle soft pulses: at steady high accrual the abbrev changes faster
+      // than the 0.42s animation can complete, which clips the scale before it
+      // reaches peak and the pulse reads as a dead twitch. Gate to 400ms so
+      // each play has room to finish.
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (!crossed && now - this._lastSoftPulse > 400) {
+        this._restartAnimation(this.amountMainEl, 'th-pulse');
+        this._lastSoftPulse = now;
+      }
     }
 
     const periodText = periodNameFor(amount);

@@ -1,6 +1,8 @@
 import {
   sortedWorlds, getRun, canCloseCycle, cycleContactCount,
   memoryShards, memoryMul, ECHO_MEMORY_PER_SHARD,
+  ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
+  getMass, getEngraving, massForPeak,
 } from './contactLog.js';
 
 // The Contact Log is the only player-facing surface for the prestige loop.
@@ -15,6 +17,7 @@ export function initContactLogUi(state, opts = {}) {
   const statsEl = modal.querySelector('.cl-stats');
   const actionEl = modal.querySelector('.cl-action');
   const listEl = modal.querySelector('.cl-list');
+  const engravingsEl = modal.querySelector('.cl-engravings');
   let armed = false;
 
   function renderStats() {
@@ -24,6 +27,7 @@ export function initContactLogUi(state, opts = {}) {
     const shards = memoryShards(log);
     const mul = memoryMul(log);
     const memoryPct = Math.round((mul - 1) * 100);
+    const mass = getMass(log);
     statsEl.innerHTML = `
       <div class="cl-stat">
         <div class="cl-stat-label">Cycle</div>
@@ -37,6 +41,55 @@ export function initContactLogUi(state, opts = {}) {
         <div class="cl-stat-label">Echo Memory</div>
         <div class="cl-stat-value cl-memory">+${memoryPct}%${shards ? ` · ${shards} shard${shards === 1 ? '' : 's'}` : ''}</div>
       </div>
+      <div class="cl-stat">
+        <div class="cl-stat-label">Carrier Mass</div>
+        <div class="cl-stat-value cl-mass">${mass} kg</div>
+      </div>
+    `;
+  }
+
+  function renderEngravings() {
+    if (!engravingsEl) return;
+    const log = state.contactLog;
+    const mass = getMass(log);
+    const rows = ENGRAVINGS.map((e) => {
+      const lvl = getEngraving(log, e.id);
+      const maxed = lvl >= (e.max || Infinity);
+      const cost = engravingCost(log, e.id);
+      const can = canBuyEngraving(log, e.id);
+      const isOneShot = (e.max || 0) === 1;
+      const levelLabel = isOneShot
+        ? (lvl > 0 ? 'cut' : '')
+        : `lvl ${lvl}${e.max ? ` / ${e.max}` : ''}`;
+      const costLabel = maxed
+        ? 'maxed'
+        : `${cost} kg`;
+      const btnLabel = isOneShot
+        ? (lvl > 0 ? 'Cut' : 'Cut into frame')
+        : 'Cut deeper';
+      return `
+        <li class="cl-engraving${maxed ? ' is-maxed' : ''}${can && !maxed ? ' is-buyable' : ''}">
+          <div class="cl-eng-head">
+            <div class="cl-eng-name">${e.name}</div>
+            <div class="cl-eng-level">${levelLabel}</div>
+          </div>
+          <div class="cl-eng-desc">${e.desc}</div>
+          <div class="cl-eng-foot">
+            <span class="cl-eng-cost">${costLabel}</span>
+            <button type="button" class="cl-eng-btn"
+              data-act="buy-engraving" data-id="${e.id}"
+              ${maxed || !can ? 'disabled' : ''}>${btnLabel}</button>
+          </div>
+        </li>
+      `;
+    }).join('');
+    engravingsEl.innerHTML = `
+      <div class="cl-eng-head-row">
+        <div class="cl-eng-title">Carrier Engravings</div>
+        <div class="cl-eng-balance">${mass} kg</div>
+      </div>
+      <p class="cl-eng-hint">Cuts in the rig that survive every reset. Bought with Carrier Mass.</p>
+      <ul class="cl-eng-list">${rows}</ul>
     `;
   }
 
@@ -45,6 +98,8 @@ export function initContactLogUi(state, opts = {}) {
     const eligible = canCloseCycle(log);
     const cycleCount = cycleContactCount(log);
     const projectedPct = Math.round(ECHO_MEMORY_PER_SHARD * 100 * cycleCount);
+    const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+    const projectedMass = massForPeak(peak);
     if (!eligible) {
       actionEl.classList.remove('armed');
       actionEl.innerHTML = `
@@ -55,7 +110,7 @@ export function initContactLogUi(state, opts = {}) {
     if (!armed) {
       actionEl.classList.remove('armed');
       actionEl.innerHTML = `
-        <div class="cl-action-hint">${cycleCount} new name${cycleCount === 1 ? '' : 's'} on the log · banking <span class="cl-memory">+${projectedPct}%</span> to Echo Memory</div>
+        <div class="cl-action-hint">${cycleCount} new name${cycleCount === 1 ? '' : 's'} on the log · banking <span class="cl-memory">+${projectedPct}%</span> to Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Carrier Mass` : ''}</div>
         <button type="button" class="cl-close-btn" data-act="arm">Close the Cycle</button>
       `;
       return;
@@ -63,7 +118,7 @@ export function initContactLogUi(state, opts = {}) {
     actionEl.classList.add('armed');
     actionEl.innerHTML = `
       <div class="cl-confirm">
-        <p>Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier.</p>
+        <p>Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier. Mass accreted on the rig becomes Carrier Mass — spend it on Engravings.</p>
       </div>
       <div class="cl-confirm-actions">
         <button type="button" class="cl-cancel-btn" data-act="cancel">Not yet</button>
@@ -112,6 +167,7 @@ export function initContactLogUi(state, opts = {}) {
   function render() {
     renderStats();
     renderAction();
+    renderEngravings();
     renderList();
   }
 
@@ -121,12 +177,25 @@ export function initContactLogUi(state, opts = {}) {
   btn.addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
-    const act = e.target.closest('[data-act]')?.dataset.act;
+    const target = e.target.closest('[data-act]');
+    const act = target?.dataset.act;
     if (!act) return;
     if (act === 'arm') { armed = true; renderAction(); return; }
     if (act === 'cancel') { armed = false; renderAction(); return; }
     if (act === 'confirm') {
       if (typeof opts.onCloseCycle === 'function') opts.onCloseCycle();
+      return;
+    }
+    if (act === 'buy-engraving') {
+      const id = target.dataset.id;
+      if (buyEngraving(state.contactLog, id)) {
+        // Refresh the live state mirrors so the new exponent/base bonuses
+        // kick in immediately if the buy unlocks them mid-cycle. Engravings
+        // mostly bite on the *next* cycle (start-of-run grants don't retro),
+        // but Ascent applies live.
+        if (typeof opts.onBuyEngraving === 'function') opts.onBuyEngraving(id);
+        render();
+      }
       return;
     }
   });

@@ -63,6 +63,15 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **a window** | A natural condition (ion calm, aurora coherence, etc.) that makes contact easier. |
 | **a triggered world** | A silent world that, after contact, accelerated dangerously. |
 | **the hijack** | The hidden system on the relay grid that edits Kalen's signals. (Sera's term, late S1.) |
+| **Carrier Mass** | Persistent prestige currency. The literal accreted weight of every carrier Kalen has ever pushed — measurable on the rig, in kilograms. Survives a cycle close. Spent on Engravings. |
+| **a Carrier Engraving** | A permanent cut into Kalen's listening rig. Survives the wipe of any single cycle because the metal remembers. Each one a small, irreversible commitment. |
+| **First Light** | An Engraving. A pilot tone burned into the rig so the next cycle does not start cold. |
+| **Bone Memory** | An Engraving. Solder-traces that remember the last cycle's tuning. Pure persistence. |
+| **Quick Wake** | An Engraving. A boot routine that hands Kalen a hot carrier the moment he sits down. |
+| **Patched Hands** | An Engraving. Worn tuning gloves; the band-sweep is muscle memory now. |
+| **Open Frame** | An Engraving. A third band, permanently patched into the rig's chassis. |
+| **Ascent** | An Engraving, and the name of the new mathematical axis it opens. The carrier no longer just gets stronger — it climbs a new dimension. Each level adds +0.02 to the exponent on effective rate. |
+| **accretion** | The in-world physical model for Carrier Mass: every push leaves a residue. Sera's word, used straight-faced. |
 
 ## Names you should NOT use (IP / Trek overlap)
 
@@ -94,3 +103,4 @@ If a term in this file ever needs to change:
 ### Changelog
 
 - 2026-05-13 — Initial glossary committed.
+- 2026-05-14 — Added Carrier Mass, Carrier Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the rig literally carries the weight of past cycles.

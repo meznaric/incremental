@@ -144,6 +144,46 @@ test('integrateRate stays finite with two stacked compound buffs at modern epoch
   assert.ok(v > 30); // strictly more than the unbuffed base accrual
 });
 
+test('Ascent exponent: effectiveRate raises rate by (1+exp)', () => {
+  const s = makeState({ basePerSecond: 100, ascentExp: 0.1 });
+  // base = 100; ascent lifts to 100^1.1 ≈ 158.49.
+  const r = effectiveRate(s, 0);
+  assert.ok(Math.abs(r - Math.pow(100, 1.1)) < 1e-9);
+});
+
+test('Ascent exponent: integrateRate scales linearly with the lifted rate', () => {
+  const s = makeState({ basePerSecond: 100, ascentExp: 0.1 });
+  // Constant rate 100^1.1 over 10s.
+  const expected = 10 * Math.pow(100, 1.1);
+  assert.ok(Math.abs(integrateRate(s, 0, 10) - expected) < 1e-6);
+});
+
+test('Ascent exponent: no-op when rate <= 1', () => {
+  const s = makeState({ basePerSecond: 0.5, ascentExp: 0.1 });
+  assert.equal(effectiveRate(s, 0), 0.5);
+});
+
+test('Ascent exponent: no-op when exp is 0 or missing', () => {
+  const s1 = makeState({ basePerSecond: 100 });
+  const s2 = makeState({ basePerSecond: 100, ascentExp: 0 });
+  assert.equal(effectiveRate(s1, 0), 100);
+  assert.equal(effectiveRate(s2, 0), 100);
+});
+
+test('Ascent exponent: stacks on top of rateMul buffs', () => {
+  const s = makeState({
+    basePerSecond: 100,
+    ascentExp: 0.1,
+    buffs: {
+      rateMul: [{ value: 2, duration: 100, expiresAt: 100 }],
+      gambleLuck: [], gambleCushion: [], compound: [],
+    },
+  });
+  // pre-ascent = 100*2 = 200; lifted = 200^1.1.
+  const expected = Math.pow(200, 1.1);
+  assert.ok(Math.abs(effectiveRate(s, 0) - expected) < 1e-9);
+});
+
 test('pruneBuffs drops expired entries across all keys', () => {
   const s = makeState({
     buffs: {

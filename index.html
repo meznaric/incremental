@@ -224,6 +224,102 @@
       font-variant-numeric: tabular-nums;
     }
     .cl-memory { color: #f5d34a; }
+    .cl-mass { color: #4ea8ff; }
+    .cl-engravings {
+      padding: 10px 0 12px;
+      border-bottom: 1px solid rgba(120, 140, 255, 0.12);
+      margin-bottom: 10px;
+    }
+    .cl-eng-head-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0 0 6px;
+    }
+    .cl-eng-title {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #8aa0ff;
+    }
+    .cl-eng-balance {
+      font-size: 13px;
+      color: #4ea8ff;
+      font-variant-numeric: tabular-nums;
+    }
+    .cl-eng-hint {
+      font-size: 11px;
+      color: #aab0d0;
+      line-height: 1.45;
+      margin: 0 0 8px;
+    }
+    .cl-eng-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cl-engraving {
+      background: rgba(20, 20, 40, 0.55);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .cl-engraving.is-buyable { border-color: rgba(78, 168, 255, 0.45); }
+    .cl-engraving.is-maxed { opacity: 0.55; }
+    .cl-eng-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .cl-eng-name {
+      font-size: 13px;
+      color: #e8e8f0;
+      font-weight: 600;
+    }
+    .cl-eng-level {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #6a6a90;
+    }
+    .cl-eng-desc {
+      font-size: 11px;
+      color: #aab0d0;
+      line-height: 1.4;
+      margin: 4px 0 6px;
+    }
+    .cl-eng-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .cl-eng-cost {
+      font-size: 12px;
+      color: #4ea8ff;
+      font-variant-numeric: tabular-nums;
+    }
+    .cl-eng-btn {
+      background: rgba(78, 168, 255, 0.14);
+      border: 1px solid rgba(78, 168, 255, 0.45);
+      color: #4ea8ff;
+      border-radius: 5px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .cl-eng-btn:hover:not([disabled]) { background: rgba(78, 168, 255, 0.24); border-color: #4ea8ff; }
+    .cl-eng-btn[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
     .cl-action {
       display: flex;
       flex-direction: column;
@@ -1046,6 +1142,7 @@
       <div class="bm-body cl-body">
         <div class="cl-stats"></div>
         <div class="cl-action"></div>
+        <div class="cl-engravings"></div>
         <ul class="cl-list"></ul>
         <div class="cl-empty">The log is empty. The dark is still listening.</div>
       </div>

@@ -5,6 +5,10 @@ import {
   WORLD_FOR_INTERSTITIAL, backfillFromShown,
   cycleContactCount, canCloseCycle, memoryShards, memoryMul,
   closeCycle, ECHO_MEMORY_PER_SHARD,
+  massForPeak, getMass, getEngraving, ENGRAVINGS,
+  engravingCost, canBuyEngraving, buyEngraving,
+  ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount,
+  ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
 } from '../src/contactLog.js';
 
 const freshLog = () => ({ run: 1, worlds: [] });
@@ -156,7 +160,7 @@ test('memoryMul: 1 + ECHO_MEMORY_PER_SHARD * shards', () => {
 
 test('closeCycle: refuses to close an empty cycle', () => {
   const log = freshLog();
-  assert.equal(closeCycle(log), false);
+  assert.equal(closeCycle(log, 0), false);
   assert.equal(getRun(log), 1, 'run does not advance');
 });
 
@@ -164,10 +168,125 @@ test('closeCycle: advances the run and keeps the world list intact', () => {
   const log = freshLog();
   recordContact(log, 'milestone_1k', 100);
   recordContact(log, 'milestone_1m', 110);
-  const ok = closeCycle(log);
-  assert.equal(ok, true);
+  const banked = closeCycle(log, 1e6); // 1M peak → log10(1e6) - 2 = 4 kg
+  assert.equal(banked, 4);
   assert.equal(getRun(log), 2);
   assert.equal(log.worlds.length, 2, 'worlds survive prestige');
   // Echo Memory carries forward — shards persist.
   assert.equal(memoryShards(log), 2);
+});
+
+// — Carrier Mass —
+
+test('massForPeak: zero below 1k', () => {
+  assert.equal(massForPeak(0), 0);
+  assert.equal(massForPeak(999), 0);
+  assert.equal(massForPeak(NaN), 0);
+});
+
+test('massForPeak: log10(peak) - 2, floored', () => {
+  assert.equal(massForPeak(1e3), 1);      // log10 = 3 → 1
+  assert.equal(massForPeak(1e6), 4);      // 6 - 2 = 4
+  assert.equal(massForPeak(1e9), 7);
+  assert.equal(massForPeak(1e12), 10);
+  assert.equal(massForPeak(5e6), 4);      // floor(6.7) - 2 = 4
+});
+
+test('closeCycle: banks mass against peak, persists across closes', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1k', 100);
+  closeCycle(log, 1e6);                    // +4 kg
+  assert.equal(getMass(log), 4);
+  recordContact(log, 'milestone_1m', 200);
+  closeCycle(log, 1e9);                    // +7 kg
+  assert.equal(getMass(log), 11);
+});
+
+test('closeCycle: refusal does not bank mass', () => {
+  const log = freshLog();
+  const banked = closeCycle(log, 1e9);
+  assert.equal(banked, false);
+  assert.equal(getMass(log), 0);
+});
+
+// — Carrier Engravings —
+
+test('ENGRAVINGS: every entry has the required shape', () => {
+  for (const e of ENGRAVINGS) {
+    assert.equal(typeof e.id, 'string', `engraving id`);
+    assert.equal(typeof e.name, 'string', `engraving name`);
+    assert.equal(typeof e.desc, 'string', `engraving desc`);
+    assert.equal(typeof e.cost, 'function', `engraving cost fn`);
+    assert.ok(e.max && e.max >= 1, `engraving max`);
+  }
+});
+
+test('engravingCost: returns the entry cost at current level', () => {
+  const log = freshLog();
+  // First Light is one-time, cost 1.
+  assert.equal(engravingCost(log, 'first_light'), 1);
+  // Bone Memory at lvl 0 → 2; one buy → lvl 1, next cost 4.
+  log.mass = 100;
+  assert.equal(engravingCost(log, 'bone_memory'), 2);
+  buyEngraving(log, 'bone_memory');
+  assert.equal(engravingCost(log, 'bone_memory'), 4);
+});
+
+test('engravingCost: Infinity once maxed', () => {
+  const log = freshLog();
+  log.mass = 10;
+  buyEngraving(log, 'first_light');                  // max 1
+  assert.equal(engravingCost(log, 'first_light'), Infinity);
+});
+
+test('canBuyEngraving + buyEngraving: gated by mass', () => {
+  const log = freshLog();
+  assert.equal(canBuyEngraving(log, 'first_light'), false);
+  log.mass = 1;
+  assert.equal(canBuyEngraving(log, 'first_light'), true);
+  assert.equal(buyEngraving(log, 'first_light'), true);
+  assert.equal(getMass(log), 0);
+  assert.equal(getEngraving(log, 'first_light'), 1);
+});
+
+test('buyEngraving: ignored when broke', () => {
+  const log = freshLog();
+  assert.equal(buyEngraving(log, 'bone_memory'), false);
+  assert.equal(getEngraving(log, 'bone_memory'), 0);
+});
+
+test('ascentExp: 0 when no levels, +ASCENT_PER_LEVEL per level', () => {
+  const log = freshLog();
+  assert.equal(ascentExp(log), 0);
+  log.mass = 10000;
+  buyEngraving(log, 'ascent');
+  assert.equal(ascentExp(log), ASCENT_PER_LEVEL);
+  buyEngraving(log, 'ascent');
+  assert.ok(Math.abs(ascentExp(log) - 2 * ASCENT_PER_LEVEL) < 1e-12);
+});
+
+test('boneMemoryBonus: scales with level', () => {
+  const log = freshLog();
+  assert.equal(boneMemoryBonus(log), 0);
+  log.mass = 100;
+  buyEngraving(log, 'bone_memory');
+  assert.equal(boneMemoryBonus(log), BONE_MEMORY_PER_LEVEL);
+});
+
+test('quickWakeMul: 0 at level 0, 1+level otherwise', () => {
+  const log = freshLog();
+  assert.equal(quickWakeMul(log), 0);
+  log.mass = 100;
+  buyEngraving(log, 'quick_wake');
+  assert.equal(quickWakeMul(log), 2);
+  buyEngraving(log, 'quick_wake');
+  assert.equal(quickWakeMul(log), 3);
+});
+
+test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
+  const log = freshLog();
+  assert.equal(firstLightAmount(log), 0);
+  log.mass = 1;
+  buyEngraving(log, 'first_light');
+  assert.equal(firstLightAmount(log), FIRST_LIGHT_AMOUNT);
 });

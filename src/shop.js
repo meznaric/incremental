@@ -108,10 +108,23 @@ function memoryFactor(state) {
   return Number.isFinite(state.memoryMul) && state.memoryMul > 0 ? state.memoryMul : 1;
 }
 
+// Ascent exponent from Carrier Engravings. Lifts the entire effective rate to
+// rate^(1+ascentExp). Stored as state.ascentExp (derived; defaults to 0).
+// WHY: every existing rate term is multiplicative; once cost growth is super-
+// exponential, multipliers asymptote. An exponent on the wire opens a new axis.
+function ascentExp(state) {
+  return Number.isFinite(state.ascentExp) && state.ascentExp > 0 ? state.ascentExp : 0;
+}
+function applyAscent(rate, exp) {
+  if (exp <= 0 || rate <= 1) return rate;
+  return Math.pow(rate, 1 + exp);
+}
+
 export function effectiveRate(state, now) {
   let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
-  return rate * memoryFactor(state);
+  rate *= memoryFactor(state);
+  return applyAscent(rate, ascentExp(state));
 }
 
 // Closed-form integral of effective rate from t0 to t1. Splits the window at every
@@ -131,6 +144,7 @@ export function integrateRate(state, t0, t1) {
   }
   const sorted = [...transitions].sort((x, y) => x - y);
   const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul * memoryFactor(state);
+  const exp = ascentExp(state);
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i], c = sorted[i + 1];
@@ -151,7 +165,20 @@ export function integrateRate(state, t0, t1) {
         factor *= desc.multAt(xs, (a + c) / 2);
       }
     }
-    total += base * factor * timeIntegral;
+    // When Ascent is active, lift the *whole* segment's rate by (1+exp). For
+    // continuous (compound) segments we lose strict closed-form accuracy and
+    // accept a tiny mid-segment approximation: lift the time integral by the
+    // mid-segment ascent factor. Discrete segments stay exact.
+    if (exp > 0) {
+      const liftedBase = applyAscent(base * factor, exp);
+      const linearBase = base * factor;
+      // Scale the (possibly-continuous) timeIntegral by liftedBase/linearBase,
+      // guarding division by zero when base*factor === 0.
+      if (linearBase > 0) total += timeIntegral * liftedBase;
+      else total += 0;
+    } else {
+      total += base * factor * timeIntegral;
+    }
   }
   return total;
 }

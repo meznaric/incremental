@@ -16,9 +16,13 @@
 //     worlds: [
 //       { id, name, ep, status, contactedAt: <unix seconds>, run: <run that added it> },
 //       ...
-//     ] }
+//     ],
+//     mass: number,              // Carrier Mass — persistent prestige currency.
+//     engravings: { [id]: lvl }, // Carrier Engravings owned across cycles.
+//     bestPeak: number,          // Highest peakAmount of any past cycle (for stats).
+//   }
 
-export const CONTACT_LOG_KEY = 'eots.contactlog.v1';
+export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
 // World ↔ interstitial mapping. The status comes from docs/lore/episodes.md.
 // Keys are interstitial ids; values describe the world recorded when that
@@ -42,7 +46,7 @@ export const STATUS_COLOR = {
   MISSING:   '#4ea8ff',
 };
 
-const fresh = () => ({ run: 1, worlds: [] });
+const fresh = () => ({ run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0 });
 
 // Returns a plain object always — never null. Defensive against corrupted or
 // missing localStorage entries (which can happen if a user wipes site data
@@ -58,7 +62,15 @@ export function loadContactLog() {
   const worlds = Array.isArray(s.worlds) ? s.worlds.filter((w) =>
     w && typeof w === 'object' && typeof w.id === 'string' && typeof w.name === 'string'
   ) : [];
-  return { run, worlds };
+  const mass = Number.isFinite(s.mass) && s.mass >= 0 ? s.mass : 0;
+  const engravings = s.engravings && typeof s.engravings === 'object'
+    ? Object.fromEntries(Object.entries(s.engravings).filter(
+        ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
+    : {};
+  const bestPeak = Number.isFinite(s.bestPeak) && s.bestPeak >= 0 ? s.bestPeak : 0;
+  const firstCloseBeatShown = !!s.firstCloseBeatShown;
+  const firstEngravingSeen = !!s.firstEngravingSeen;
+  return { run, worlds, mass, engravings, bestPeak, firstCloseBeatShown, firstEngravingSeen };
 }
 
 export function saveContactLog(log) {
@@ -151,8 +163,127 @@ export function memoryMul(log) {
 // Performs the prestige bookkeeping on the log itself. Callers are still
 // responsible for wiping the gameplay save and reloading the page.
 // Returns false if the cycle is not eligible to close.
-export function closeCycle(log) {
+// `peakAmount` is the highest Echo count this cycle hit; it determines how
+// much Carrier Mass the close banks.
+export function closeCycle(log, peakAmount) {
   if (!canCloseCycle(log)) return false;
+  const banked = massForPeak(peakAmount);
+  log.mass = (log.mass || 0) + banked;
+  if ((peakAmount || 0) > (log.bestPeak || 0)) log.bestPeak = peakAmount || 0;
   advanceRun(log);
+  return banked;
+}
+
+// — Carrier Mass & Carrier Engravings —
+//
+// Carrier Mass is the *second* persistent prestige currency. Where Echo Memory
+// is broad (every name ever logged adds a flat multiplier), Mass is bankable
+// and spendable — it buys Engravings, upgrades that survive every reset
+// because they're literally cut into Kalen's listening rig.
+//
+// WHY a separate currency: shards count names; Mass counts magnitude. Pushing
+// further in a single cycle is what mints Mass.
+//
+// Formula: floor(log10(peakAmount)) − 2. A cycle that peaks at 1k bites zero;
+// 100k bites 3 kg; 1B bites 7 kg; 1T bites 10 kg. Tuned so the first prestige
+// (which under the new wall lands around 100k–1M) gives 3–4 kg — enough for
+// First Light, Bone Memory level 1, and a head start on Quick Wake.
+export function massForPeak(peakAmount) {
+  if (!Number.isFinite(peakAmount) || peakAmount < 1000) return 0;
+  return Math.max(0, Math.floor(Math.log10(peakAmount)) - 2);
+}
+
+export function getMass(log) {
+  return (log && Number.isFinite(log.mass)) ? log.mass : 0;
+}
+
+export function getEngraving(log, id) {
+  return (log && log.engravings && Number.isFinite(log.engravings[id])) ? log.engravings[id] : 0;
+}
+
+// Carrier Engravings — the persistent tier of upgrades bought with Mass.
+// Each entry: { id, name, desc, cost(level) → kg, max, voice/lore notes }.
+// All in-world names canonicalised in docs/lore/naming-conventions.md.
+export const ENGRAVINGS = [
+  // One-time. Mass starts modest so the first prestige can afford one.
+  { id: 'first_light',  name: 'First Light',
+    desc: 'A pilot tone burned into the rig. Each cycle starts with 1k Echoes already on the carrier.',
+    cost: () => 1, max: 1 },
+  // Leveled. Persistent flat additive to base listening yield.
+  // Cost doubles per level. Effect: +0.5 Echoes/s per level, permanent.
+  { id: 'bone_memory',  name: 'Bone Memory',
+    desc: 'Solder-traces that remember the last cycle. +0.5 base Echoes/s per level. Persists.',
+    cost: (lvl) => Math.pow(2, lvl + 1), max: 12 },
+  // Leveled. Boots a 60s rate window at cycle open.
+  { id: 'quick_wake',   name: 'Quick Wake',
+    desc: 'The carrier wakes faster each cycle. First 60s of every cycle: ×(1 + level) effective rate.',
+    cost: (lvl) => 3 * Math.pow(2, lvl), max: 8 },
+  // One-time. Reroll comes pre-unlocked next cycle.
+  { id: 'patched_hands', name: 'Patched Hands',
+    desc: 'Worn tuning gloves; the band-sweep already knows the way. Re-tune is unlocked from cycle open.',
+    cost: () => 8, max: 1 },
+  // One-time. Third band patched in from the start.
+  { id: 'open_frame',    name: 'Open Frame',
+    desc: 'A third band, permanently patched into the rig.',
+    cost: () => 15, max: 1 },
+  // Leveled. The *new mathematical variable*. Each level adds +0.02 to the
+  // exponent on effective rate: rate becomes max(rate, 1) ^ (1 + 0.02 * level).
+  // WHY exponent and not mult: multipliers crowd at the top under the super-
+  // exponential cost wall. An exponent on the rate breaks that ceiling open
+  // — every additional decade of base rate becomes a decade-plus on the wire.
+  { id: 'ascent',        name: 'Ascent',
+    desc: 'A new dimension of carrier. Effective rate is raised by +0.02 per level (rate^1.02… and beyond).',
+    cost: (lvl) => 25 * Math.pow(2, lvl), max: 10 },
+];
+
+const ENG_BY_ID = new Map(ENGRAVINGS.map((e) => [e.id, e]));
+
+export function engravingCost(log, id) {
+  const def = ENG_BY_ID.get(id);
+  if (!def) return Infinity;
+  const lvl = getEngraving(log, id);
+  if (lvl >= (def.max || Infinity)) return Infinity;
+  return def.cost(lvl);
+}
+
+export function canBuyEngraving(log, id) {
+  const c = engravingCost(log, id);
+  return Number.isFinite(c) && getMass(log) >= c;
+}
+
+export function buyEngraving(log, id) {
+  if (!canBuyEngraving(log, id)) return false;
+  const c = engravingCost(log, id);
+  log.mass = getMass(log) - c;
+  log.engravings = log.engravings || {};
+  log.engravings[id] = getEngraving(log, id) + 1;
   return true;
+}
+
+// Ascent exponent applied to effective rate. The exponent on the rate itself
+// only makes physical sense once rate ≥ 1; the consumer guards that.
+export const ASCENT_PER_LEVEL = 0.02;
+export function ascentExp(log) {
+  return ASCENT_PER_LEVEL * getEngraving(log, 'ascent');
+}
+
+// Bone Memory: each level adds 0.5 to base listening yield, permanent across
+// cycles. Applied at load time so it shows up in the existing rate pipeline.
+export const BONE_MEMORY_PER_LEVEL = 0.5;
+export function boneMemoryBonus(log) {
+  return BONE_MEMORY_PER_LEVEL * getEngraving(log, 'bone_memory');
+}
+
+// Quick Wake: a 60-second rate-mul buff seeded at cycle open. Multiplier is
+// (1 + level), e.g. lvl 3 → ×4 for 60s.
+export const QUICK_WAKE_DURATION = 60;
+export function quickWakeMul(log) {
+  const lvl = getEngraving(log, 'quick_wake');
+  return lvl > 0 ? 1 + lvl : 0;
+}
+
+// First Light: starting Echoes per cycle.
+export const FIRST_LIGHT_AMOUNT = 1000;
+export function firstLightAmount(log) {
+  return getEngraving(log, 'first_light') > 0 ? FIRST_LIGHT_AMOUNT : 0;
 }

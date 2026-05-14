@@ -1,6 +1,6 @@
 import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 
-export const SAVE_KEY = 'incremental.save.v11';
+export const SAVE_KEY = 'incremental.save.v12';
 
 export function nowSeconds() {
   return Date.now() / 1000;

@@ -170,6 +170,28 @@ export const INTERSTITIALS = {
     ],
   },
 
+  // voice: Kalen. First time the player closes a cycle and banks Carrier Mass
+  // under the new prestige system. The "weight" line refers to the new
+  // currency literally — Mass, in kg, accreted into the rig.
+  first_cycle_close: {
+    steps: [
+      { text: 'The rig has weight now. It did not before.' },
+      { text: 'Sera once told me a carrier accretes — every push leaves a little of itself on the hardware.' },
+      { text: 'I did not believe her. The numbers on the bench say I should.' },
+      { text: 'I can cut this weight into the frame. The next cycle will remember.' },
+    ],
+  },
+
+  // voice: Sera. First Carrier Engraving purchased. Sera reads the rig
+  // and gets the answer she was always going to get.
+  first_engraving: {
+    steps: [
+      { text: 'You cut something into the frame today.' },
+      { text: 'The mass spectrometer reads it as your handwriting. Three grams, by my count.' },
+      { text: 'Tell me what you wrote.' },
+    ],
+  },
+
   // voice: Sera. Once per cycle from cycle 4 onward. The interrogation
   // grows with the log — Sera reads from it directly, names and all. By
   // cycle 4 the run-history has weight: more names, more questions, more
@@ -297,6 +319,29 @@ export function bumpAnomaly(state, by) {
     s.anomalyFired = true;
     enqueue(state, 'anomaly_threshold_1');
   }
+}
+
+// Call when a Carrier Engraving is purchased. Fires the first-engraving beat
+// exactly once *ever* — gated on the contact log so it survives reloads even
+// though messages.shown is gameplay-save state. The log already persists
+// engravings; an "ever bought one" flag rides on the same record.
+export function checkEngraving(state, _id) {
+  const log = state.contactLog;
+  if (!log) return;
+  if (log.firstEngravingSeen) return;
+  log.firstEngravingSeen = true;
+  enqueue(state, 'first_engraving');
+}
+
+// Called from main on cycle open. If the player has prestiged before but the
+// first-close beat has not yet shown (the close itself wipes the gameplay
+// save, so we use the log to gate this), queue it now.
+export function enqueueFirstCloseBeat(state) {
+  const log = state.contactLog;
+  if (!log) return;
+  if (log.firstCloseBeatShown) return;
+  log.firstCloseBeatShown = true;
+  enqueue(state, 'first_cycle_close');
 }
 
 // Call from the tick loop. Cheap: just numeric compare against peak.

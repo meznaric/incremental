@@ -10,10 +10,15 @@ import {
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
 } from './shop.js';
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
-import { checkStart, checkAmount } from './interstitial.js';
+import {
+  checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
+} from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
-import { loadContactLog, saveContactLog, backfillFromShown, closeCycle, memoryMul } from './contactLog.js';
+import {
+  loadContactLog, saveContactLog, backfillFromShown, closeCycle, memoryMul,
+  ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount, getEngraving, QUICK_WAKE_DURATION,
+} from './contactLog.js';
 import { initContactLogUi } from './contactLogUi.js';
 
 const state = {
@@ -26,18 +31,33 @@ const state = {
 };
 // Derived each session from the log. Drives Echo Memory in the rate math.
 state.memoryMul = memoryMul(state.contactLog);
+// Carrier Engraving — Ascent. Lifts the whole effective rate by this exponent.
+state.ascentExp = ascentExp(state.contactLog);
 
 initMenu();
 initContactLogUi(state, {
   // "Close the Cycle" — soft prestige. Wipes the gameplay save, advances the
   // log's run counter so milestones can fire again, leaves the world list
-  // (and therefore Echo Memory) intact, then reloads.
+  // (and therefore Echo Memory) intact, banks Carrier Mass against the
+  // cycle's peakAmount, then reloads.
   onCloseCycle() {
-    if (!closeCycle(state.contactLog)) return false;
+    const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+    const banked = closeCycle(state.contactLog, peak);
+    if (banked === false) return false;
     saveContactLog(state.contactLog);
     clearSave();
     location.reload();
     return true;
+  },
+  onBuyEngraving(id) {
+    // Live updates for engravings whose effect should bite immediately rather
+    // than wait for the next cycle. Ascent applies to the rate pipeline now;
+    // start-of-cycle grants (First Light, Open Frame, Patched Hands) do not
+    // retroactively reshape the current run.
+    state.ascentExp = ascentExp(state.contactLog);
+    // checkEngraving sets log.firstEngravingSeen, so save *after*.
+    checkEngraving(state, id);
+    saveContactLog(state.contactLog);
   },
 });
 
@@ -106,6 +126,13 @@ if (loaded && backfillFromShown(state.contactLog, state.messages.shown, nowSecon
   saveContactLog(state.contactLog);
 }
 checkStart(state, !loaded, loaded ? loaded.offline : 0);
+// First close beat — fires once across the player's whole history, on the
+// very first fresh boot of a cycle >= 2. The log is the gate (the gameplay
+// save is wiped by Close the Cycle, so messages.shown can't carry the flag).
+if (!loaded && (state.contactLog.run || 1) >= 2) {
+  enqueueFirstCloseBeat(state);
+  saveContactLog(state.contactLog);
+}
 if (loaded) {
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
@@ -115,19 +142,39 @@ if (loaded) {
   }
 }
 
+// Apply Carrier Engravings (persistent cross-cycle boosts) on a fresh boot.
+// Must run before validateSlate so Open Frame's extra band is filled by it.
+if (!loaded) {
+  state.amount += firstLightAmount(state.contactLog);
+  state.flatBonus += boneMemoryBonus(state.contactLog);
+  if (getEngraving(state.contactLog, 'patched_hands') > 0) {
+    state.shop.rerollUnlocked = true;
+  }
+  if (getEngraving(state.contactLog, 'open_frame') > 0 && state.shop.slotsUnlocked < 3) {
+    state.shop.slotsUnlocked = 3;
+    state.shop.slots.push(null);
+  }
+}
+
 // Fill any empty slots and reroll any items that no longer fit (kind/rate gate).
 // Existing slots keep their frozen cost.
 validateSlate(state, nowSeconds());
 
 // First-roll seed: slot 1 starts as the cheap starter mul (×1.5, cost ≤ 100).
 // Subsequent rerolls/buys fall back to any rarity mul per SLOT_FILTERS.
-// Also grant one starting buff: 3× rate for 20 seconds.
+// Also grant one starting buff: 3× rate for 20 seconds, plus Quick Wake if cut.
 if (!loaded) {
   const ctx = { balance: state.amount, rate: state.basePerSecond, owned: state.owned };
   const starterMul = getUpgrade('mult_starter');
   if (starterMul) state.shop.slots[1] = buildSlot(starterMul, ctx);
   const t0 = nowSeconds();
   state.buffs.rateMul.push({ value: 3, duration: 20, expiresAt: t0 + 20 });
+  const qw = quickWakeMul(state.contactLog);
+  if (qw > 1) {
+    state.buffs.rateMul.push({ value: qw, duration: QUICK_WAKE_DURATION, expiresAt: t0 + QUICK_WAKE_DURATION });
+  }
+  amountInput.value = formatAbbrev(state.amount);
+  rateInput.value = formatAbbrev(state.basePerSecond);
 }
 
 amountInput.addEventListener('input', () => {

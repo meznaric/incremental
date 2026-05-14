@@ -213,6 +213,13 @@
       gap: 18px;
     }
     .th-amount {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      transform-origin: center;
+    }
+    .th-amount-main {
       display: inline-flex;
       align-items: baseline;
       gap: 8px;
@@ -223,13 +230,22 @@
       text-shadow: 0 0 22px rgba(212, 154, 85, 0.55);
       letter-spacing: 0.02em;
       line-height: 1;
-      transform-origin: center;
     }
     .th-amount-icon {
       font-family: "remixicon";
       font-size: 0.74em;
       font-weight: 400;
     }
+    .th-amount-period {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+      font-weight: 600;
+      line-height: 1;
+      padding-left: 2px;
+    }
+    .th-amount-period:empty { display: none; }
     .th-rate {
       font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
       font-weight: 700;
@@ -263,7 +279,8 @@
         justify-content: space-between;
         gap: 8px;
       }
-      .th-amount { font-size: 22px; }
+      .th-amount-main { font-size: 22px; }
+      .th-amount-period { font-size: 9px; letter-spacing: 0.16em; }
       .th-rate { font-size: 13px; }
     }
     .cl-intro {
@@ -1944,7 +1961,10 @@
 
   <div id="topHud" class="top-hud" aria-hidden="true">
     <div class="th-amount">
-      <i class="ri-broadcast-fill th-amount-icon"></i><span class="th-amount-num">0</span>
+      <div class="th-amount-main">
+        <i class="ri-broadcast-fill th-amount-icon"></i><span class="th-amount-num">0</span>
+      </div>
+      <div class="th-amount-period"></div>
     </div>
     <div class="th-rate">0/s</div>
   </div>

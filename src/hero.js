@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import { formatAbbrev } from './bignum.js';
+import { PERIODS } from './periods-data.js';
 
 const COLOR_BURST = 0xffd866;
+
+function periodNameFor(amount) {
+  if (!isFinite(amount) || amount < 1000) return '';
+  let p = 0;
+  let n = amount;
+  while (n >= 1000 && p < PERIODS.length - 1) { n /= 1000; p++; }
+  return PERIODS[p]?.name || '';
+}
 
 function makeRadialTexture(color) {
   const canvas = document.createElement('canvas');
@@ -40,11 +49,13 @@ export class HeroDisplay {
     this.burst.scale.set(0.1, 0.1, 1);
     this.group.add(this.burst);
 
-    this.amountEl    = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount') : null;
-    this.amountNumEl = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-num') : null;
-    this.rateEl      = typeof document !== 'undefined' ? document.querySelector('#topHud .th-rate') : null;
+    this.amountEl       = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount') : null;
+    this.amountNumEl    = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-num') : null;
+    this.amountPeriodEl = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-period') : null;
+    this.rateEl         = typeof document !== 'undefined' ? document.querySelector('#topHud .th-rate') : null;
 
     this._amtText = null;
+    this._periodText = null;
     this._rateText = null;
     this._burstT = 0;
     this._prevRate = 0;
@@ -77,6 +88,12 @@ export class HeroDisplay {
       this._amtText = amtText;
       if (this.amountNumEl) this.amountNumEl.textContent = amtText;
       if (!crossed) this._restartAnimation(this.amountEl, 'th-pulse');
+    }
+
+    const periodText = periodNameFor(amount);
+    if (periodText !== this._periodText) {
+      this._periodText = periodText;
+      if (this.amountPeriodEl) this.amountPeriodEl.textContent = periodText;
     }
 
     const buffed = rate > baseRate * 1.001;

@@ -100,7 +100,7 @@ export function loadState(state) {
   const earnings = offline > 0 ? integrateRate(state, savedAt, now) : 0;
   state.amount += earnings;
   validateSlate(state, now);
-  return { offline, earnings };
+  return { offline, earnings, savedAt, now };
 }
 
 export function clearSave() {

@@ -20,6 +20,7 @@ import {
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount, getEngraving, QUICK_WAKE_DURATION,
 } from './contactLog.js';
 import { initContactLogUi } from './contactLogUi.js';
+import { showWelcomeBack } from './welcomeBack.js';
 
 const state = {
   amount: 0,
@@ -140,6 +141,14 @@ if (loaded) {
   if (loaded.offline > 1) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
   }
+  // Signal Lock — celebratory accounting of what came in while away. Earnings
+  // are already credited inside loadState; this screen only displays them.
+  showWelcomeBack({
+    state,
+    offline: loaded.offline,
+    earnings: loaded.earnings,
+    savedAt: loaded.savedAt,
+  });
 }
 
 // Apply Carrier Engravings (persistent cross-cycle boosts) on a fresh boot.

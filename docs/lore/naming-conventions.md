@@ -72,6 +72,7 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Open Frame** | An Engraving. A third band, permanently patched into the rig's chassis. |
 | **Ascent** | An Engraving, and the name of the new mathematical axis it opens. The carrier no longer just gets stronger — it climbs a new dimension. Each level adds +0.02 to the exponent on effective rate. |
 | **accretion** | The in-world physical model for Carrier Mass: every push leaves a residue. Sera's word, used straight-faced. |
+| **Signal Lock** | The welcome-back screen. Sera's report when Kalen returns to the Console: time away, base carrier, any windows still holding, and the count of Echoes the rig logged in his absence. Procedural register; never reads as a payout. |
 
 ## Names you should NOT use (IP / Trek overlap)
 
@@ -104,3 +105,4 @@ If a term in this file ever needs to change:
 
 - 2026-05-13 — Initial glossary committed.
 - 2026-05-14 — Added Carrier Mass, Carrier Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the rig literally carries the weight of past cycles.
+- 2026-05-14 — Added Signal Lock — the name for the welcome-back screen.

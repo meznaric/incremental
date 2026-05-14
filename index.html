@@ -524,6 +524,81 @@
     .cl-status.s-collapsed { color: #ff5a6e; }
     .cl-status.s-shifted   { color: #9d6ee0; }
     .cl-status.s-missing   { color: #4ea8ff; }
+    .cl-hook {
+      font-size: 12px;
+      color: #aab0d0;
+      line-height: 1.5;
+      padding: 6px 10px 10px;
+      border-left: 2px solid rgba(212, 154, 85, 0.45);
+      margin: 4px 0 12px;
+      font-style: italic;
+    }
+    .cl-hook:empty { display: none; }
+    .cl-entry {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 4px;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      letter-spacing: inherit;
+    }
+    .cl-entry:hover { background: rgba(76, 208, 125, 0.06); }
+    .cl-entry-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cl-entry-chev {
+      color: #6a6a90;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .cl-group-list li.contacted { background: rgba(76, 208, 125, 0.04); padding: 0; display: block; }
+    .cl-group-list li.contacted.is-open { background: rgba(76, 208, 125, 0.08); }
+    .cl-detail {
+      padding: 4px 12px 12px;
+      border-top: 1px dashed rgba(120, 140, 255, 0.18);
+    }
+    .cl-detail-rows {
+      margin: 6px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .cl-detail-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 8px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .cl-detail-row dt {
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #6a6a90;
+      padding-top: 2px;
+    }
+    .cl-detail-row dd { margin: 0; color: #aab0d0; }
+    .cl-detail-note {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: #d49a55;
+      line-height: 1.5;
+    }
+    .cl-detail-empty {
+      margin: 4px 0 0;
+      font-size: 11px;
+      color: #6a6a90;
+      font-style: italic;
+    }
     .cl-empty {
       font-size: 12px;
       color: #6a6a90;
@@ -1607,6 +1682,104 @@
       #buffs .buff-tile { display: inline-flex; scroll-snap-align: start; }
     }
 
+    /* --- Cycle Pattern selector --- */
+    #patternModal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 14, 0.86);
+      backdrop-filter: blur(6px);
+      z-index: 230;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    #patternModal.open { display: flex; }
+    .pat-card {
+      width: 100%;
+      max-width: 640px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: rgba(20, 20, 40, 0.96);
+      border: 1px solid rgba(212, 154, 85, 0.45);
+      border-radius: 14px;
+      box-shadow: 0 0 40px -4px rgba(212, 154, 85, 0.35);
+      padding: 22px 22px 18px;
+    }
+    .pat-title {
+      font-size: 10px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #d49a55;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .pat-intro {
+      color: #c0c0d8;
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: center;
+      margin: 0 auto 18px;
+      max-width: 520px;
+    }
+    .pat-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    @media (max-width: 560px) {
+      .pat-list { grid-template-columns: 1fr; }
+    }
+    .pat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid rgba(120, 140, 255, 0.22);
+      border-radius: 10px;
+      background: rgba(30, 30, 56, 0.55);
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      color: inherit;
+      transition: border-color 0.14s, background 0.14s, transform 0.08s;
+    }
+    .pat-item:hover {
+      border-color: rgba(212, 154, 85, 0.6);
+      background: rgba(40, 38, 60, 0.7);
+    }
+    .pat-item:active { transform: translateY(1px); }
+    .pat-name {
+      color: #d49a55;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .pat-desc {
+      color: #c0c0d8;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .pat-effect {
+      color: #8aa0ff;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .pat-foot {
+      margin-top: 14px;
+      color: #8a8ac0;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
   </style>
   <script type="importmap">
     {
@@ -1707,6 +1880,7 @@
       <div class="bm-body cl-body">
         <div class="cl-intro"></div>
         <div class="cl-progress"></div>
+        <div class="cl-hook"></div>
         <div class="cl-stats"></div>
         <div class="cl-action"></div>
         <div class="cl-engravings"></div>
@@ -1781,6 +1955,15 @@
       <div class="it-text"></div>
       <div class="it-dots"></div>
       <div class="it-hint"><span class="hint-key">press space</span><span class="hint-tap">tap to continue</span></div>
+    </div>
+  </div>
+
+  <div id="patternModal" role="dialog" aria-modal="true" aria-label="Cycle Pattern">
+    <div class="pat-card">
+      <div class="pat-title">Cycle Pattern</div>
+      <p class="pat-intro"></p>
+      <ul class="pat-list"></ul>
+      <div class="pat-foot">Pick one. It holds until you close the cycle.</div>
     </div>
   </div>
 

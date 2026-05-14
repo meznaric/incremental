@@ -60,6 +60,65 @@ export function worldForInterstitial(id) {
   return WORLD_FOR_INTERSTITIAL[id] || null;
 }
 
+// Per-world lore detail — surfaces only when the player taps a logged
+// contact. Content is canonical (sourced from docs/lore/episodes.md,
+// world-rules.md, and characters.md). No S2/S3 reveals.
+//
+// Shape per world:
+//   method  — one sentence on how Kalen reached them.
+//   biology — one sentence on what they are.
+//   politics — one sentence on who decides.
+//   cost    — one sentence on the consequence of contact.
+//   note    — one short Kalen-voice line, italic in render.
+export const WORLD_DETAIL = {
+  ahn_tar_3: {
+    method:   'Radio leakage. He pushed his voice sideways into the carrier band of their crude oil-lit radio sets.',
+    biology:  'Pre-industrial. Theocratic. A small caste of sky-listeners believed the heavens spoke in static.',
+    politics: 'A sixteen-year-old sky-listener heard him first. Within three years that boy held a state.',
+    cost:     'Six thousand Ahn-Tarsi dead in a religious purge before Kalen understood what he had said.',
+    note:     'I said good morning. He took it as scripture.',
+  },
+  solunn: {
+    method:   'Seismic resonance. Pulse trains modulated against the ocean-floor crust, heard by every Solunni below the thermocline at once.',
+    biology:  'Cetacean-analog. Slow, large, song-singing. Communication carried thousands of kilometres through the deep sound channel.',
+    politics: 'The eldest singers were the legal system. They lost it the day Kalen sang back.',
+    cost:     'A schism opened in the old singer-courts that was never going to close on its own.',
+    note:     'They thought it was the ocean. I let them.',
+  },
+  vehrn_9: {
+    method:   'Aurora modulation. Charged particles steered into the upper atmosphere in patterns that resolved as glyph-text from the ground.',
+    biology:  'Industrial-age. Smoggy. An astronomer named Iv Korash read his first message; she did not believe in gods, she believed in lattices.',
+    politics: 'A second Vehrnese government weaponised the medium first. The aurora war is now a recognised theatre of conflict.',
+    cost:     'Disinformation written across their sky in his hand.',
+    note:     'I wanted to show them the sky could speak. I should have remembered who controls the printing.',
+  },
+  tarsus_minor: {
+    method:   'Magnetic-storm encoding. Bursts in geomagnetic field perturbations, read on compass anomalies by two fringe physicists.',
+    biology:  'Atomic-age. Industrially capable. Hungry for cheap power.',
+    politics: 'A married pair of fringe physicists trusted him. So did their state, eventually.',
+    cost:     'A city of eighteen million is gone in eight seconds. Kalen watched it through a borrowed scope and did not look away.',
+    note:     'I gave them a correction. The correction was also a weapon. I knew that.',
+  },
+  lehl: {
+    method:   'Their own observational satellites. He woke their cameras gently. He had been careful for two years.',
+    biology:  'Long-lived. Three-hundred-year average. Peaceful, settled, self-sufficient.',
+    politics: 'Elders decide for the population. One elder heard a sentence in Kalen\'s voice that Kalen did not write.',
+    cost:     'Lifespan dropped to two hundred and twenty. Suicide rose eight-fold. Paradise restructured around metrics.',
+    note:     'That sentence is not mine. I have listened to it forty-one times.',
+  },
+  designation_withheld: {
+    method:   'A custom relay path he assembled himself across three FTL nodes. The path no longer exists.',
+    biology:  'Unknown. The recordings remain. The star-charts no longer match anything in Union records.',
+    politics: 'Unknown.',
+    cost:     'The world is gone from Union astronomy. There are no ruins to point at.',
+    note:     'I had a folder of their songs. I still have it. There is nothing to give it back to.',
+  },
+};
+
+export function worldDetail(id) {
+  return WORLD_DETAIL[id] || null;
+}
+
 export const STATUS_COLOR = {
   TRIGGERED: '#ff8a3a',
   COLLAPSED: '#ff5a6e',

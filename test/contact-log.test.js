@@ -9,6 +9,7 @@ import {
   engravingCost, canBuyEngraving, buyEngraving,
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount,
   ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
+  echoLoopLevel, isLoopMode,
 } from '../src/contactLog.js';
 import { WORLDS_BY_EP } from '../src/worlds.js';
 
@@ -385,4 +386,46 @@ test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
   log.mass = 1;
   buyEngraving(log, 'first_light');
   assert.equal(firstLightAmount(log), FIRST_LIGHT_AMOUNT);
+});
+
+// — Echo Loop mode (post-season prestige) —
+
+test('echoLoopLevel: 0 for runs 1..8, then run-8 from cycle 9 on', () => {
+  for (let r = 1; r <= 8; r++) {
+    assert.equal(echoLoopLevel({ run: r, worlds: [] }), 0, `run ${r}`);
+  }
+  assert.equal(echoLoopLevel({ run: 9,  worlds: [] }), 1);
+  assert.equal(echoLoopLevel({ run: 14, worlds: [] }), 6);
+});
+
+test('isLoopMode: false before cycle 9 closes, true afterward', () => {
+  assert.equal(isLoopMode({ run: 1, worlds: [] }), false);
+  assert.equal(isLoopMode({ run: 8, worlds: [] }), false);
+  assert.equal(isLoopMode({ run: 9, worlds: [] }), true);
+});
+
+test('canCloseCycle: Loop mode always closes (no contact required)', () => {
+  // run 9 with zero current-cycle contacts — Season 1 mechanic would refuse,
+  // Echo Loop allows the close.
+  const log = { run: 9, worlds: [] };
+  assert.equal(canCloseCycle(log), true);
+});
+
+test('memoryMul: each Echo Loop adds the same as one virtual shard', () => {
+  // Same shard count, different loop level → mul scales by ECHO_MEMORY_PER_SHARD.
+  const baseShards = { run: 1, worlds: [{ id: 'a' }, { id: 'b' }] };
+  const oneLoop = { run: 9, worlds: [{ id: 'a' }, { id: 'b' }] };
+  assert.equal(memoryMul(baseShards), 1 + 2 * ECHO_MEMORY_PER_SHARD);
+  assert.equal(memoryMul(oneLoop),    1 + 3 * ECHO_MEMORY_PER_SHARD);
+});
+
+test('closeCycle: Loop-mode close advances run and banks mass without contacts', () => {
+  // Player ends cycle 8 climactically and prestiges → run = 9. The next
+  // Loop close should work on the very first cycle 9 boot, before they
+  // climb at all, because canCloseCycle is loop-relaxed.
+  const log = { run: 9, worlds: [{ id: 'a', run: 1 }], mass: 0, engravings: {}, bestPeak: 0 };
+  const banked = closeCycle(log, 1e9);
+  assert.equal(banked, 7);
+  assert.equal(getRun(log), 10);
+  assert.equal(echoLoopLevel(log), 2);
 });

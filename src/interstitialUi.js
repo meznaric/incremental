@@ -66,11 +66,48 @@ export function makeInterstitialUi(state, onShown) {
     }
   }
 
+  // Tracks the per-interstitial cssClass we apply so close() can strip the
+  // exact set without enumerating every possible class. Keeps the contract
+  // generic — any interstitial can declare `cssClass`.
+  let appliedClass = null;
+  let appliedBgEl = null;
+
+  function applyCustomFrame(def) {
+    if (!card) return;
+    if (def && def.cssClass) {
+      card.classList.add(def.cssClass);
+      appliedClass = def.cssClass;
+    }
+    // Cinematic interstitials may want a full-bleed background image (the
+    // season finale, future season openers). We inject a dedicated layer
+    // behind the card content so the existing contact-portrait styling
+    // stays unaffected.
+    if (def && def.bgImage) {
+      const bg = document.createElement('div');
+      bg.className = 'it-bg-image';
+      bg.style.backgroundImage = `url("${def.bgImage}")`;
+      card.appendChild(bg);
+      appliedBgEl = bg;
+    }
+  }
+
+  function clearCustomFrame() {
+    if (appliedClass && card) {
+      card.classList.remove(appliedClass);
+      appliedClass = null;
+    }
+    if (appliedBgEl && appliedBgEl.parentNode) {
+      appliedBgEl.parentNode.removeChild(appliedBgEl);
+      appliedBgEl = null;
+    }
+  }
+
   function open(id) {
     const def = INTERSTITIALS[id];
     if (!def) return;
     active = { id, def, stepIdx: 0 };
     applyContactFrame(id);
+    applyCustomFrame(def);
     root.style.display = 'flex';
     root.classList.add('it-guard');
     if (guardTimer) clearTimeout(guardTimer);
@@ -87,6 +124,7 @@ export function makeInterstitialUi(state, onShown) {
     waitingInput = false;
     autoTimer = 0;
     if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
+    clearCustomFrame();
     root.classList.remove('it-visible', 'it-guard');
     setTimeout(() => { if (!active) root.style.display = 'none'; }, 180);
     state.messages.shown[id] = true;

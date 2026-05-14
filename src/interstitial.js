@@ -138,6 +138,25 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
+  // voice: Narrator → Kalen → Anonymous. The Season 1 finale beat. Fires
+  // once *ever*, on the first boot after the player closes cycle 8. Renders
+  // through interstitialUi with the `it-season-finale` CSS class — full-bleed
+  // background using the canonical "the-dark-was-never-silent" image, slower
+  // fade, bigger type. The card is otherwise the same component so the
+  // typewriter and click-to-advance affordances stay consistent.
+  season_complete: {
+    cssClass: 'it-season-finale',
+    bgImage: './docs/lore/images/the-dark-was-never-silent.png',
+    steps: [
+      { text: 'Season 1 closed.',                                                       autoMs: 2400 },
+      { text: 'Eighty contacts on the log. Eight folders, all open on the desk.',       autoMs: 2800 },
+      { text: 'The cascade is broadcasting. We do not know to whom.',                   autoMs: 2600 },
+      { text: 'Sera tells me to sleep. She says tomorrow is — pending.',                autoMs: 2800 },
+      { text: 'The dark was never silent. It is louder now.', italic: true,             autoMs: 2800 },
+      { text: 'The rig stays on the carrier. The Echoes keep arriving.' },
+    ],
+  },
+
   // voice: Sera. Once per cycle from cycle 4 onward.
   sera_interrogation_open: {
     repeat: true,
@@ -183,16 +202,36 @@ const ROTATING_KEYS = [
   'milestone_1t',
 ];
 
-// Swap in the active EP's milestone interstitials. Called from main.js at
+// Echo Loop cycle_open. After the player closes Season 1 (cycle 8 → run 9),
+// every subsequent cycle plays this beat instead of an EP's. No milestone
+// interstitials are bound in Loop mode; the climb is a pure Mass grind.
+// voice: Kalen. Numbered against the loop, not the cycle, so the player can
+// see they've crossed the finale and are now in holding territory.
+const LOOP_CYCLE_OPEN = {
+  repeat: true,
+  steps: [
+    { text: (s) => `Echo Loop ${Math.max(1, getRun(s.contactLog) - 8)}. The desk is the desk.` },
+    { text: 'Sera is not in tonight. The rig is.' },
+    { text: 'I keep listening. The Resonance compounds.' },
+  ],
+};
+
+// Swap in the active cycle's milestone interstitials. Called from main.js at
 // startup with the run loaded from the Contact Log; if a cycle close happens
 // inside the running app (the page reloads) the next boot will rebind here.
+//
+// Post-finale (run >= 9): only cycle_open is bound, no milestone beats —
+// the player has seen them all, and Echo Loop mode is purposefully sparse.
 export function bindEpisode(epOrRun) {
-  // Accept either a raw run (1..N) or a pre-resolved EP (1..8). getActiveEp
-  // is idempotent on already-clamped values, so it is safe to call here.
-  const ep = getActiveEp(epOrRun);
   for (const k of ROTATING_KEYS) {
     delete INTERSTITIALS[k];
   }
+  const run = Number.isFinite(epOrRun) ? Math.floor(epOrRun) : 1;
+  if (run >= 9) {
+    INTERSTITIALS.cycle_open = LOOP_CYCLE_OPEN;
+    return;
+  }
+  const ep = getActiveEp(run);
   const block = EP_INTERSTITIALS[ep] || {};
   for (const k of ROTATING_KEYS) {
     if (block[k]) INTERSTITIALS[k] = block[k];
@@ -384,6 +423,19 @@ export function enqueueFirstCloseBeat(state) {
   if (log.firstCloseBeatShown) return;
   log.firstCloseBeatShown = true;
   enqueue(state, 'first_cycle_close');
+}
+
+// Called from main on boot when the player has just crossed into Echo Loop
+// mode (closed cycle 8 → run 9). Fires the season-finale cinematic beat
+// exactly once; the log carries the flag so a player who reloads mid-beat
+// does not retrigger it.
+export function enqueueSeasonCompleteBeat(state) {
+  const log = state.contactLog;
+  if (!log) return;
+  if (log.seasonCompleteShown) return;
+  if (getRun(log) < 9) return;
+  log.seasonCompleteShown = true;
+  enqueue(state, 'season_complete');
 }
 
 // Call from the tick loop. Cheap: just numeric compare against peak.

@@ -100,6 +100,7 @@ export function loadContactLog() {
   const firstCloseBeatShown = !!s.firstCloseBeatShown;
   const firstEngravingSeen = !!s.firstEngravingSeen;
   const firstContactSeen = !!s.firstContactSeen;
+  const seasonCompleteShown = !!s.seasonCompleteShown;
   const pattern = typeof s.pattern === 'string' && s.pattern.length > 0 ? s.pattern : null;
   const pendingPatternChoice = !!s.pendingPatternChoice;
   const patternUsed = s.patternUsed && typeof s.patternUsed === 'object'
@@ -108,7 +109,7 @@ export function loadContactLog() {
     : {};
   return {
     run, worlds, mass, engravings, bestPeak,
-    firstCloseBeatShown, firstEngravingSeen, firstContactSeen,
+    firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     pattern, pendingPatternChoice, patternUsed,
   };
 }
@@ -220,9 +221,31 @@ export function cycleContactCount(log) {
   return n;
 }
 
-// At least one contact in the current cycle is required to close it.
-// Thematically: Kalen needs someone on the line before he can let the cycle go.
+// — Echo Loop mode (post-season) —
+//
+// Season 1 ends at cycle 8. Once the player closes EP8, the run counter
+// advances to 9 and the game shifts into Echo Loop mode: a holding pattern
+// where Kalen listens back. No new contacts can be logged (EP9+ has no
+// world catalogue), but each loop close still banks Carrier Mass and adds
+// a "Loop Resonance" multiplier to Echo Memory — the rig keeps remembering.
+//
+// Loop level = max(0, run - 8). A player who has never closed cycle 8 has
+// loop level 0 and runs the normal contact-bearing mechanic.
+export function echoLoopLevel(log) {
+  return Math.max(0, getRun(log) - 8);
+}
+
+export function isLoopMode(log) {
+  return echoLoopLevel(log) > 0;
+}
+
+// At least one contact in the current cycle is required to close it —
+// except in Loop mode, where there are no contacts to fire and the close
+// is the whole mechanic. Thematically: Kalen needs someone on the line
+// before he can let a Season 1 cycle go; in Loop mode the line is silent
+// and the close is the prayer.
 export function canCloseCycle(log) {
+  if (isLoopMode(log)) return true;
   return cycleContactCount(log) > 0;
 }
 
@@ -230,8 +253,11 @@ export function memoryShards(log) {
   return log && Array.isArray(log.worlds) ? log.worlds.length : 0;
 }
 
+// Echo Memory multiplier. Each shard adds ECHO_MEMORY_PER_SHARD; each
+// completed Echo Loop adds the same again as a virtual shard, so Loop
+// Resonance reads on the same dial without a parallel pipeline.
 export function memoryMul(log) {
-  return 1 + ECHO_MEMORY_PER_SHARD * memoryShards(log);
+  return 1 + ECHO_MEMORY_PER_SHARD * (memoryShards(log) + echoLoopLevel(log));
 }
 
 // Performs the prestige bookkeeping on the log itself. Callers are still

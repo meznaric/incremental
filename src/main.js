@@ -12,7 +12,7 @@ import {
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
-  scheduleTutorialIfEligible, bindEpisode,
+  scheduleTutorialIfEligible, bindEpisode, enqueueSeasonCompleteBeat,
 } from './interstitial.js';
 import { getRun } from './contactLog.js';
 import { makeInterstitialUi } from './interstitialUi.js';
@@ -150,6 +150,14 @@ checkStart(state, !loaded, loaded ? loaded.offline : 0);
 // save is wiped by Close the Cycle, so messages.shown can't carry the flag).
 if (!loaded && (state.contactLog.run || 1) >= 2) {
   enqueueFirstCloseBeat(state);
+  saveContactLog(state.contactLog);
+}
+// Season-finale cinematic — fires once across the player's whole history,
+// on the first fresh boot after they close cycle 8 (run advances to 9, the
+// log enters Echo Loop mode). enqueueSeasonCompleteBeat is the gate; it
+// flips the persisted seasonCompleteShown flag and queues the interstitial.
+if (!loaded) {
+  enqueueSeasonCompleteBeat(state);
   saveContactLog(state.contactLog);
 }
 if (loaded) {

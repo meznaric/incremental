@@ -4,6 +4,7 @@ import {
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
   getMass, getEngraving, massForPeak, worldFor,
   worldDetail, STATUS_MEANING,
+  echoLoopLevel, isLoopMode,
 } from './contactLog.js';
 import { nextContactMilestone, MILESTONE_THRESHOLDS, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
@@ -52,12 +53,18 @@ export function initContactLogUi(state, opts = {}) {
     const log = state.contactLog;
     const n = (log && Array.isArray(log.worlds)) ? log.worlds.length : 0;
     const run = getRun(log);
+    const loop = echoLoopLevel(log);
     // voice: Kalen. The field log framed in his hand — first person, ambient.
-    // Two short sentences, the second a small qualifier. Reframes the panel
-    // as a personal notebook rather than a UI screen.
-    const headK = n === 0
-      ? `<em>Cycle ${run}. The notebook is open. No names yet.</em>`
-      : `<em>Cycle ${run}. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log. I read them again before I sleep.</em>`;
+    // In Loop mode (post-season) the framing shifts: no new names land, but
+    // the rig keeps building Resonance. The line still reads as Kalen's notebook.
+    let headK;
+    if (loop > 0) {
+      headK = `<em>Echo Loop ${loop}. The season is closed. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log, and a Resonance that compounds.</em>`;
+    } else if (n === 0) {
+      headK = `<em>Cycle ${run}. The notebook is open. No names yet.</em>`;
+    } else {
+      headK = `<em>Cycle ${run}. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log. I read them again before I sleep.</em>`;
+    }
     introEl.innerHTML = headK;
   }
 
@@ -94,6 +101,12 @@ export function initContactLogUi(state, opts = {}) {
 
   function renderHook() {
     if (!hookEl) return;
+    if (isLoopMode(state.contactLog)) {
+      // Loop mode has no next contact to preview. The hook frames the climb
+      // itself: every kg of Mass and every Loop Resonance level compounds.
+      hookEl.innerHTML = `Season 1 is closed. The carrier is still warm. Each Loop closes for +10% Echo Memory and the Mass that the climb carries.`;
+      return;
+    }
     const next = nextContactMilestone(state);
     if (!next) {
       // After the last contact has fired the log itself becomes the question.
@@ -110,6 +123,8 @@ export function initContactLogUi(state, opts = {}) {
   function renderPending() {
     if (!pendingEl) return;
     const log = state.contactLog;
+    // Loop mode has no pending contacts; the season catalogue is closed.
+    if (isLoopMode(log)) { pendingEl.innerHTML = ''; return; }
     const contacted = new Set((log && log.worlds || []).map((w) => w.id));
     const rows = [];
     for (const m of MILESTONE_THRESHOLDS) {
@@ -133,6 +148,7 @@ export function initContactLogUi(state, opts = {}) {
   function renderStats() {
     const log = state.contactLog;
     const run = getRun(log);
+    const loop = echoLoopLevel(log);
     const cycleCount = cycleContactCount(log);
     const shards = memoryShards(log);
     const mul = memoryMul(log);
@@ -145,18 +161,36 @@ export function initContactLogUi(state, opts = {}) {
         <div class="cl-stat-value">${pat.name}</div>
       </div>
     ` : '';
+    // The first stat shifts label + value in Loop mode so the cycle counter
+    // does not keep climbing past 8 in a way that reads like more episodes.
+    // Loop count is its own dial, and Memory shows the loop bonus inline.
+    const headStat = loop > 0
+      ? `<div class="cl-stat">
+          <div class="cl-stat-label">Echo Loop</div>
+          <div class="cl-stat-value">${loop}</div>
+        </div>`
+      : `<div class="cl-stat">
+          <div class="cl-stat-label">Cycle</div>
+          <div class="cl-stat-value">${run}</div>
+        </div>`;
+    const secondStat = loop > 0
+      ? `<div class="cl-stat">
+          <div class="cl-stat-label">Status</div>
+          <div class="cl-stat-value">Season 1 · complete</div>
+        </div>`
+      : `<div class="cl-stat">
+          <div class="cl-stat-label">This Cycle</div>
+          <div class="cl-stat-value">${cycleCount} contact${cycleCount === 1 ? '' : 's'}</div>
+        </div>`;
+    const memoryTail = loop > 0
+      ? ` · ${shards} shard${shards === 1 ? '' : 's'} + ${loop} loop${loop === 1 ? '' : 's'}`
+      : (shards ? ` · ${shards} shard${shards === 1 ? '' : 's'}` : '');
     statsEl.innerHTML = `
-      <div class="cl-stat">
-        <div class="cl-stat-label">Cycle</div>
-        <div class="cl-stat-value">${run}</div>
-      </div>
-      <div class="cl-stat">
-        <div class="cl-stat-label">This Cycle</div>
-        <div class="cl-stat-value">${cycleCount} contact${cycleCount === 1 ? '' : 's'}</div>
-      </div>
+      ${headStat}
+      ${secondStat}
       <div class="cl-stat">
         <div class="cl-stat-label">Echo Memory</div>
-        <div class="cl-stat-value cl-memory">+${memoryPct}%${shards ? ` · ${shards} shard${shards === 1 ? '' : 's'}` : ''}</div>
+        <div class="cl-stat-value cl-memory">+${memoryPct}%${memoryTail}</div>
       </div>
       <div class="cl-stat">
         <div class="cl-stat-label">Carrier Mass</div>
@@ -223,8 +257,12 @@ export function initContactLogUi(state, opts = {}) {
     // pulse on the button and a "ready" line under it. Players who want to
     // push past the climax for more Carrier Mass still can — eligibility is
     // canCloseCycle, not isCycleComplete.
+    const loop = echoLoopLevel(log);
     const complete = isCycleComplete(state);
-    actionEl.classList.toggle('cycle-ready', complete && eligible);
+    // Loop mode is always "ready" — no contacts to wait for. The pulse stays
+    // on; the player closes whenever the Mass is worth it.
+    const readyState = loop > 0 ? true : (complete && eligible);
+    actionEl.classList.toggle('cycle-ready', readyState);
     if (!eligible) {
       actionEl.classList.remove('armed');
       actionEl.innerHTML = `
@@ -234,6 +272,15 @@ export function initContactLogUi(state, opts = {}) {
     }
     if (!armed) {
       actionEl.classList.remove('armed');
+      if (loop > 0) {
+        const nextLoop = loop + 1;
+        actionEl.innerHTML = `
+          <div class="cl-action-headline">Echo Loop ${nextLoop} ready.</div>
+          <div class="cl-action-hint">Banking <span class="cl-memory">+10%</span> Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Carrier Mass` : ''}</div>
+          <button type="button" class="cl-close-btn is-ready" data-act="arm">Close Echo Loop ${loop}</button>
+        `;
+        return;
+      }
       const headline = complete
         ? `<div class="cl-action-headline">The cycle is full. Ready to close.</div>`
         : '';
@@ -245,13 +292,19 @@ export function initContactLogUi(state, opts = {}) {
       return;
     }
     actionEl.classList.add('armed');
+    const confirmCopy = loop > 0
+      ? `Closing this loop resets your relays and decoders. The Contact Log remains. Loop Resonance compounds on Echo Memory; Carrier Mass accretes against your peak.`
+      : `Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier. Mass accreted on the rig becomes Carrier Mass — spend it on Engravings.`;
+    const confirmBtn = loop > 0
+      ? `Close Echo Loop ${loop}`
+      : `Close cycle ${getRun(state.contactLog)}`;
     actionEl.innerHTML = `
       <div class="cl-confirm">
-        <p>Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier. Mass accreted on the rig becomes Carrier Mass — spend it on Engravings.</p>
+        <p>${confirmCopy}</p>
       </div>
       <div class="cl-confirm-actions">
         <button type="button" class="cl-cancel-btn" data-act="cancel">Not yet</button>
-        <button type="button" class="cl-close-btn danger" data-act="confirm">Close cycle ${getRun(state.contactLog)}</button>
+        <button type="button" class="cl-close-btn danger" data-act="confirm">${confirmBtn}</button>
       </div>
     `;
   }
@@ -366,9 +419,12 @@ export function initContactLogUi(state, opts = {}) {
 
   // Reflect cycle-complete on the top-right contact-log button so the player
   // notices the prestige is available without having to open the modal first.
-  // main.js calls this from the tick loop after checkAmount runs.
+  // main.js calls this from the tick loop after checkAmount runs. In Loop
+  // mode the button stays pulsing as long as the close is legal — the player
+  // can prestige whenever they like.
   const updateAffordance = () => {
-    const ready = isCycleComplete(state) && canCloseCycle(state.contactLog);
+    const log = state.contactLog;
+    const ready = canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state));
     btn.classList.toggle('is-ready', ready);
   };
 

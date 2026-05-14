@@ -1,6 +1,7 @@
 import {
-  WORLD_FOR_INTERSTITIAL, recordContact, saveContactLog, getRun,
+  worldFor, recordContact, saveContactLog, getRun,
 } from './contactLog.js';
+import { EP_INTERSTITIALS, getActiveEp } from './episodes.js';
 
 // Staging id for the one-shot First Contact beat. Queued *before* the very
 // first contact-bearing interstitial in a player's history, with the same
@@ -19,80 +20,23 @@ export const FIRST_CONTACT_ID = 'first_contact';
 //
 // `repeat: true` lets a message fire more than once.
 //
-// Milestone interstitials are keyed by amount threshold *and* by run. The
-// MILESTONE_EPISODES table maps (run → ep). The first run plays Episode 1
-// beats; later runs (added when prestige ships) rotate in Episodes 2..8.
+// Each run plays one episode (EP1..EP8). The milestone_* interstitials and
+// the cycle_open beat are EP-scoped — bindEpisode() rewrites those entries
+// in INTERSTITIALS at startup and whenever the run advances.
 
-// Episode 1 — Discovery / Sea Choir / Sky Language / Fire Given / Perfect
-// Garden / Echoes are the canonical S1 beats. Until prestige lands, every
-// run reads from this table. Future:
-//   MILESTONE_EPISODES = { 1: EP1, 2: EP2, ... }
-//   active = MILESTONE_EPISODES[state.run] ?? EP1
-// and copy under each milestone_* key swaps with `active`.
-const EP1 = {
-  // voice: Sera. Ep 1 — Discovery beat.
-  milestone_1k: {
-    steps: [
-      { text: 'The first one. The desert.',     autoMs: 1400 },
-      { text: 'You said his name to him.',      autoMs: 2000 },
-    ],
-  },
-  // voice: Kalen. Ep 2 — Sea Choir beat.
-  milestone_1m: {
-    steps: [
-      { text: 'They thought it was the ocean.', autoMs: 1400 },
-      { text: 'I let them.',                    autoMs: 2000 },
-    ],
-  },
-  // voice: Sera. Ep 3 — Sky Language beat.
-  milestone_1b: {
-    steps: [
-      { text: 'Someone is amplifying you.',                       autoMs: 1400 },
-      { text: 'I have not decided yet whether to tell you.',      autoMs: 2200 },
-    ],
-  },
-  // voice: Kalen. Ep 4 — Fire Given beat.
-  milestone_1t: {
-    steps: [
-      { text: 'Eight seconds.', autoMs: 1200 },
-      { text: 'I watched.',     autoMs: 2200 },
-    ],
-  },
-  // voice: Kalen. Ep 5 — Perfect Garden beat.
-  milestone_1qa: {
-    steps: [
-      { text: 'That sentence is not mine.',           autoMs: 1400 },
-      { text: 'I have listened to it forty-one times.', autoMs: 2000 },
-    ],
-  },
-  // voice: Sera. Ep 7 — Echoes beat.
-  milestone_1qi: {
-    steps: [
-      { text: 'The pattern is the route.',                 autoMs: 1200 },
-      { text: 'Every triggered world rode the same nodes.', autoMs: 2200 },
-    ],
-  },
-};
-
-export const INTERSTITIALS = {
+const BASE_INTERSTITIALS = {
   // voice: Narrator → Sera. Fires once *ever*, immediately before the first
   // contact-bearing interstitial in a player's history. The moment Kalen
   // first reaches anyone is when the loop reveals itself; we let it breathe.
-  // The UI looks up state.messages.stats.firstContactWorld to render the
-  // accompanying world image and name.
   first_contact: {
     steps: [
-      { text: 'First contact.',                                            autoMs: 1800 },
+      { text: 'First contact.',                                                 autoMs: 1800 },
       { text: 'A world returned your carrier. They heard something out there.', autoMs: 2400 },
       { text: 'Their name goes on the log. The log does not forget.' },
     ],
   },
 
   // voice: Narrator (step 1), Kalen (steps 2-5). Fresh-game cold open.
-  // Step 1 auto-advances — the tagline functions as the boot screen.
-  // Steps 2-5 layer in: Kalen's name + situation, what Echoes are, what the
-  // rig does, and a soft hand-off to the loop. No info-dump; each beat is
-  // one short Kalen sentence with a qualifier.
   welcome: {
     steps: [
       { text: 'The dark was never silent.', autoMs: 2400 },
@@ -103,11 +47,8 @@ export const INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. The "how do I play" beat. Fires ~10s after the player has
-  // seen the welcome set on their very first session. Coaches the loop in
-  // theme: the rig listens on its own, the Console opens at 100 Echoes, the
-  // bands are how Kalen acts on the carrier. Sera speaks *to* Kalen — second
-  // person, procedural, periods. Never breaks the fourth wall.
+  // voice: Sera. The "how do I play" beat. Fires ~10s after welcome on the
+  // player's very first session.
   tutorial_open: {
     steps: [
       { text: 'The rig is on the carrier. It will pull Echoes whether you sit at the desk or not.' },
@@ -115,22 +56,6 @@ export const INTERSTITIALS = {
       { text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
       { text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
       { text: 'Sit at the desk, Kalen. We will see what answers.' },
-    ],
-  },
-
-  // voice: Kalen. Fires the first time the Console boots into a new cycle
-  // (run > 1 with a fresh save). Gated by stats.lastCycleOpener so the same
-  // cycle does not replay it on reload — but the entry persists in
-  // `shown` only via the stats gate, mirroring sera_interrogation_open.
-  cycle_open: {
-    repeat: true,
-    steps: [
-      { text: 'The console boots. I have been here before.' },
-      { text: (s) => {
-        const n = s.contactLog && Array.isArray(s.contactLog.worlds) ? s.contactLog.worlds.length : 0;
-        return `Cycle ${getRun(s.contactLog)}. The names remain — ${n} of them, on the heavier carrier.`;
-      } },
-      { text: 'I start the listening.' },
     ],
   },
 
@@ -161,20 +86,6 @@ export const INTERSTITIALS = {
       { text: 'I will start again. Or I will not.' },
     ],
   },
-
-  // voice: Narrator. End-state, currently fires at the magnitude cap (1e63).
-  // When prestige ships this becomes the S1 finale beat, not the magnitude beat.
-  end_vigintillion: {
-    steps: [
-      { text: 'Hundreds of young worlds, all at once, began to reach outward.' },
-      { text: 'Too early. Too fast. Too loud.' },
-      { text: 'Something is coming.' },
-      { text: 'The dark was never silent.' },
-    ],
-  },
-
-  // Episode-rotating milestone slots. Currently locked to EP1.
-  ...EP1,
 
   // voice: Kalen. First base-rate permanent purchase (a Relay Node).
   first_relay: {
@@ -208,9 +119,7 @@ export const INTERSTITIALS = {
     ],
   },
 
-  // voice: Kalen. First time the player closes a cycle and banks Carrier Mass
-  // under the new prestige system. The "weight" line refers to the new
-  // currency literally — Mass, in kg, accreted into the rig.
+  // voice: Kalen. First cycle close.
   first_cycle_close: {
     steps: [
       { text: 'The rig has weight now. It did not before.' },
@@ -220,8 +129,7 @@ export const INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. First Carrier Engraving purchased. Sera reads the rig
-  // and gets the answer she was always going to get.
+  // voice: Sera. First Carrier Engraving purchased.
   first_engraving: {
     steps: [
       { text: 'You cut something into the frame today.' },
@@ -230,11 +138,7 @@ export const INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. Once per cycle from cycle 4 onward. The interrogation
-  // grows with the log — Sera reads from it directly, names and all. By
-  // cycle 4 the run-history has weight: more names, more questions, more
-  // silence between them. `repeat` so it can fire again next cycle; gated
-  // by stats.lastSeraCycle so it never fires twice in the same run.
+  // voice: Sera. Once per cycle from cycle 4 onward.
   sera_interrogation_open: {
     repeat: true,
     steps: [
@@ -244,7 +148,6 @@ export const INTERSTITIALS = {
         return `I have ${n} name${n === 1 ? '' : 's'} on your log.`;
       } },
       { text: (s) => {
-        // Most recent first, take up to three names, fall back gracefully.
         const ws = (s.contactLog && s.contactLog.worlds) || [];
         const recent = ws.slice().sort((a, b) => (b.contactedAt || 0) - (a.contactedAt || 0)).slice(0, 3);
         const names = recent.map((w) => w.name);
@@ -256,34 +159,89 @@ export const INTERSTITIALS = {
       { text: 'Walk me through the part where you said this would be the last one.' },
     ],
   },
+
+  // Episode-rotated keys are layered in by bindEpisode() at boot. They are
+  // declared here as placeholders so non-rotated callers do not crash before
+  // bindEpisode() runs (e.g. unit tests that exercise enqueue() in isolation).
+  cycle_open: { repeat: true, steps: [{ text: 'The console boots. I have been here before.' }] },
 };
 
+// Public interstitials table. The static (cross-episode) entries live in
+// BASE_INTERSTITIALS; bindEpisode() merges in the active EP's beats. The
+// table is intentionally mutable — callers reach in by id every frame and
+// must see the current cycle's content without re-importing.
+export const INTERSTITIALS = { ...BASE_INTERSTITIALS };
+
+// Every EP defines this set of milestone slots plus a cycle_open beat.
+// Listed once so bindEpisode() knows which keys to strip before layering in
+// the next EP's content.
+const ROTATING_KEYS = [
+  'cycle_open',
+  'milestone_1k',  'milestone_10k', 'milestone_100k',
+  'milestone_1m',  'milestone_10m', 'milestone_100m',
+  'milestone_1b',  'milestone_10b', 'milestone_100b',
+  'milestone_1t',
+];
+
+// Swap in the active EP's milestone interstitials. Called from main.js at
+// startup with the run loaded from the Contact Log; if a cycle close happens
+// inside the running app (the page reloads) the next boot will rebind here.
+export function bindEpisode(epOrRun) {
+  // Accept either a raw run (1..N) or a pre-resolved EP (1..8). getActiveEp
+  // is idempotent on already-clamped values, so it is safe to call here.
+  const ep = getActiveEp(epOrRun);
+  for (const k of ROTATING_KEYS) {
+    delete INTERSTITIALS[k];
+  }
+  const block = EP_INTERSTITIALS[ep] || {};
+  for (const k of ROTATING_KEYS) {
+    if (block[k]) INTERSTITIALS[k] = block[k];
+  }
+}
+
+// Bind on module load so the table is populated even before main.js wires up
+// (e.g. unit tests). main.js calls bindEpisode again with the loaded run.
+bindEpisode(1);
+
+// Thresholds for contact-bearing milestones. Each EP fills all ten slots with
+// distinct worlds, so density is ten contacts per cycle: dense at the bottom
+// of the climb (where the player needs the most feedback) and pacing out
+// toward the climactic 1t beat.
 export const MILESTONE_THRESHOLDS = [
-  { id: 'milestone_1k',  at: 1e3 },
-  { id: 'milestone_1m',  at: 1e6 },
-  { id: 'milestone_1b',  at: 1e9 },
-  { id: 'milestone_1t',  at: 1e12 },
-  { id: 'milestone_1qa', at: 1e15 },
-  { id: 'milestone_1qi', at: 1e18 },
+  { id: 'milestone_1k',   at: 1e3  },
+  { id: 'milestone_10k',  at: 1e4  },
+  { id: 'milestone_100k', at: 1e5  },
+  { id: 'milestone_1m',   at: 1e6  },
+  { id: 'milestone_10m',  at: 1e7  },
+  { id: 'milestone_100m', at: 1e8  },
+  { id: 'milestone_1b',   at: 1e9  },
+  { id: 'milestone_10b',  at: 1e10 },
+  { id: 'milestone_100b', at: 1e11 },
+  { id: 'milestone_1t',   at: 1e12 },
 ];
 
 // Returns the next contact-bearing milestone the player has not yet hit, or
-// null if every one has fired. Contact Log UI surfaces this as a clear
-// "next contact at X Echoes" indicator at the top of the panel.
+// null if every one has fired in the current cycle. The Contact Log UI uses
+// this both as the "next contact at X Echoes" indicator and as the gate for
+// the green-pulse close-cycle affordance (null ⇒ cycle is full).
 export function nextContactMilestone(state) {
   const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || 0;
   for (const m of MILESTONE_THRESHOLDS) {
-    if (!WORLD_FOR_INTERSTITIAL[m.id]) continue;
+    if (!worldFor(state.contactLog, m.id)) continue;
     if (peak < m.at) return m;
   }
   return null;
 }
 
-const END_THRESHOLD = 1e63;
+// True once the player has crossed (or exceeded) every contact-bearing
+// milestone in the current cycle. The contact log button blinks green and
+// the close-cycle button gets a brighter style once this flips.
+export function isCycleComplete(state) {
+  return nextContactMilestone(state) === null;
+}
 
 // Anonymous-fragment cue: a low-magnitude trigger keyed to player *actions*
 // (hails, mythic rolls, long-haul buys) rather than amount. See checkAnomaly.
-// Bumped to fire once the player has clearly settled into the game.
 const ANOMALY_AT = 25;
 
 // Offline accrual that earns the soft "you came back" beat.
@@ -294,7 +252,7 @@ export function enqueue(state, id) {
   if (!INTERSTITIALS[id]) return false;
   if (m.shown[id] && !INTERSTITIALS[id].repeat) return false;
   if (m.queue.includes(id)) return false;
-  const isContact = !!(state.contactLog && WORLD_FOR_INTERSTITIAL[id]);
+  const isContact = !!(state.contactLog && worldFor(state.contactLog, id));
   // Stage the one-shot First Contact beat just *before* the very first
   // contact-bearing interstitial in the player's history. It announces what
   // the loop is. After this fires once, the flag persists in the contact log
@@ -338,8 +296,6 @@ export function scheduleTutorialIfEligible(state) {
   if (getRun(state.contactLog) !== 1) return;
   tutorialTimer = setTimeout(() => {
     tutorialTimer = null;
-    // Re-check at fire time — the player may have already crossed the gate
-    // some other way (devtools, save edit) between schedule and fire.
     if (state.messages.shown.tutorial_open) return;
     enqueue(state, 'tutorial_open');
   }, TUTORIAL_DELAY_MS);
@@ -352,7 +308,7 @@ export function checkStart(state, isFreshPlayer, offlineSeconds) {
   const run = getRun(state.contactLog);
   const s = state.messages.stats;
   // Welcome only on the very first boot (cycle 1, no save). Subsequent
-  // cycles get the cycle_open beat instead, which knows about the log.
+  // cycles get the cycle_open beat instead, which knows about the episode.
   if (isFreshPlayer && run === 1) enqueue(state, 'welcome');
   else if (isFreshPlayer && run > 1 && (s.lastCycleOpener || 0) < run) {
     s.lastCycleOpener = run;
@@ -361,9 +317,6 @@ export function checkStart(state, isFreshPlayer, offlineSeconds) {
   } else if ((offlineSeconds || 0) >= OFFLINE_RETURN_S) enqueue(state, 'offline_returner');
   if (run >= 4 && (s.lastSeraCycle || 0) < run) {
     s.lastSeraCycle = run;
-    // The shown-map prevents enqueue() from re-running a non-repeat interstitial;
-    // since this one carries `repeat: true`, the stats gate above is what
-    // enforces "once per cycle".
     delete state.messages.shown.sera_interrogation_open;
     enqueue(state, 'sera_interrogation_open');
   }
@@ -439,9 +392,6 @@ export function checkAmount(state, amount) {
   if (amount <= (s.peakAmount || 0)) return;
   for (const m of MILESTONE_THRESHOLDS) {
     if (amount >= m.at && (s.peakAmount || 0) < m.at) enqueue(state, m.id);
-  }
-  if (amount >= END_THRESHOLD && (s.peakAmount || 0) < END_THRESHOLD) {
-    enqueue(state, 'end_vigintillion');
   }
   s.peakAmount = amount;
 }

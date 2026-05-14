@@ -1,5 +1,5 @@
 import { INTERSTITIALS, FIRST_CONTACT_ID } from './interstitial.js';
-import { worldForInterstitial } from './contactLog.js';
+import { worldFor } from './contactLog.js';
 
 const TYPE_MS_PER_CHAR = 22;
 
@@ -32,9 +32,9 @@ export function makeInterstitialUi(state, onShown) {
   function resolveContact(id) {
     if (id === FIRST_CONTACT_ID) {
       const next = state.messages && state.messages.stats && state.messages.stats.firstContactWorld;
-      return next ? worldForInterstitial(next) : null;
+      return next ? worldFor(state.contactLog, next) : null;
     }
-    return worldForInterstitial(id);
+    return worldFor(state.contactLog, id);
   }
 
   function applyContactFrame(id) {

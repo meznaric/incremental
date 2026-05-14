@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   recordContact, sortedWorlds, getRun, advanceRun,
-  WORLD_FOR_INTERSTITIAL, backfillFromShown,
+  worldFor, ALL_WORLDS, backfillFromShown,
   cycleContactCount, canCloseCycle, memoryShards, memoryMul,
   closeCycle, ECHO_MEMORY_PER_SHARD,
   massForPeak, getMass, getEngraving, ENGRAVINGS,
@@ -10,20 +10,31 @@ import {
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount,
   ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
 } from '../src/contactLog.js';
+import { WORLDS_BY_EP } from '../src/worlds.js';
 
 const freshLog = () => ({ run: 1, worlds: [] });
 
-test('recordContact: appends a world for a known interstitial', () => {
+test('recordContact: appends a world for a known milestone (EP1 by default)', () => {
   const log = freshLog();
   const added = recordContact(log, 'milestone_1k', 100);
   assert.equal(added, true);
   assert.equal(log.worlds.length, 1);
-  assert.equal(log.worlds[0].id, 'ahn_tar_3');
-  assert.equal(log.worlds[0].name, 'AHN-TAR-3');
+  // Cycle 1 plays EP1; milestone_1k → Ish-Karal.
+  assert.equal(log.worlds[0].id, 'ish_karal');
+  assert.equal(log.worlds[0].name, 'ISH-KARAL');
   assert.equal(log.worlds[0].ep, 1);
-  assert.equal(log.worlds[0].status, 'TRIGGERED');
+  assert.equal(log.worlds[0].status, 'SHIFTED');
   assert.equal(log.worlds[0].run, 1);
   assert.equal(log.worlds[0].contactedAt, 100);
+});
+
+test('recordContact: climactic 1t slot is the canonical EP world', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1t', 100);
+  // Cycle 1 plays EP1; milestone_1t (the climax) → Ahn-Tar-3.
+  assert.equal(log.worlds[0].id, 'ahn_tar_3');
+  assert.equal(log.worlds[0].name, 'AHN-TAR-3');
+  assert.equal(log.worlds[0].status, 'TRIGGERED');
 });
 
 test('recordContact: idempotent — does not duplicate the same world', () => {
@@ -42,33 +53,107 @@ test('recordContact: ignores unknown interstitial ids', () => {
   assert.equal(log.worlds.length, 0);
 });
 
+test('recordContact: resolves the world per the log.run → EP rotation', () => {
+  const cycle1 = { run: 1, worlds: [] };
+  recordContact(cycle1, 'milestone_1t', 100);
+  assert.equal(cycle1.worlds[0].id, 'ahn_tar_3', 'cycle 1 climax = Ahn-Tar-3');
+
+  const cycle2 = { run: 2, worlds: [] };
+  recordContact(cycle2, 'milestone_1t', 100);
+  assert.equal(cycle2.worlds[0].id, 'solunn', 'cycle 2 climax = Solunn');
+
+  const cycle3 = { run: 3, worlds: [] };
+  recordContact(cycle3, 'milestone_1t', 100);
+  assert.equal(cycle3.worlds[0].id, 'vehrn_9', 'cycle 3 climax = Vehrn-9');
+
+  const cycle8 = { run: 8, worlds: [] };
+  recordContact(cycle8, 'milestone_1t', 100);
+  assert.equal(cycle8.worlds[0].id, 'the_cascade', 'cycle 8 climax = The Cascade');
+});
+
 test('recordContact: tags each entry with the current run', () => {
   const log = freshLog();
   recordContact(log, 'milestone_1k', 100);
   advanceRun(log);
   advanceRun(log);
+  // run is now 3 → EP3. milestone_1m in EP3 = esnal.
   recordContact(log, 'milestone_1m', 200);
   assert.equal(log.worlds[0].run, 1);
   assert.equal(log.worlds[1].run, 3);
+  assert.equal(log.worlds[0].id, 'ish_karal');
+  assert.equal(log.worlds[1].id, 'esnal');
 });
 
-test('WORLD_FOR_INTERSTITIAL: every entry has the required shape', () => {
-  for (const [key, def] of Object.entries(WORLD_FOR_INTERSTITIAL)) {
-    assert.equal(typeof def.id, 'string', `${key}.id`);
-    assert.equal(typeof def.name, 'string', `${key}.name`);
-    assert.equal(typeof def.ep, 'number', `${key}.ep`);
-    assert.ok(['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'].includes(def.status),
-      `${key}.status must be one of TRIGGERED|COLLAPSED|SHIFTED|MISSING`);
+test('WORLDS_BY_EP: every entry has the required shape', () => {
+  for (const [ep, milestones] of Object.entries(WORLDS_BY_EP)) {
+    for (const [key, def] of Object.entries(milestones)) {
+      const label = `EP${ep}/${key}`;
+      assert.equal(typeof def.id, 'string', `${label}.id`);
+      assert.equal(typeof def.name, 'string', `${label}.name`);
+      assert.equal(typeof def.ep, 'number', `${label}.ep`);
+      assert.equal(def.ep, Number(ep), `${label}.ep matches its EP key`);
+      assert.ok(['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'].includes(def.status),
+        `${label}.status must be one of TRIGGERED|COLLAPSED|SHIFTED|MISSING`);
+    }
+  }
+});
+
+test('WORLDS_BY_EP: every entry declares image and flavor', () => {
+  for (const [ep, milestones] of Object.entries(WORLDS_BY_EP)) {
+    for (const [key, def] of Object.entries(milestones)) {
+      const label = `EP${ep}/${key}`;
+      assert.ok('image' in def, `${label}.image must be declared (string or null)`);
+      assert.ok(def.image === null || (typeof def.image === 'string' && def.image.endsWith('.png')),
+        `${label}.image must be a .png path or null`);
+      assert.equal(typeof def.flavor, 'string', `${label}.flavor`);
+      assert.ok(def.flavor.length > 0, `${label}.flavor non-empty`);
+    }
+  }
+});
+
+test('WORLDS_BY_EP: world ids are unique across all EPs', () => {
+  const seen = new Map();
+  for (const [ep, milestones] of Object.entries(WORLDS_BY_EP)) {
+    for (const def of Object.values(milestones)) {
+      const prev = seen.get(def.id);
+      assert.equal(prev, undefined,
+        `duplicate world id ${def.id} appears in EP${ep} and EP${prev}`);
+      seen.set(def.id, ep);
+    }
+  }
+});
+
+test('WORLDS_BY_EP: every EP fills the 10 milestone slots', () => {
+  const required = [
+    'milestone_1k', 'milestone_10k', 'milestone_100k',
+    'milestone_1m', 'milestone_10m', 'milestone_100m',
+    'milestone_1b', 'milestone_10b', 'milestone_100b',
+    'milestone_1t',
+  ];
+  for (const ep of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const slot of required) {
+      assert.ok(WORLDS_BY_EP[ep][slot], `EP${ep}.${slot} missing`);
+    }
+  }
+});
+
+test('worldFor: returns null for unknown milestone id', () => {
+  assert.equal(worldFor({ run: 1, worlds: [] }, 'not_a_milestone'), null);
+});
+
+test('ALL_WORLDS: every entry is keyed by its world id', () => {
+  for (const [key, def] of Object.entries(ALL_WORLDS)) {
+    assert.equal(def.id, key, `ALL_WORLDS[${key}].id mismatch`);
   }
 });
 
 test('sortedWorlds: newest contact first', () => {
   const log = freshLog();
-  recordContact(log, 'milestone_1k', 100);
-  recordContact(log, 'milestone_1m', 200);
-  recordContact(log, 'milestone_1b', 50);
+  recordContact(log, 'milestone_1k', 100);  // ish_karal
+  recordContact(log, 'milestone_1m', 200);  // daouns_reach
+  recordContact(log, 'milestone_1b', 50);   // halun_veth
   const sorted = sortedWorlds(log);
-  assert.deepEqual(sorted.map((w) => w.id), ['solunn', 'ahn_tar_3', 'vehrn_9']);
+  assert.deepEqual(sorted.map((w) => w.id), ['daouns_reach', 'ish_karal', 'halun_veth']);
 });
 
 test('getRun: defaults to 1 on a fresh or malformed log', () => {
@@ -78,19 +163,20 @@ test('getRun: defaults to 1 on a fresh or malformed log', () => {
   assert.equal(getRun({ run: 4 }), 4);
 });
 
-test('backfillFromShown: adds entries for every contact-bearing shown id', () => {
+test('backfillFromShown: adds entries for every legacy contact-bearing shown id', () => {
   const log = freshLog();
   const shown = {
     welcome: true,        // not a contact — ignored
     first_gamble: true,   // not a contact — ignored
     milestone_1k: true,
     milestone_1m: true,
-    milestone_1qa: true,
+    milestone_1qa: true,  // legacy id from before the EP rotation
   };
   const added = backfillFromShown(log, shown, 500);
   assert.equal(added, 3);
   assert.equal(log.worlds.length, 3);
   const ids = log.worlds.map((w) => w.id).sort();
+  // Backfill uses the pre-rotation mapping: 1k→Ahn-Tar-3, 1m→Solunn, 1qa→Lehl.
   assert.deepEqual(ids, ['ahn_tar_3', 'lehl', 'solunn']);
 });
 
@@ -138,6 +224,19 @@ test('canCloseCycle: false again immediately after closing, until next contact',
   assert.equal(canCloseCycle(log), false, 'new cycle starts empty');
 });
 
+test('canCloseCycle: cycle 2 can be closed with EP2 contacts (no dedupe lock)', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1k', 100);   // ish_karal, cycle 1
+  closeCycle(log, 0);
+  assert.equal(getRun(log), 2);
+  // Cycle 2 plays EP2; same milestone id resolves to a different world (mora_brae),
+  // so the dedupe-by-world-id contract does NOT lock the cycle.
+  const added = recordContact(log, 'milestone_1k', 200);
+  assert.equal(added, true);
+  assert.equal(log.worlds[1].id, 'mora_brae');
+  assert.equal(canCloseCycle(log), true);
+});
+
 test('memoryShards: counts every world ever logged across all cycles', () => {
   const log = freshLog();
   assert.equal(memoryShards(log), 0);
@@ -172,7 +271,6 @@ test('closeCycle: advances the run and keeps the world list intact', () => {
   assert.equal(banked, 4);
   assert.equal(getRun(log), 2);
   assert.equal(log.worlds.length, 2, 'worlds survive prestige');
-  // Echo Memory carries forward — shards persist.
   assert.equal(memoryShards(log), 2);
 });
 
@@ -185,20 +283,20 @@ test('massForPeak: zero below 1k', () => {
 });
 
 test('massForPeak: log10(peak) - 2, floored', () => {
-  assert.equal(massForPeak(1e3), 1);      // log10 = 3 → 1
-  assert.equal(massForPeak(1e6), 4);      // 6 - 2 = 4
+  assert.equal(massForPeak(1e3), 1);
+  assert.equal(massForPeak(1e6), 4);
   assert.equal(massForPeak(1e9), 7);
   assert.equal(massForPeak(1e12), 10);
-  assert.equal(massForPeak(5e6), 4);      // floor(6.7) - 2 = 4
+  assert.equal(massForPeak(5e6), 4);
 });
 
 test('closeCycle: banks mass against peak, persists across closes', () => {
   const log = freshLog();
   recordContact(log, 'milestone_1k', 100);
-  closeCycle(log, 1e6);                    // +4 kg
+  closeCycle(log, 1e6);
   assert.equal(getMass(log), 4);
   recordContact(log, 'milestone_1m', 200);
-  closeCycle(log, 1e9);                    // +7 kg
+  closeCycle(log, 1e9);
   assert.equal(getMass(log), 11);
 });
 
@@ -223,9 +321,7 @@ test('ENGRAVINGS: every entry has the required shape', () => {
 
 test('engravingCost: returns the entry cost at current level', () => {
   const log = freshLog();
-  // First Light is one-time, cost 1.
   assert.equal(engravingCost(log, 'first_light'), 1);
-  // Bone Memory at lvl 0 → 2; one buy → lvl 1, next cost 4.
   log.mass = 100;
   assert.equal(engravingCost(log, 'bone_memory'), 2);
   buyEngraving(log, 'bone_memory');
@@ -235,7 +331,7 @@ test('engravingCost: returns the entry cost at current level', () => {
 test('engravingCost: Infinity once maxed', () => {
   const log = freshLog();
   log.mass = 10;
-  buyEngraving(log, 'first_light');                  // max 1
+  buyEngraving(log, 'first_light');
   assert.equal(engravingCost(log, 'first_light'), Infinity);
 });
 
@@ -289,14 +385,4 @@ test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
   log.mass = 1;
   buyEngraving(log, 'first_light');
   assert.equal(firstLightAmount(log), FIRST_LIGHT_AMOUNT);
-});
-
-test('WORLD_FOR_INTERSTITIAL: every entry declares image and flavor', () => {
-  for (const [key, def] of Object.entries(WORLD_FOR_INTERSTITIAL)) {
-    assert.ok('image' in def, `${key}.image must be declared (string or null)`);
-    assert.ok(def.image === null || (typeof def.image === 'string' && def.image.endsWith('.png')),
-      `${key}.image must be a .png path or null`);
-    assert.equal(typeof def.flavor, 'string', `${key}.flavor`);
-    assert.ok(def.flavor.length > 0, `${key}.flavor non-empty`);
-  }
 });

@@ -5,11 +5,12 @@
 // the names. Run N+1 then plays the next episode against a heavier log.
 //
 // Wire-up:
-//   * Persisted under its own key (CONTACT_LOG_KEY), independent of the gameplay save.
+//   * Persisted under its own key (CONTACT_LOG_KEY), independent of the
+//     gameplay save.
 //   * Mutated only via recordContact(), which is keyed on world.id so the
 //     same world is not appended twice across reloads.
 //   * advanceRun() bumps the run counter — call this when a prestige reset
-//     happens. Until prestige ships, runs stay at 1 and the log just grows.
+//     happens. Each run plays one episode (EP1..EP8); see worlds.js.
 //
 // Schema:
 //   { run: number,
@@ -22,102 +23,38 @@
 //     bestPeak: number,          // Highest peakAmount of any past cycle (for stats).
 //   }
 
+import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds.js';
+import { getActiveEp } from './episodes.js';
+
 export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
-// World ↔ interstitial mapping. The status comes from docs/lore/episodes.md.
-// Keys are interstitial ids; values describe the world recorded when that
-// interstitial first fires.
-//
-// `image` is a path relative to index.html — the contact interstitial loads
-// it as a hero portrait. Worlds without a dedicated portrait fall back to a
-// stylised placeholder (see .it-portrait-fallback in index.html).
-// `flavor` is one short in-world line shown beneath the world name on contact.
-export const WORLD_FOR_INTERSTITIAL = {
-  milestone_1k:  { id: 'ahn_tar_3',    name: 'AHN-TAR-3',    ep: 1, status: 'TRIGGERED',
-    image: './docs/lore/images/desert-ahn-tar.png',
-    flavor: 'A desert world. Theocratic. Lit by oil. The sky-listeners heard you first.' },
-  milestone_1m:  { id: 'solunn',       name: 'SOLUNN',       ep: 2, status: 'TRIGGERED',
-    image: './docs/lore/images/sea-choir-solunn.png',
-    flavor: 'A water world. Cetacean choir. Your carrier rode the deep sound channel.' },
-  milestone_1b:  { id: 'vehrn_9',      name: 'VEHRN-9',      ep: 3, status: 'TRIGGERED',
-    image: './docs/lore/images/sky-language-vehrn.png',
-    flavor: 'Industrial. Aurora-bright. Your message resolved as glyphs in their sky.' },
-  milestone_1t:  { id: 'tarsus_minor', name: 'TARSUS MINOR', ep: 4, status: 'COLLAPSED',
-    image: null,
-    flavor: 'Atomic-age. Hungry for power. Eight seconds of fusion, then no return tone.' },
-  milestone_1qa: { id: 'lehl',         name: 'LEHL',         ep: 5, status: 'SHIFTED',
-    image: null,
-    flavor: 'A long-lived, settled world. You only listened. Something still landed.' },
-  // Ep 6 — the world Kalen was contacting when he was caught. He cannot
-  // find it. The status reads MISSING, the name reads as a placeholder. The
-  // offline-returner beat is what surfaces it.
-  offline_returner: { id: 'designation_withheld', name: '[DESIGNATION WITHHELD]', ep: 6, status: 'MISSING',
-    image: null,
-    flavor: 'The folder is intact. The star-charts no longer match anything in Union records.' },
-};
-
-export function worldForInterstitial(id) {
-  return WORLD_FOR_INTERSTITIAL[id] || null;
+// Resolve the world definition for a given milestone id, scoped to the
+// log's current run. Each run plays one episode (EP1..EP8) and each EP
+// defines its own world per milestone slot.
+export function worldFor(log, milestoneId) {
+  const ep = getActiveEp(getRun(log));
+  return WORLDS_BY_EP[ep]?.[milestoneId] || null;
 }
 
-// Per-world lore detail — surfaces only when the player taps a logged
-// contact. Content is canonical (sourced from docs/lore/episodes.md,
-// world-rules.md, and characters.md). No S2/S3 reveals.
-//
-// Shape per world:
-//   method  — one sentence on how Kalen reached them.
-//   biology — one sentence on what they are.
-//   politics — one sentence on who decides.
-//   cost    — one sentence on the consequence of contact.
-//   note    — one short Kalen-voice line, italic in render.
-export const WORLD_DETAIL = {
-  ahn_tar_3: {
-    method:   'Radio leakage. He pushed his voice sideways into the carrier band of their crude oil-lit radio sets.',
-    biology:  'Pre-industrial. Theocratic. A small caste of sky-listeners believed the heavens spoke in static.',
-    politics: 'A sixteen-year-old sky-listener heard him first. Within three years that boy held a state.',
-    cost:     'Six thousand Ahn-Tarsi dead in a religious purge before Kalen understood what he had said.',
-    note:     'I said good morning. He took it as scripture.',
-  },
-  solunn: {
-    method:   'Seismic resonance. Pulse trains modulated against the ocean-floor crust, heard by every Solunni below the thermocline at once.',
-    biology:  'Cetacean-analog. Slow, large, song-singing. Communication carried thousands of kilometres through the deep sound channel.',
-    politics: 'The eldest singers were the legal system. They lost it the day Kalen sang back.',
-    cost:     'A schism opened in the old singer-courts that was never going to close on its own.',
-    note:     'They thought it was the ocean. I let them.',
-  },
-  vehrn_9: {
-    method:   'Aurora modulation. Charged particles steered into the upper atmosphere in patterns that resolved as glyph-text from the ground.',
-    biology:  'Industrial-age. Smoggy. An astronomer named Iv Korash read his first message; she did not believe in gods, she believed in lattices.',
-    politics: 'A second Vehrnese government weaponised the medium first. The aurora war is now a recognised theatre of conflict.',
-    cost:     'Disinformation written across their sky in his hand.',
-    note:     'I wanted to show them the sky could speak. I should have remembered who controls the printing.',
-  },
-  tarsus_minor: {
-    method:   'Magnetic-storm encoding. Bursts in geomagnetic field perturbations, read on compass anomalies by two fringe physicists.',
-    biology:  'Atomic-age. Industrially capable. Hungry for cheap power.',
-    politics: 'A married pair of fringe physicists trusted him. So did their state, eventually.',
-    cost:     'A city of eighteen million is gone in eight seconds. Kalen watched it through a borrowed scope and did not look away.',
-    note:     'I gave them a correction. The correction was also a weapon. I knew that.',
-  },
-  lehl: {
-    method:   'Their own observational satellites. He woke their cameras gently. He had been careful for two years.',
-    biology:  'Long-lived. Three-hundred-year average. Peaceful, settled, self-sufficient.',
-    politics: 'Elders decide for the population. One elder heard a sentence in Kalen\'s voice that Kalen did not write.',
-    cost:     'Lifespan dropped to two hundred and twenty. Suicide rose eight-fold. Paradise restructured around metrics.',
-    note:     'That sentence is not mine. I have listened to it forty-one times.',
-  },
-  designation_withheld: {
-    method:   'A custom relay path he assembled himself across three FTL nodes. The path no longer exists.',
-    biology:  'Unknown. The recordings remain. The star-charts no longer match anything in Union records.',
-    politics: 'Unknown.',
-    cost:     'The world is gone from Union astronomy. There are no ruins to point at.',
-    note:     'I had a folder of their songs. I still have it. There is nothing to give it back to.',
-  },
-};
-
+// Per-world lore detail — surfaces only when the player taps a contact in the
+// log. Defined per world id in worlds.js so the same lookup serves every EP.
 export function worldDetail(id) {
   return WORLD_DETAIL[id] || null;
 }
+
+// Compatibility shim — used by callers (mainly contactLogUi.js + tests) that
+// want to enumerate every world the game knows about. Iterates every EP and
+// flattens into { worldId: worldDef } so the keys are stable across EPs.
+// Note: the per-EP milestone id is *not* used as a key here, because the
+// same milestone id appears in every EP — use worldFor(log, milestoneId)
+// when you need the EP-scoped lookup.
+export const ALL_WORLDS = Object.freeze(
+  Object.fromEntries(
+    Object.values(WORLDS_BY_EP).flatMap((ep) =>
+      Object.values(ep).map((w) => [w.id, w])
+    )
+  )
+);
 
 export const STATUS_COLOR = {
   TRIGGERED: '#ff8a3a',
@@ -181,15 +118,43 @@ export function saveContactLog(log) {
   catch (e) { return false; }
 }
 
+// Legacy milestone-id → world mapping. The pre-EP-rotation code packed all
+// ten S1 worlds into a single run keyed by milestone_1k..milestone_30qa.
+// Existing saves carry these ids in their `messages.shown` map; backfilling
+// reattaches the corresponding worlds to the log so old players' history is
+// not silently dropped after the rotation lands.
+const LEGACY_BACKFILL_WORLDS = {
+  milestone_1k:   { id: 'ahn_tar_3',    name: 'AHN-TAR-3',    ep: 1, status: 'TRIGGERED' },
+  milestone_30k:  { id: 'korv_shen',    name: 'KORV-SHEN',    ep: 1, status: 'TRIGGERED' },
+  milestone_1m:   { id: 'solunn',       name: 'SOLUNN',       ep: 2, status: 'TRIGGERED' },
+  milestone_30m:  { id: 'mora_brae',    name: 'MORA-BRAE',    ep: 2, status: 'SHIFTED'   },
+  milestone_1b:   { id: 'vehrn_9',      name: 'VEHRN-9',      ep: 3, status: 'TRIGGERED' },
+  milestone_30b:  { id: 'theran',       name: 'THERAN',       ep: 3, status: 'COLLAPSED' },
+  milestone_1t:   { id: 'tarsus_minor', name: 'TARSUS MINOR', ep: 4, status: 'COLLAPSED' },
+  milestone_30t:  { id: 'pellan_toth',  name: 'PELLAN-TOTH',  ep: 3, status: 'SHIFTED'   },
+  milestone_1qa:  { id: 'lehl',         name: 'LEHL',         ep: 5, status: 'SHIFTED'   },
+  milestone_30qa: { id: 'iyarra_vell',  name: 'IYARRA-VELL',  ep: 4, status: 'SHIFTED'   },
+};
+
 // Backfill the Contact Log from a gameplay save's `messages.shown` map.
-// Existing players already had milestones fire under the old code; their
-// log would otherwise be empty until they crossed a *new* threshold. Run
-// this once on load. Returns the number of entries added.
+// Pre-EP-rotation players already had milestones fire under the old code;
+// their log would otherwise lose those names after this PR. Run this once
+// on load. Legacy ids are looked up against LEGACY_BACKFILL_WORLDS so the
+// shape stays stable across the milestone-id rename. All backfilled entries
+// land under cycle 1 because that is the run they were originally tagged to.
+// Returns the number of entries added.
 export function backfillFromShown(log, shown, now) {
   if (!shown || typeof shown !== 'object') return 0;
+  const t = typeof now === 'number' ? now : Date.now() / 1000;
   let added = 0;
-  for (const id of Object.keys(WORLD_FOR_INTERSTITIAL)) {
-    if (shown[id] && recordContact(log, id, now)) added++;
+  for (const [oldId, def] of Object.entries(LEGACY_BACKFILL_WORLDS)) {
+    if (!shown[oldId]) continue;
+    if (log.worlds.some((w) => w.id === def.id)) continue;
+    log.worlds.push({
+      id: def.id, name: def.name, ep: def.ep, status: def.status,
+      contactedAt: t, run: 1,
+    });
+    added++;
   }
   // A backfill means the player already crossed at least one contact in the
   // past; the First Contact beat would have nothing to introduce. Flip the
@@ -200,8 +165,10 @@ export function backfillFromShown(log, shown, now) {
 
 // Append a world only if its id is not already present. Mutates and returns
 // the log; returns true if a new entry landed, false if it was a no-op.
-export function recordContact(log, interstitialId, now) {
-  const def = WORLD_FOR_INTERSTITIAL[interstitialId];
+// The milestone id is resolved against the *current* run's EP, so the same
+// id (e.g. milestone_1k) records different worlds in different cycles.
+export function recordContact(log, milestoneId, now) {
+  const def = worldFor(log, milestoneId);
   if (!def) return false;
   if (log.worlds.some((w) => w.id === def.id)) return false;
   log.worlds.push({

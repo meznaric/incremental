@@ -82,6 +82,68 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Patched Frame** | A Cycle Pattern. Three bands ride free at cycle open; every re-tune after that bills double. |
 | **Bare Wire** | A Cycle Pattern. Base listening runs half-strength, but windows hold twice as long and hail carry-chance climbs five points. |
 
+## Worlds, by cycle (Season 1)
+
+Each cycle of the game plays one canonical episode. Inside each cycle the
+player works through ten contacts before the climactic one; the worlds and
+their statuses are listed here as the single source of truth. Code lives in
+[`src/worlds.js`](../../src/worlds.js); narrative beats in
+[`src/episodes.js`](../../src/episodes.js).
+
+Status legend: **TRIGGERED** (set off a cascade) · **COLLAPSED** (world ended) ·
+**SHIFTED** (trajectory bent) · **MISSING** (gone from records).
+
+### Cycle 1 — Discovery (climax: Ahn-Tar-3)
+
+Ish-Karal · Belnesh · Korv-Shen · Daoun's Reach · Hsareth · Mirum-3 ·
+Halun-Veth · Voun · Sephir-2 · **Ahn-Tar-3**.
+
+### Cycle 2 — The Sea Choir (climax: Solunn)
+
+Mora-Brae · Telnir · Achos · Ven-Thar · Drath · Quel-Sin · Eolun ·
+Brel-Halon · Iharran · **Solunn**.
+
+### Cycle 3 — Sky Language (climax: Vehrn-9)
+
+Tachet · Pelnar Belt · Theran · Esnal · Pellan-Toth · Norr-Halen ·
+Korov Drift · Eshrane · Vail-South · **Vehrn-9**.
+
+### Cycle 4 — Fire Given (climax: Tarsus Minor)
+
+Olun · Tavel · Khel-Vir · Sennak · Iyarra-Vell · Brel-Halon-Tertius ·
+Pavel-9 · Aros-Marl · Ven-Karah · **Tarsus Minor**.
+
+### Cycle 5 — Perfect Garden (climax: Lehl)
+
+Welun · Tor-Mira · Ehlan · Sereshan · Norvell · Iyarra-Lesser · Pellach ·
+The Quiet Three · Vatha-Sel · **Lehl**.
+
+### Cycle 6 — Missing World (climax: designation withheld)
+
+Ar-Sennech · Toravan · Veld-Ar · Halun-Outer · The Empty Coordinate ·
+Iyarra-Echo · Veska · Reltha · Pen-Halun · **[DESIGNATION WITHHELD]**.
+
+### Cycle 7 — Echoes (climax: Shann-Vel)
+
+Tov-Karav · Ralis · Khol-3 · Sephor-3 · Pratha · Vell-Karash · Eshin ·
+Norv · Halun-Pattern · **Shann-Vel**.
+
+### Cycle 8 — Finale (climax: The Cascade)
+
+Relay 712 · Tov-Bright · Ahn-Bright · Hesh-Bright · The Eighth Bright ·
+Verel-Bright · Ven-Bright · Korash-Bright · The Cascade Spine ·
+**The Cascade**.
+
+### Naming rules for new worlds
+
+- Two- or three-syllable proper noun, sometimes hyphenated, optionally
+  with a numeric suffix (e.g., Vehrn-9, Khol-3, Mirum-3, Pavel-9).
+- A small set of "name-like-a-place" entries break the rule and are titled
+  (The Cascade, The Quiet Three, The Empty Coordinate, Cascade Spine).
+- World ids in code are lowercase snake_case (e.g., `pelnar_belt`).
+- World display names in code are UPPERCASE with spaces and hyphens
+  retained (e.g., `PELNAR BELT`, `[DESIGNATION WITHHELD]`).
+
 ## Names you should NOT use (IP / Trek overlap)
 
 These are banned. If you find a draft using them, rewrite.
@@ -117,3 +179,4 @@ If a term in this file ever needs to change:
 - 2026-05-14 — Added Signal Diagnostic and current pulse. Names the breakdown screen and the final rate figure; Sera-voiced UI surface.
 - 2026-05-14 — Added Wake. Names the starter rate-mul beat at every cycle open so the mobile collapsed-buff detail modal has a clear provenance label.
 - 2026-05-14 — Added Cycle Pattern + the four canonical Pattern names (Surge Tide, Cold Sky, Patched Frame, Bare Wire). Each is a per-cycle strategy modifier the player picks the moment the rig boots into a new cycle.
+- 2026-05-15 — Added eighty new worlds across cycles 1–8 (full Season 1 build-out). Each cycle now plays one canonical episode arc with ten contacts; the canonical world is the climactic 1t milestone. See the per-cycle world list above.

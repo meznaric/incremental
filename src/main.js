@@ -12,8 +12,9 @@ import {
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
-  scheduleTutorialIfEligible,
+  scheduleTutorialIfEligible, bindEpisode,
 } from './interstitial.js';
+import { getRun } from './contactLog.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
 import {
@@ -42,7 +43,11 @@ state.memoryMul = memoryMul(state.contactLog);
 state.ascentExp = ascentExp(state.contactLog);
 
 initMenu();
-initContactLogUi(state, {
+// Bind the active episode's interstitials (milestone beats + cycle_open) to
+// match the cycle the player is loading into. Must run before checkStart so
+// any cycle_open/milestone enqueue picks up the EP's content.
+bindEpisode(getRun(state.contactLog));
+const contactLogUi = initContactLogUi(state, {
   // "Close the Cycle" — soft prestige. Wipes the gameplay save, advances the
   // log's run counter so milestones can fire again, leaves the world list
   // (and therefore Echo Memory) intact, banks Carrier Mass against the
@@ -766,6 +771,9 @@ function tick(raf) {
   if (Number.isFinite(accrual)) state.amount += accrual;
   else console.warn('integrateRate produced non-finite value', accrual);
   checkAmount(state, state.amount);
+  // Reflect cycle-complete on the top-right contact-log button. Cheap; just
+  // a class toggle. Drives the green pulse + the "ready" hint inside the modal.
+  contactLogUi.updateAffordance();
 
   display.update(state.amount, rate, t, dt);
   hero.update(state.amount, rate, baseRate, dt);

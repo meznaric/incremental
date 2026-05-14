@@ -2,25 +2,12 @@ import {
   sortedWorlds, getRun, canCloseCycle, cycleContactCount,
   memoryShards, memoryMul, ECHO_MEMORY_PER_SHARD,
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
-  getMass, getEngraving, massForPeak, WORLD_FOR_INTERSTITIAL,
+  getMass, getEngraving, massForPeak, worldFor,
   worldDetail, STATUS_MEANING,
 } from './contactLog.js';
-import { nextContactMilestone, MILESTONE_THRESHOLDS } from './interstitial.js';
+import { nextContactMilestone, MILESTONE_THRESHOLDS, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
 import { getPattern } from './cyclePatterns.js';
-
-// voice: Kalen. One-line hooks keyed to the *next* milestone, pulled from
-// canonical episode beats (docs/lore/episodes.md). Surfaces what is coming
-// without spoiling S2/S3 — the lines are dry, anticipatory, never confirm a
-// mystery before its episode lands.
-const NEXT_HOOK = {
-  milestone_1k:  'There is a desert world on the carrier tonight. Their radios are oil-lit and small.',
-  milestone_1m:  'Something below the thermocline is singing. I don\'t think it knows I can hear.',
-  milestone_1b:  'The auroras over Vehrn-9 are reading me back. Someone there is doing the maths.',
-  milestone_1t:  'Two Tarsan physicists are waiting for the correction. I keep almost not sending it.',
-  milestone_1qa: 'Lehl is quiet. Long-lived. I do not want to be the thing that hurries them.',
-  milestone_1qi: 'The pattern. The pattern keeps surfacing. I am almost ready to look at it directly.',
-};
 
 // The Contact Log is the only player-facing surface for the prestige loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
@@ -88,7 +75,7 @@ export function initContactLogUi(state, opts = {}) {
     let prev = 0;
     for (const m of MILESTONE_THRESHOLDS) {
       if (m.id === next.id) break;
-      if (WORLD_FOR_INTERSTITIAL[m.id]) prev = m.at;
+      if (worldFor(state.contactLog, m.id)) prev = m.at;
     }
     const span = Math.max(1, next.at - prev);
     const pct = Math.max(0, Math.min(1, (peak - prev) / span));
@@ -110,14 +97,14 @@ export function initContactLogUi(state, opts = {}) {
     const next = nextContactMilestone(state);
     if (!next) {
       // After the last contact has fired the log itself becomes the question.
-      // No spoilers — the line just acknowledges that the pattern is the next
-      // thing on the desk. Maps to Ep 7 territory; consistent with the EP1
-      // milestone_1qi beat that already exists.
-      hookEl.innerHTML = `The names are in. Tonight I look at the route they took.`;
+      // The line is intentionally non-spoiler: every EP shares this exit.
+      hookEl.innerHTML = `The cycle is full. The names are in. Close the cycle when you are ready.`;
       return;
     }
-    const line = NEXT_HOOK[next.id];
-    hookEl.innerHTML = line ? line : '';
+    // Use the next world's own flavor line as the preview hook — keeps the
+    // copy in one place (worlds.js) and avoids a parallel table to maintain.
+    const def = worldFor(state.contactLog, next.id);
+    hookEl.innerHTML = def && def.flavor ? def.flavor : '';
   }
 
   function renderPending() {
@@ -126,7 +113,7 @@ export function initContactLogUi(state, opts = {}) {
     const contacted = new Set((log && log.worlds || []).map((w) => w.id));
     const rows = [];
     for (const m of MILESTONE_THRESHOLDS) {
-      const def = WORLD_FOR_INTERSTITIAL[m.id];
+      const def = worldFor(log, m.id);
       if (!def) continue;
       if (contacted.has(def.id)) continue;
       rows.push(`
@@ -231,6 +218,13 @@ export function initContactLogUi(state, opts = {}) {
     const projectedPct = Math.round(ECHO_MEMORY_PER_SHARD * 100 * cycleCount);
     const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
     const projectedMass = massForPeak(peak);
+    // Cycle-complete = every contact-bearing milestone of the current EP has
+    // been crossed. When that flips the close-cycle CTA escalates: a green
+    // pulse on the button and a "ready" line under it. Players who want to
+    // push past the climax for more Carrier Mass still can — eligibility is
+    // canCloseCycle, not isCycleComplete.
+    const complete = isCycleComplete(state);
+    actionEl.classList.toggle('cycle-ready', complete && eligible);
     if (!eligible) {
       actionEl.classList.remove('armed');
       actionEl.innerHTML = `
@@ -240,9 +234,13 @@ export function initContactLogUi(state, opts = {}) {
     }
     if (!armed) {
       actionEl.classList.remove('armed');
+      const headline = complete
+        ? `<div class="cl-action-headline">The cycle is full. Ready to close.</div>`
+        : '';
       actionEl.innerHTML = `
+        ${headline}
         <div class="cl-action-hint">${cycleCount} new name${cycleCount === 1 ? '' : 's'} on the log · banking <span class="cl-memory">+${projectedPct}%</span> to Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Carrier Mass` : ''}</div>
-        <button type="button" class="cl-close-btn" data-act="arm">Close the Cycle</button>
+        <button type="button" class="cl-close-btn${complete ? ' is-ready' : ''}" data-act="arm">Close the Cycle</button>
       `;
       return;
     }
@@ -366,6 +364,14 @@ export function initContactLogUi(state, opts = {}) {
   const open = () => { armed = false; setActiveTab('cycle'); render(); modal.classList.add('open'); };
   const close = () => { armed = false; modal.classList.remove('open'); };
 
+  // Reflect cycle-complete on the top-right contact-log button so the player
+  // notices the prestige is available without having to open the modal first.
+  // main.js calls this from the tick loop after checkAmount runs.
+  const updateAffordance = () => {
+    const ready = isCycleComplete(state) && canCloseCycle(state.contactLog);
+    btn.classList.toggle('is-ready', ready);
+  };
+
   btn.addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
@@ -403,5 +409,9 @@ export function initContactLogUi(state, opts = {}) {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();
   });
 
-  return { open, close, render };
+  // First paint of the affordance state in case the player loads into a
+  // cycle they had already finished.
+  updateAffordance();
+
+  return { open, close, render, updateAffordance };
 }

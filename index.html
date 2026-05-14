@@ -516,15 +516,84 @@
       margin-top: 2px;
     }
     .cl-status {
+      display: inline-block;
       font-size: 10px;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 3px 8px;
+      border: 1px solid currentColor;
+      border-radius: 3px;
+      line-height: 1.1;
+    }
+    .cl-status.s-triggered { color: #ff8a3a; background: rgba(255, 138, 58, 0.10); }
+    .cl-status.s-collapsed { color: #ff5a6e; background: rgba(255, 90, 110, 0.10); }
+    .cl-status.s-shifted   { color: #9d6ee0; background: rgba(157, 110, 224, 0.12); }
+    .cl-status.s-missing   { color: #4ea8ff; background: rgba(78, 168, 255, 0.10); }
+    .cl-ep-meaning {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: #8a8ac0;
+      margin-top: 3px;
+    }
+    .cl-ep-meaning.s-triggered { color: #d9803a; }
+    .cl-ep-meaning.s-collapsed { color: #d96675; }
+    .cl-ep-meaning.s-shifted   { color: #9d8edc; }
+    .cl-ep-meaning.s-missing   { color: #6aa3d8; }
+    .cl-tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+    }
+    .cl-tab {
+      background: transparent;
+      border: 0;
+      color: #8a8ac0;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 9px 14px 10px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.12s ease, border-color 0.12s ease;
+    }
+    .cl-tab:hover { color: #d49a55; }
+    .cl-tab.is-active {
+      color: #d49a55;
+      border-bottom-color: #d49a55;
+    }
+    .cl-panel { display: none; }
+    .cl-panel.is-active { display: block; }
+    .cl-legend {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 14px;
+      row-gap: 6px;
+      align-items: baseline;
+      background: rgba(20, 20, 40, 0.55);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .cl-legend-status {
+      font-size: 10px;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       font-weight: 600;
     }
-    .cl-status.s-triggered { color: #ff8a3a; }
-    .cl-status.s-collapsed { color: #ff5a6e; }
-    .cl-status.s-shifted   { color: #9d6ee0; }
-    .cl-status.s-missing   { color: #4ea8ff; }
+    .cl-legend-status.s-triggered { color: #ff8a3a; }
+    .cl-legend-status.s-collapsed { color: #ff5a6e; }
+    .cl-legend-status.s-shifted   { color: #9d6ee0; }
+    .cl-legend-status.s-missing   { color: #4ea8ff; }
+    .cl-legend-meaning {
+      font-size: 11px;
+      color: #aab0d0;
+      letter-spacing: 0.02em;
+    }
     .cl-hook {
       font-size: 12px;
       color: #aab0d0;
@@ -561,8 +630,21 @@
       font-size: 14px;
       line-height: 1;
     }
-    .cl-group-list li.contacted { background: rgba(76, 208, 125, 0.04); padding: 0; display: block; }
-    .cl-group-list li.contacted.is-open { background: rgba(76, 208, 125, 0.08); }
+    .cl-group-list li.contacted {
+      background: rgba(20, 20, 40, 0.4);
+      padding: 0;
+      display: block;
+      border-left: 3px solid transparent;
+      border-top: none;
+      border-radius: 0 4px 4px 0;
+      margin-top: 6px;
+    }
+    .cl-group-list li.contacted:first-child { margin-top: 0; }
+    .cl-group-list li.contacted.is-open { background: rgba(20, 20, 40, 0.6); }
+    .cl-group-list li.contacted.s-triggered { border-left-color: rgba(255, 138, 58, 0.7); }
+    .cl-group-list li.contacted.s-collapsed { border-left-color: rgba(255, 90, 110, 0.7); }
+    .cl-group-list li.contacted.s-shifted   { border-left-color: rgba(157, 110, 224, 0.7); }
+    .cl-group-list li.contacted.s-missing   { border-left-color: rgba(78, 168, 255, 0.7); }
     .cl-detail {
       padding: 4px 12px 12px;
       border-top: 1px dashed rgba(120, 140, 255, 0.18);
@@ -1879,15 +1961,27 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body">
-        <div class="cl-intro"></div>
-        <div class="cl-progress"></div>
-        <div class="cl-hook"></div>
-        <div class="cl-stats"></div>
-        <div class="cl-action"></div>
-        <div class="cl-engravings"></div>
-        <ul class="cl-list"></ul>
-        <div class="cl-empty">The log is empty. The dark is still listening.</div>
-        <div class="cl-pending"></div>
+        <div class="cl-tabs" role="tablist">
+          <button type="button" class="cl-tab is-active" data-tab="cycle" role="tab" aria-selected="true">Cycle</button>
+          <button type="button" class="cl-tab" data-tab="names" role="tab" aria-selected="false">Names</button>
+          <button type="button" class="cl-tab" data-tab="rig" role="tab" aria-selected="false">Rig</button>
+        </div>
+        <div class="cl-panel is-active" data-panel="cycle" role="tabpanel">
+          <div class="cl-intro"></div>
+          <div class="cl-progress"></div>
+          <div class="cl-hook"></div>
+          <div class="cl-stats"></div>
+          <div class="cl-action"></div>
+        </div>
+        <div class="cl-panel" data-panel="names" role="tabpanel">
+          <div class="cl-legend"></div>
+          <ul class="cl-list"></ul>
+          <div class="cl-empty">The log is empty. The dark is still listening.</div>
+          <div class="cl-pending"></div>
+        </div>
+        <div class="cl-panel" data-panel="rig" role="tabpanel">
+          <div class="cl-engravings"></div>
+        </div>
       </div>
     </div>
   </div>

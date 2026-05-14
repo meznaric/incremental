@@ -3,7 +3,7 @@ import {
   memoryShards, memoryMul, ECHO_MEMORY_PER_SHARD,
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
   getMass, getEngraving, massForPeak, WORLD_FOR_INTERSTITIAL,
-  worldDetail,
+  worldDetail, STATUS_MEANING,
 } from './contactLog.js';
 import { nextContactMilestone, MILESTONE_THRESHOLDS } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
@@ -37,12 +37,28 @@ export function initContactLogUi(state, opts = {}) {
   const statsEl = modal.querySelector('.cl-stats');
   const actionEl = modal.querySelector('.cl-action');
   const listEl = modal.querySelector('.cl-list');
+  const legendEl = modal.querySelector('.cl-legend');
   const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
+  const tabEls = Array.from(modal.querySelectorAll('.cl-tab'));
+  const panelEls = Array.from(modal.querySelectorAll('.cl-panel'));
   let armed = false;
+  let activeTab = 'cycle';
   // Which logged contact (by world id) has its lore panel expanded. Held in
   // closure rather than state — a session-level UI detail, not save data.
   let expandedId = null;
+
+  function setActiveTab(name) {
+    activeTab = name;
+    for (const t of tabEls) {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+    for (const p of panelEls) {
+      p.classList.toggle('is-active', p.dataset.panel === name);
+    }
+  }
 
   function renderIntro() {
     if (!introEl) return;
@@ -242,6 +258,21 @@ export function initContactLogUi(state, opts = {}) {
     `;
   }
 
+  function renderLegend() {
+    if (!legendEl) return;
+    const log = state.contactLog;
+    const has = new Set((log && log.worlds || []).map((w) => w.status));
+    // Order matches the in-game severity / cycle progression of the statuses.
+    const order = ['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'];
+    const present = order.filter((s) => has.has(s));
+    if (!present.length) { legendEl.innerHTML = ''; legendEl.style.display = 'none'; return; }
+    legendEl.style.display = '';
+    legendEl.innerHTML = present.map((s) => `
+      <div class="cl-legend-status s-${s.toLowerCase()}">${s}</div>
+      <div class="cl-legend-meaning">${STATUS_MEANING[s] || ''}</div>
+    `).join('');
+  }
+
   function renderList() {
     const log = state.contactLog;
     const worlds = sortedWorlds(log);
@@ -276,17 +307,20 @@ export function initContactLogUi(state, opts = {}) {
   function renderEntry(w) {
     const open = expandedId === w.id;
     const detail = worldDetail(w.id);
+    const sCls = `s-${w.status.toLowerCase()}`;
+    const meaning = STATUS_MEANING[w.status] || '';
     return `
-      <li class="contacted${open ? ' is-open' : ''}">
+      <li class="contacted ${sCls}${open ? ' is-open' : ''}">
         <button type="button" class="cl-entry"
           data-act="toggle-entry" data-id="${w.id}"
           aria-expanded="${open ? 'true' : 'false'}">
           <div>
             <div class="cl-name">${w.name}</div>
             <div class="cl-ep">ep ${w.ep}</div>
+            ${meaning ? `<div class="cl-ep-meaning ${sCls}">${meaning}</div>` : ''}
           </div>
           <div class="cl-entry-right">
-            <span class="cl-status s-${w.status.toLowerCase()}">${w.status}</span>
+            <span class="cl-status ${sCls}">${w.status}</span>
             <i class="ri ${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} cl-entry-chev" aria-hidden="true"></i>
           </div>
         </button>
@@ -324,16 +358,19 @@ export function initContactLogUi(state, opts = {}) {
     renderStats();
     renderAction();
     renderEngravings();
+    renderLegend();
     renderList();
     renderPending();
   }
 
-  const open = () => { armed = false; render(); modal.classList.add('open'); };
+  const open = () => { armed = false; setActiveTab('cycle'); render(); modal.classList.add('open'); };
   const close = () => { armed = false; modal.classList.remove('open'); };
 
   btn.addEventListener('click', open);
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
+    const tab = e.target.closest('.cl-tab');
+    if (tab && tab.dataset.tab) { setActiveTab(tab.dataset.tab); return; }
     const target = e.target.closest('[data-act]');
     const act = target?.dataset.act;
     if (!act) return;

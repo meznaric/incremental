@@ -126,6 +126,15 @@ export const STATUS_COLOR = {
   MISSING:   '#4ea8ff',
 };
 
+// One-phrase plain-English meaning of each status label. Surfaced inline
+// under each contacted world and as the row in the Contact Log status legend.
+export const STATUS_MEANING = {
+  TRIGGERED: 'Set off a cascade',
+  COLLAPSED: 'World ended',
+  SHIFTED:   'Trajectory bent',
+  MISSING:   'Gone from records',
+};
+
 const fresh = () => ({
   run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
   pattern: null, pendingPatternChoice: false, patternUsed: {},

@@ -447,7 +447,13 @@ export function initContactLogUi(state, opts = {}) {
   };
 
   btn.addEventListener('click', open);
-  modal.addEventListener('click', (e) => {
+
+  // iOS Chrome occasionally drops the first synthetic `click` on an in-modal
+  // button (the tabs, the close, the engraving CTAs). Pointer events resolve
+  // at pointerdown's target regardless of DOM churn, so we delegate from
+  // pointerup with a movement threshold + click dedup. Click stays as the
+  // keyboard / mouse path.
+  function handleModalAction(e) {
     if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
     const tab = e.target.closest('.cl-tab');
     if (tab && tab.dataset.tab) { setActiveTab(tab.dataset.tab); return; }
@@ -463,10 +469,6 @@ export function initContactLogUi(state, opts = {}) {
     if (act === 'buy-engraving') {
       const id = target.dataset.id;
       if (buyEngraving(state.contactLog, id)) {
-        // Refresh the live state mirrors so the new exponent/base bonuses
-        // kick in immediately if the buy unlocks them mid-cycle. Engravings
-        // mostly bite on the *next* cycle (start-of-run grants don't retro),
-        // but Ascent applies live.
         if (typeof opts.onBuyEngraving === 'function') opts.onBuyEngraving(id);
         render();
       }
@@ -478,6 +480,30 @@ export function initContactLogUi(state, opts = {}) {
       renderList();
       return;
     }
+  }
+  let tap = null;
+  modal.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  modal.addEventListener('pointermove', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+  });
+  modal.addEventListener('pointercancel', (e) => {
+    if (tap && e.pointerId === tap.id) tap = null;
+  });
+  modal.addEventListener('pointerup', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    const s = tap; tap = null;
+    if (s.moved) return;
+    modal._tapAt = performance.now();
+    handleModalAction(e);
+  });
+  modal.addEventListener('click', (e) => {
+    // Dedup against the synthetic click that follows a touch pointerup.
+    if (modal._tapAt && performance.now() - modal._tapAt < 700) return;
+    handleModalAction(e);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();

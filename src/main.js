@@ -89,7 +89,37 @@ const closeBuffModal = () => buffModalEl.classList.remove('open');
 buffsEl.addEventListener('click', (e) => {
   if (e.target.closest('.buff-info')) openBuffModal();
 });
-buffModalEl.addEventListener('click', (e) => {
+
+// Tap-stable delegation for in-modal buttons on iOS Chrome. Pointer events
+// resolve at pointerdown's target regardless of DOM churn; click stays as the
+// keyboard / mouse path, deduped against a timestamp set on pointerup.
+function bindModalTaps(el, handler) {
+  let tap = null;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+  });
+  el.addEventListener('pointercancel', (e) => {
+    if (tap && e.pointerId === tap.id) tap = null;
+  });
+  el.addEventListener('pointerup', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    const s = tap; tap = null;
+    if (s.moved) return;
+    el._tapAt = performance.now();
+    handler(e);
+  });
+  el.addEventListener('click', (e) => {
+    if (el._tapAt && performance.now() - el._tapAt < 700) return;
+    handler(e);
+  });
+}
+
+bindModalTaps(buffModalEl, (e) => {
   if (e.target === buffModalEl || e.target.closest('.bm-close')) closeBuffModal();
 });
 
@@ -97,7 +127,7 @@ const slotModalEl = document.getElementById('slotModal');
 const slotModalTitleEl = document.getElementById('slotModalTitle');
 const slotModalBodyEl = document.getElementById('slotModalBody');
 const closeSlotModal = () => slotModalEl.classList.remove('open');
-slotModalEl.addEventListener('click', (e) => {
+bindModalTaps(slotModalEl, (e) => {
   if (e.target === slotModalEl || e.target.closest('.bm-close')) { closeSlotModal(); return; }
   // Cross-link: a buff-kind upgrade card surfaces a "What's a Window?" link
   // that hands the player straight to the four-kind overview. The detail
@@ -802,7 +832,7 @@ const buffDetailModalEl = document.getElementById('buffDetailModal');
 const buffDetailTitleEl = document.getElementById('buffDetailTitle');
 const buffDetailBodyEl = document.getElementById('buffDetailBody');
 const closeBuffDetailModal = () => buffDetailModalEl.classList.remove('open');
-buffDetailModalEl.addEventListener('click', (e) => {
+bindModalTaps(buffDetailModalEl, (e) => {
   if (e.target === buffDetailModalEl || e.target.closest('.bm-close')) { closeBuffDetailModal(); return; }
   if (e.target.closest('[data-act="open-buff-overview"]')) openBuffModal();
 });

@@ -134,13 +134,13 @@ test('surge_tide: combined first-5-min rate equals 2.5x base', () => {
 test('cold_sky: rateMul buff value is doubled and duration halved at apply time', () => {
   const s = freshState({ amount: 10_000 });
   setActivePattern(s.contactLog, 'cold_sky');
-  installSlot(s, 1, 'espresso', 200); // espresso: rateMul, mult=3, duration=60
+  installSlot(s, 1, 'espresso', 200); // espresso: rateMul, mult=3, duration=120
   const ok = tryBuy(s, 1, 1000);
   assert.ok(ok.ok);
   assert.equal(s.buffs.rateMul.length, 1);
-  // Strength: 3 * 2 = 6. Duration: 60 * 0.5 = 30.
+  // Strength: 3 * 2 = 6. Duration: 120 * 0.5 = 60.
   assert.equal(s.buffs.rateMul[0].value, 6);
-  assert.equal(s.buffs.rateMul[0].duration, 30);
+  assert.equal(s.buffs.rateMul[0].duration, 60);
 });
 
 test('patched_frame: free-purchase covers buff cost without spending Echoes', () => {
@@ -211,9 +211,9 @@ test('bare_wire: base rate halved, gamble luck +5%, durations doubled', () => {
   assert.equal(effectiveRate(s, 0), 50);
   assert.equal(patternGambleLuckBonus(s), 0.05);
   // Buy a rate buff: duration should be doubled.
-  installSlot(s, 1, 'espresso', 100); // duration 60
+  installSlot(s, 1, 'espresso', 100); // duration 120
   tryBuy(s, 1, 1000);
-  assert.equal(s.buffs.rateMul[0].duration, 120);
+  assert.equal(s.buffs.rateMul[0].duration, 240);
 });
 
 test('bare_wire: gamble luck bonus tips a coinflip win when forced', () => {

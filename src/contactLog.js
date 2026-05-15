@@ -1,7 +1,7 @@
 // The Contact Log — Kalen's accumulating record of contacted worlds.
 //
-// This file is the *narrative* prestige currency. It survives gameplay save
-// resets on purpose: when Kalen "starts over" he loses the Echoes but keeps
+// This file is the *narrative* cycle-close currency. It survives gameplay save
+// wipes on purpose: when Kalen "starts over" he loses the Echoes but keeps
 // the names. Run N+1 then plays the next episode against a heavier log.
 //
 // Wire-up:
@@ -9,7 +9,7 @@
 //     gameplay save.
 //   * Mutated only via recordContact(), which is keyed on world.id so the
 //     same world is not appended twice across reloads.
-//   * advanceRun() bumps the run counter — call this when a prestige reset
+//   * advanceRun() bumps the run counter — call this when a cycle close
 //     happens. Each run plays one episode (EP1..EP8); see worlds.js.
 //
 // Schema:
@@ -18,7 +18,7 @@
 //       { id, name, ep, status, contactedAt: <unix seconds>, run: <run that added it> },
 //       ...
 //     ],
-//     mass: number,              // Carrier Mass — persistent prestige currency.
+//     mass: number,              // Carrier Mass — persistent cycle-close currency.
 //     engravings: { [id]: lvl }, // Carrier Engravings owned across cycles.
 //     bestPeak: number,          // Highest peakAmount of any past cycle (for stats).
 //   }
@@ -192,7 +192,7 @@ export function getRun(log) {
   return (log && log.run) || 1;
 }
 
-// Called by the prestige action ("Close the Cycle") to start the next run.
+// Called by the cycle-close action ("Close the Cycle") to start the next run.
 // The world list survives; only the run counter advances.
 export function advanceRun(log) {
   log.run = (log.run || 1) + 1;
@@ -200,12 +200,12 @@ export function advanceRun(log) {
 }
 
 // Hard-erase the log. Reserved for the burger-menu "Reset save" action, which
-// is a full wipe. Soft prestige (Close the Cycle) must not call this.
+// is a full wipe. The cycle-close action (Close the Cycle) must not call this.
 export function clearContactLog() {
   try { localStorage.removeItem(CONTACT_LOG_KEY); } catch (e) { /* noop */ }
 }
 
-// — Echo Memory & prestige eligibility —
+// — Echo Memory & cycle-close eligibility —
 //
 // Each contact ever recorded is a "memory shard." Memory shards add a
 // flat +ECHO_MEMORY_PER_SHARD multiplier to base Echo accrual, and that
@@ -260,7 +260,7 @@ export function memoryMul(log) {
   return 1 + ECHO_MEMORY_PER_SHARD * (memoryShards(log) + echoLoopLevel(log));
 }
 
-// Performs the prestige bookkeeping on the log itself. Callers are still
+// Performs the cycle-close bookkeeping on the log itself. Callers are still
 // responsible for wiping the gameplay save and reloading the page.
 // Returns false if the cycle is not eligible to close.
 // `peakAmount` is the highest Echo count this cycle hit; it determines how
@@ -281,16 +281,16 @@ export function closeCycle(log, peakAmount) {
 
 // — Carrier Mass & Carrier Engravings —
 //
-// Carrier Mass is the *second* persistent prestige currency. Where Echo Memory
+// Carrier Mass is the *second* persistent cycle-close currency. Where Echo Memory
 // is broad (every name ever logged adds a flat multiplier), Mass is bankable
-// and spendable — it buys Engravings, upgrades that survive every reset
+// and spendable — it buys Engravings, upgrades that survive every cycle close
 // because they're literally cut into Kalen's listening rig.
 //
 // WHY a separate currency: shards count names; Mass counts magnitude. Pushing
 // further in a single cycle is what mints Mass.
 //
 // Formula: floor(log10(peakAmount)) − 2. A cycle that peaks at 1k bites zero;
-// 100k bites 3 kg; 1B bites 7 kg; 1T bites 10 kg. Tuned so the first prestige
+// 100k bites 3 kg; 1B bites 7 kg; 1T bites 10 kg. Tuned so the first cycle close
 // (which under the new wall lands around 100k–1M) gives 3–4 kg — enough for
 // First Light, Bone Memory level 1, and a head start on Quick Wake.
 export function massForPeak(peakAmount) {
@@ -310,7 +310,7 @@ export function getEngraving(log, id) {
 // Each entry: { id, name, desc, cost(level) → kg, max, voice/lore notes }.
 // All in-world names canonicalised in docs/lore/naming-conventions.md.
 export const ENGRAVINGS = [
-  // One-time. Mass starts modest so the first prestige can afford one.
+  // One-time. Mass starts modest so the first cycle close can afford one.
   { id: 'first_light',  name: 'First Light',
     desc: 'A pilot tone burned into the rig. Each cycle starts with 1k Echoes already on the carrier.',
     cost: () => 1, max: 1 },

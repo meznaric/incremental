@@ -66,12 +66,12 @@ test('permanent: refused when balance < cost', () => {
 
 test('buff: deducts cost and pushes a buff entry', () => {
   const s = freshState({ amount: 1000 });
-  installSlot(s, 1, 'espresso', 200); // espresso: buff, rateMul, mult=3, duration=60
+  installSlot(s, 1, 'espresso', 200); // espresso: buff, rateMul, mult=3, duration=120
   tryBuy(s, 1, 1000);
   assert.equal(s.amount, 800);
   assert.equal(s.buffs.rateMul.length, 1);
   assert.equal(s.buffs.rateMul[0].value, 3);
-  assert.equal(s.buffs.rateMul[0].expiresAt, 1060);
+  assert.equal(s.buffs.rateMul[0].expiresAt, 1120);
 });
 
 test('buff: compound buffs land in the compound queue', () => {

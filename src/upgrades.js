@@ -77,109 +77,140 @@ export const UPGRADES = [
 
   { id: 'caffeine',  kind: 'buff', rarity: 'common', buffType: 'rateMul',
     name: 'Stim Patch',   desc: 'Cortical stim. 2× rate, 5 min.',
-    mult: 2,  duration: 300, costSec: 200 },
+    mult: 2,  duration: 600, costSec: 200 },
   { id: 'espresso',  kind: 'buff', rarity: 'common', buffType: 'rateMul',
     name: 'Quick Stim',   desc: 'One minute, sharp as a needle. 3× rate, 60s.',
-    mult: 3,  duration: 60,  costSec: 60 },
+    mult: 3,  duration: 120, costSec: 60 },
   { id: 'fortune',   kind: 'buff', rarity: 'common', buffType: 'gambleLuck',
     name: 'Hunch',        desc: 'This band feels right. +5% hail chance, 5 min.',
-    bonus: 0.05, duration: 300, costSec: 120 },
+    bonus: 0.05, duration: 600, costSec: 120 },
   { id: 'insurance', kind: 'buff', rarity: 'common', buffType: 'gambleCushion',
     name: 'Failsafe Buffer', desc: 'A small refund on a misfire. 3% return, 3 min.',
-    refund: 0.03, duration: 180, costSec: 100 },
+    refund: 0.03, duration: 360, costSec: 100 },
   { id: 'lucky',     kind: 'buff', rarity: 'uncommon', buffType: 'gambleLuck',
     name: 'Clear Window', desc: 'Ion calm. Signals carry. +10% hail chance, 10 min.',
-    bonus: 0.1, duration: 600, costSec: 200 },
+    bonus: 0.1, duration: 1200, costSec: 200 },
   { id: 'steady',    kind: 'buff', rarity: 'uncommon', buffType: 'gambleCushion',
     name: 'Error-Correction', desc: 'Most wasted bits come home. 5% return, 5 min.',
-    refund: 0.05, duration: 300, costSec: 200 },
+    refund: 0.05, duration: 600, costSec: 200 },
   { id: 'overdrive', kind: 'buff', rarity: 'uncommon', buffType: 'rateMul',
     name: 'Overclock',    desc: 'Push the decoder past spec. It will whine. 5×, 90s.',
-    mult: 5,  duration: 90,  costSec: 150 },
+    mult: 5,  duration: 180, costSec: 150 },
   { id: 'snowball',  kind: 'buff', rarity: 'uncommon', buffType: 'compound',
     name: 'Cascade',      desc: 'Each second feeds the next. +1%/s compounding, 120s.',
-    rate: 0.01, duration: 120, costSec: 50 },
+    rate: 0.01, duration: 240, costSec: 50 },
   { id: 'frenzy',    kind: 'buff', rarity: 'rare', buffType: 'rateMul',
     name: 'Burst Mode',   desc: 'Thirty seconds at full bandwidth. 10×, 30s.',
-    mult: 10, duration: 30,  costSec: 100 },
+    mult: 10, duration: 60,  costSec: 100 },
   { id: 'compound',  kind: 'buff', rarity: 'rare', buffType: 'compound',
     name: 'Resonance Build', desc: 'The carrier finds itself. +2%/s compounding, 60s.',
-    rate: 0.02, duration: 60, costSec: 30 },
+    rate: 0.02, duration: 120, costSec: 30 },
   { id: 'power_hour', kind: 'buff', rarity: 'rare', buffType: 'rateMul',
     name: 'Clean Sky',    desc: 'An hour of orbital quiet. 4× rate, 1 hour.',
-    mult: 4,  duration: 3600, costSec: 1800 },
+    mult: 4,  duration: 7200, costSec: 1800 },
   { id: 'clover',    kind: 'buff', rarity: 'rare', buffType: 'gambleLuck',
     name: 'Carrier Surge', desc: 'Background noise drops. +25% hail chance, 5 min.',
-    bonus: 0.25, duration: 300, costSec: 600 },
+    bonus: 0.25, duration: 600, costSec: 600 },
   { id: 'iron_will', kind: 'buff', rarity: 'rare', buffType: 'gambleCushion',
     name: 'Hardened Stack', desc: 'Failures hurt less. 7% return, 5 min.',
-    refund: 0.07, duration: 300, costSec: 400 },
+    refund: 0.07, duration: 600, costSec: 400 },
   { id: 'berserker', kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Critical Load', desc: 'Run hot. Hope nothing melts. 100×, 10s.',
-    mult: 100, duration: 10, costSec: 500 },
+    mult: 100, duration: 20, costSec: 500 },
   { id: 'avalanche', kind: 'buff', rarity: 'legendary', buffType: 'compound',
     name: 'Resonance Storm', desc: 'Compounds dangerously. +5%/s, 30s.',
-    rate: 0.05, duration: 30, costSec: 200 },
+    rate: 0.05, duration: 60, costSec: 200 },
 
   { id: 'marathon',  kind: 'buff', rarity: 'rare', buffType: 'rateMul',
     name: 'Long Watch',   desc: 'Two hours, doubled output, no sleep.',
-    mult: 2, duration: 7200, costSec: 3600 },
+    mult: 2, duration: 14400, costSec: 3600 },
   { id: 'vigil',     kind: 'buff', rarity: 'rare', buffType: 'rateMul',
     name: 'Patience',     desc: 'Six hours, slow gains, no breaks. 1.5× rate.',
-    mult: 1.5, duration: 21600, costSec: 7200 },
+    mult: 1.5, duration: 43200, costSec: 7200 },
   { id: 'tide',      kind: 'buff', rarity: 'rare', buffType: 'gambleLuck',
     name: 'Open Sky',     desc: 'Six hours of quiet space weather. +15% hail chance.',
-    bonus: 0.15, duration: 21600, costSec: 4000 },
+    bonus: 0.15, duration: 43200, costSec: 4000 },
   { id: 'ember',     kind: 'buff', rarity: 'rare', buffType: 'compound',
     name: 'Slow Burn',    desc: 'A trickle compounding all day. +0.02%/s, 6h.',
-    rate: 0.0002, duration: 21600, costSec: 5000 },
+    rate: 0.0002, duration: 43200, costSec: 5000 },
   { id: 'bastion',   kind: 'buff', rarity: 'rare', buffType: 'gambleCushion',
     name: 'Shield Net',   desc: 'Twelve hours of partial refunds on a loss. 5% return.',
-    refund: 0.05, duration: 43200, costSec: 3000 },
+    refund: 0.05, duration: 86400, costSec: 3000 },
   { id: 'dynasty',   kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Held Channel', desc: 'One full day on a single carrier. 1.3× rate.',
-    mult: 1.3, duration: 86400, costSec: 7200 },
+    mult: 1.3, duration: 172800, costSec: 7200 },
   { id: 'eclipse',   kind: 'buff', rarity: 'legendary', buffType: 'compound',
     name: 'Black Sky',    desc: 'Long, dark, quietly growing. +0.007%/s, 1 day.',
-    rate: 0.00007, duration: 86400, costSec: 12000 },
+    rate: 0.00007, duration: 172800, costSec: 12000 },
   { id: 'pilgrimage', kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Deep Drift',   desc: 'Three days. No correction. 1.2× rate.',
-    mult: 1.2, duration: 259200, costSec: 12000 },
+    mult: 1.2, duration: 518400, costSec: 12000 },
   { id: 'solstice',  kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Solar Quiet',  desc: 'A week of cooperative star-weather. 1.15× rate.',
-    mult: 1.15, duration: 604800, costSec: 18000 },
+    mult: 1.15, duration: 1209600, costSec: 18000 },
   { id: 'aeon',      kind: 'buff', rarity: 'legendary', buffType: 'rateMul',
     name: 'Cold Cycle',   desc: 'Four weeks of mild gain. 1.05× rate.',
-    mult: 1.05, duration: 2419200, costSec: 18000 },
+    mult: 1.05, duration: 4838400, costSec: 18000 },
   { id: 'wake_up',   kind: 'buff', rarity: 'common', buffType: 'rateMul',
     name: 'Ping',         desc: 'A nudge from the system. 1.5× rate, 2 min.',
-    mult: 1.5, duration: 120, costSec: 40 },
+    mult: 1.5, duration: 240, costSec: 40 },
   { id: 'momentum',  kind: 'buff', rarity: 'uncommon', buffType: 'compound',
     name: 'Phase Climb',  desc: 'Phase-lock tightens. +0.5%/s compounding, 90s.',
-    rate: 0.005, duration: 90, costSec: 30 },
+    rate: 0.005, duration: 180, costSec: 30 },
   { id: 'divine_fortune', kind: 'buff', rarity: 'legendary', buffType: 'gambleLuck',
     name: 'Oracle Window', desc: 'Sixty seconds. Use them. +50% hail chance.',
-    bonus: 0.5, duration: 60, costSec: 800 },
+    bonus: 0.5, duration: 120, costSec: 800 },
   { id: 'last_stand', kind: 'buff', rarity: 'legendary', buffType: 'gambleCushion',
     name: 'Final Buffer', desc: 'Sixty seconds of generous cushion. 8% return.',
-    refund: 0.08, duration: 60, costSec: 800 },
+    refund: 0.08, duration: 120, costSec: 800 },
 
   // Mythic-only long haulers — week-plus durations, modest multipliers.
   { id: 'epoch',     kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
     name: 'Slow Era',     desc: 'Two weeks at a steady premium. 1.25× rate.',
-    mult: 1.25, duration: 1209600, costSec: 36000 },
+    mult: 1.25, duration: 2419200, costSec: 36000 },
   { id: 'monolith',  kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
     name: 'Lighthouse',   desc: 'A week of strong, reliable carrier. 1.4× rate.',
-    mult: 1.4,  duration: 604800,  costSec: 30000 },
+    mult: 1.4,  duration: 1209600, costSec: 30000 },
   { id: 'forever',   kind: 'buff', rarity: 'mythic', buffType: 'rateMul',
     name: 'False Dawn',   desc: 'Six weeks. The horizon never quite arrives. 1.1× rate.',
-    mult: 1.1,  duration: 3628800, costSec: 30000 },
+    mult: 1.1,  duration: 7257600, costSec: 30000 },
   { id: 'ancestral', kind: 'buff', rarity: 'mythic', buffType: 'compound',
     name: 'Old Carrier',  desc: 'A pre-Union signal lingers. +0.001%/s, 2 weeks.',
-    rate: 0.00001, duration: 1209600, costSec: 48000 },
+    rate: 0.00001, duration: 2419200, costSec: 48000 },
   { id: 'oracle',    kind: 'buff', rarity: 'mythic', buffType: 'gambleLuck',
     name: 'Pre-Echo',     desc: 'You read the answer before you hear it. +20%, 1 week.',
-    bonus: 0.2, duration: 604800, costSec: 24000 },
+    bonus: 0.2, duration: 1209600, costSec: 24000 },
+
+  // Meta-buffs ("Frames") — short strategic windows that scale the next
+  // window you open. They don't act on their own; they prime everything
+  // applied while they hold. value semantics depend on buffType:
+  //   metaStrength: rateMul buffs land at value×this while active
+  //   metaDuration: every newly-applied buff's duration ×this while active
+  //   metaLuck:     gambleLuck buffs land at value+this while active
+  { id: 'prime_frame',   kind: 'buff', rarity: 'common', buffType: 'metaDuration',
+    name: 'Prime Frame', desc: 'Frame the next windows to last longer. Buff durations ×1.5 while it holds.',
+    value: 1.5, duration: 90, costSec: 200 },
+  { id: 'tight_lattice', kind: 'buff', rarity: 'uncommon', buffType: 'metaStrength',
+    name: 'Tight Lattice', desc: 'Brace the carrier scaffold. New rate windows land ×1.3 stronger.',
+    value: 1.3, duration: 120, costSec: 400 },
+  { id: 'wide_band',     kind: 'buff', rarity: 'uncommon', buffType: 'metaDuration',
+    name: 'Wide Band', desc: 'Open the gate before you push. Buff durations ×2 while it holds.',
+    value: 2, duration: 180, costSec: 500 },
+  { id: 'cold_lens',     kind: 'buff', rarity: 'rare', buffType: 'metaLuck',
+    name: 'Cold Lens', desc: 'A clean atmosphere column. Carry windows bought now read +5% richer.',
+    value: 0.05, duration: 240, costSec: 700 },
+  { id: 'standing_wave', kind: 'buff', rarity: 'rare', buffType: 'metaStrength',
+    name: 'Standing Wave', desc: 'The carrier scaffold stiffens. New rate windows land ×1.75 stronger.',
+    value: 1.75, duration: 300, costSec: 1200 },
+  { id: 'echo_prime',    kind: 'buff', rarity: 'legendary', buffType: 'metaStrength',
+    name: 'Echo Prime', desc: 'Five minutes of perfect framing. New rate windows land ×2.5 stronger.',
+    value: 2.5, duration: 300, costSec: 2400 },
+  { id: 'long_frame',    kind: 'buff', rarity: 'legendary', buffType: 'metaDuration',
+    name: 'Long Frame', desc: 'Stretch the gate wide open. Buff durations ×3 while it holds.',
+    value: 3, duration: 600, costSec: 2400 },
+  { id: 'oracle_lens',   kind: 'buff', rarity: 'legendary', buffType: 'metaLuck',
+    name: 'Oracle Lens', desc: 'A pristine viewing window. Carry windows bought now read +12% richer.',
+    value: 0.12, duration: 300, costSec: 2400 },
 
   // Additive permanents are generated dynamically per slate via genBaseAdd —
   // see the _dyn:'add' virtual entries below. The static list grew unwieldy
@@ -262,18 +293,20 @@ export const resolveUpgrade = (slot) => slot && (slot.dyn || BY_ID.get(slot.id))
 
 export const CONVERT_MIN_RATE = 100;
 
-// Per-slot type pin. Slots 0..3 are typed; slot 1's *first* roll is seeded to
+// Per-slot type pin. Slots 0..4 are typed; slot 1's *first* roll is seeded to
 // a cheap common mul by main.js, but the filter stays permissive so rerolls/buys
-// land on any rarity mul. Anything past idx 3 accepts any upgrade kind.
+// land on any rarity mul. Anything past idx 4 accepts any upgrade kind.
 //   0: base-rate additive permanent (generated tier)
 //   1: multiplicative permanent (any rarity)
-//   2: buff or gift
+//   2: non-gamble buff (rateMul / compound)
 //   3: gamble
+//   4: gamble buff (gambleLuck / gambleCushion)
 export const SLOT_FILTERS = [
   (u) => u.kind === 'permanent' && (u._dyn === 'add' || u.permType === 'add'),
   (u) => u.kind === 'permanent' && u.permType === 'mul',
-  (u) => u.kind === 'buff' || u.kind === 'gift',
+  (u) => u.kind === 'buff' && (u.buffType === 'rateMul' || u.buffType === 'compound'),
   (u) => u.kind === 'gamble',
+  (u) => u.kind === 'buff' && (u.buffType === 'gambleLuck' || u.buffType === 'gambleCushion'),
 ];
 
 // Per-kind theming used by the shop UI. Labels follow lore archetypes
@@ -506,7 +539,7 @@ function mulRateAwareCost(upgrade, rate) {
 // Permanent cost: super-exponential in own count (growth^(n+n²/25)) so the Nth
 // purchase costs visibly more than the (N-1)th. Mul permanents additionally
 // pay a stacked-exponential category ramp 1.35^(N+N²/40) over total muls owned
-// — the wall steepens late, prestige is meant to break through.
+// — the wall steepens late, the cycle close is meant to break through.
 export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;

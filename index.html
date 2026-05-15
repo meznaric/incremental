@@ -200,7 +200,7 @@
     #contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
     #contactLogBtn .ri, #diagnosticBtn .ri { line-height: 1; }
     /* Green pulse on the contact-log button once every contact of the
-       current EP has been logged. The player is invited to prestige; the
+       current EP has been logged. The player is invited to close the cycle; the
        pulse is the only out-of-modal hint. Subtle by design — a soft glow
        breathing on a slow loop, not a hard blink. */
     #contactLogBtn.is-ready {
@@ -781,6 +781,37 @@
       padding: 4px 12px 12px;
       border-top: 1px dashed rgba(120, 140, 255, 0.18);
     }
+    .cl-detail-img {
+      display: block;
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid rgba(212, 154, 85, 0.35);
+      margin: 10px 0 4px;
+    }
+    .cl-detail-fallback {
+      width: 100%;
+      height: 120px;
+      border-radius: 6px;
+      border: 1px solid rgba(212, 154, 85, 0.35);
+      margin: 10px 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(40% 60% at 50% 50%, rgba(212, 154, 85, 0.18), transparent 70%),
+        repeating-radial-gradient(circle at 50% 50%, rgba(212, 154, 85, 0.14) 0, rgba(212, 154, 85, 0.14) 1px, transparent 1px, transparent 14px),
+        linear-gradient(180deg, #14142a 0%, #060614 100%);
+    }
+    .cl-detail-fallback::before {
+      content: '';
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(212, 154, 85, 0.55);
+      box-shadow: 0 0 14px rgba(212, 154, 85, 0.4) inset, 0 0 18px rgba(212, 154, 85, 0.3);
+    }
     .cl-detail-rows {
       margin: 6px 0 0;
       padding: 0;
@@ -885,10 +916,15 @@
     @media (hover: hover) and (pointer: fine) { .slots-nav { display: inline-flex; } }
     #shopToolbar {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 6px;
-      justify-content: center;
+      justify-content: flex-start;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
+    #shopToolbar::-webkit-scrollbar { display: none; }
+    #shopToolbar > * { flex: 0 0 auto; }
     .tb-btn {
       display: inline-flex;
       align-items: center;
@@ -1025,24 +1061,29 @@
     .slot.pinned .pin { color: #f5d34a; }
     .slot.pinned .pin::before { border-color: #f5d34a; background: rgba(245, 211, 74, 0.18); transform: rotate(0deg); }
     .slot.pinned .pin > i { transform: rotate(0deg); }
-    .slot .head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; padding-right: 28px; }
-    .slot .kind-icon { font-size: 16px; line-height: 1; color: var(--kind-color, #8aa0ff); }
+    .slot { align-items: center; text-align: center; padding-top: 18px; padding-bottom: 8px; }
+    .slot .kind-icon {
+      font-size: 44px;
+      line-height: 1;
+      color: var(--kind-color, #8aa0ff);
+      margin: 6px 0 8px;
+      filter: drop-shadow(0 0 8px var(--kind-glow, rgba(120, 140, 255, 0.3)));
+    }
     .slot .rarity {
       font-size: 9px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      flex: 1;
+      order: -1;
+      align-self: center;
     }
-    .slot .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; color: #e8e8f0; }
-    .slot .desc { font-size: 11px; color: #aab0d0; line-height: 1.35; min-height: 30px; }
-    .slot .cost { font-size: 13px; font-weight: 600; color: #d49a55; margin-top: 6px; }
-    .slot .outcomes { margin-top: 4px; min-height: 14px; line-height: 1.45; font-size: 11px; }
+    .slot .name, .slot .desc, .slot .outcomes { display: none; }
     .slot .outcome { display: flex; align-items: center; gap: 4px; }
     .slot .outcome.win  { color: #4cd07d; }
     .slot .outcome.lose { color: #ff7a8c; }
     .slot .outcome .cc  { color: #d49a55; }
-    .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
-    .slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; }
+    .slot .cost { font-size: 16px; font-weight: 700; color: #d49a55; margin-top: 4px; }
+    .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 4px; }
+    .slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; align-self: stretch; }
     .slot .slot-info {
       display: inline-flex;
       align-items: center;
@@ -1285,6 +1326,60 @@
     .buff-tile.kind-compound .buff-tile-bar { background: #ff4ad0; }
     .buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #ff4ad0; }
     .buff-tile:active { transform: scale(0.97); }
+
+    /* Meta-buff minibar — smaller, dimmer pills than .buff-tile, stacked
+       just above the shop toolbar. Hidden when no metas are active. */
+    #metaBuffs {
+      display: none;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      padding-bottom: 2px;
+    }
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 11px;
+      background: rgba(20, 20, 40, 0.6);
+      border: 1px solid rgba(120, 140, 255, 0.25);
+      color: #b8c0d8;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+    .meta-pill .meta-bar {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 100%;
+      transform-origin: left center;
+      opacity: 0.18;
+      transition: transform 0.1s linear;
+    }
+    .meta-pill .meta-fg {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      line-height: 1;
+    }
+    .meta-pill .ri { font-size: 12px; line-height: 1; }
+    .meta-pill .meta-val { font-weight: 600; }
+    .meta-pill .meta-time { color: #8a8ac0; font-size: 9px; }
+    .meta-pill.kind-strength .meta-bar { background: #ff8a3a; }
+    .meta-pill.kind-strength { border-color: rgba(255, 138, 58, 0.35); }
+    .meta-pill.kind-strength .ri, .meta-pill.kind-strength .meta-val { color: #ff8a3a; }
+    .meta-pill.kind-duration .meta-bar { background: #8aa0ff; }
+    .meta-pill.kind-duration { border-color: rgba(138, 160, 255, 0.35); }
+    .meta-pill.kind-duration .ri, .meta-pill.kind-duration .meta-val { color: #8aa0ff; }
+    .meta-pill.kind-luck     .meta-bar { background: #f5d34a; }
+    .meta-pill.kind-luck     { border-color: rgba(245, 211, 74, 0.35); }
+    .meta-pill.kind-luck     .ri, .meta-pill.kind-luck .meta-val { color: #f5d34a; }
 
     #result {
       position: fixed;
@@ -1908,11 +2003,9 @@
         padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
         scroll-padding-inline: 8px;
       }
-      .slot { width: 150px; padding: 8px; }
-      .slot .name { font-size: 12px; }
-      .slot .desc { font-size: 10px; min-height: 28px; }
-      .slot .cost { font-size: 12px; margin-top: 4px; }
-      .slot .outcomes { font-size: 10px; }
+      .slot { width: 110px; padding: 12px 8px 8px; }
+      .slot .kind-icon { font-size: 38px; margin: 4px 0 6px; }
+      .slot .cost { font-size: 14px; margin-top: 4px; }
       .slot .rarity { font-size: 8px; }
       #result { bottom: auto; top: 12px; right: 12px; left: auto; transform: none; font-size: 14px; padding: 6px 12px; }
       #buffs {
@@ -2123,6 +2216,7 @@
   </button>
 
   <div id="shop" class="panel">
+    <div id="metaBuffs"></div>
     <div id="shopToolbar"></div>
     <div id="slotsWrap">
       <button id="slotsLeft" class="slots-nav left hidden" type="button" aria-label="Scroll upgrades left"><i class="ri ri-arrow-left-s-line"></i></button>
@@ -2150,7 +2244,6 @@
   <div id="contactLogModal" role="dialog" aria-modal="true" aria-label="Contact Log">
     <div class="bm-card">
       <div class="bm-head">
-        <span class="bm-title">Contact Log</span>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body">

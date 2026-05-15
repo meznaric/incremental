@@ -14,14 +14,14 @@ test('non-gamble kinds keep their full weight (default 1)', () => {
 });
 
 test('rollSlate: in any-kind slots, gambles appear roughly 1/4 of pre-change rate', () => {
-  // Build a context where every kind is eligible. Slot index 4 is the first
-  // any-kind slot (0/1/2/3 are pinned).
+  // Build a context where every kind is eligible. Slot index 5 is the first
+  // any-kind slot (0..4 are pinned).
   const ctx = { balance: 1e6, rate: 1e6, owned: {} };
   const N = 4000;
   const counts = { gamble: 0, permanent: 0, buff: 0, convert: 0 };
   for (let i = 0; i < N; i++) {
-    const slate = rollSlate(5, ctx);
-    const slot = slate[4];
+    const slate = rollSlate(6, ctx);
+    const slot = slate[5];
     if (!slot) continue;
     const u = slot.dyn || UPGRADES.find((x) => x.id === slot.id);
     if (!u) continue;
@@ -55,8 +55,8 @@ test('fresh state has no startup bonuses — player starts at base rate only', (
   assert.equal(s.owned['startup_mul'], undefined);
 });
 
-test('SLOT_FILTERS order: [base-add][mul][buff/gift][gamble]', () => {
-  assert.equal(SLOT_FILTERS.length, 4);
+test('SLOT_FILTERS order: [base-add][mul][non-gamble buff][gamble][gamble buff]', () => {
+  assert.equal(SLOT_FILTERS.length, 5);
   // slot 0: base-add permanent
   assert.ok(SLOT_FILTERS[0]({ kind: 'permanent', permType: 'add' }));
   assert.ok(SLOT_FILTERS[0]({ kind: 'permanent', _dyn: 'add' }));
@@ -64,13 +64,20 @@ test('SLOT_FILTERS order: [base-add][mul][buff/gift][gamble]', () => {
   // slot 1: any-rarity mul permanent
   assert.ok(SLOT_FILTERS[1]({ kind: 'permanent', permType: 'mul' }));
   assert.ok(!SLOT_FILTERS[1]({ kind: 'permanent', permType: 'add' }));
-  // slot 2: buff OR gift
-  assert.ok(SLOT_FILTERS[2]({ kind: 'buff' }));
-  assert.ok(SLOT_FILTERS[2]({ kind: 'gift' }));
+  // slot 2: non-gamble buff (rateMul / compound)
+  assert.ok(SLOT_FILTERS[2]({ kind: 'buff', buffType: 'rateMul' }));
+  assert.ok(SLOT_FILTERS[2]({ kind: 'buff', buffType: 'compound' }));
+  assert.ok(!SLOT_FILTERS[2]({ kind: 'buff', buffType: 'gambleLuck' }));
+  assert.ok(!SLOT_FILTERS[2]({ kind: 'gift' }));
   assert.ok(!SLOT_FILTERS[2]({ kind: 'gamble' }));
   // slot 3: gamble
   assert.ok(SLOT_FILTERS[3]({ kind: 'gamble' }));
-  assert.ok(!SLOT_FILTERS[3]({ kind: 'buff' }));
+  assert.ok(!SLOT_FILTERS[3]({ kind: 'buff', buffType: 'rateMul' }));
+  // slot 4: gamble buff (gambleLuck / gambleCushion)
+  assert.ok(SLOT_FILTERS[4]({ kind: 'buff', buffType: 'gambleLuck' }));
+  assert.ok(SLOT_FILTERS[4]({ kind: 'buff', buffType: 'gambleCushion' }));
+  assert.ok(!SLOT_FILTERS[4]({ kind: 'buff', buffType: 'rateMul' }));
+  assert.ok(!SLOT_FILTERS[4]({ kind: 'gamble' }));
 });
 
 test('mult_starter exists: common, ×1.5, baseCost ≤ 100', () => {

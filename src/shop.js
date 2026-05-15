@@ -45,6 +45,12 @@ export function makeShopState() {
       gambleLuck:    [], // { value, duration, expiresAt }
       gambleCushion: [], // { value, duration, expiresAt }
       compound:      [], // { rate,  duration, startedAt, expiresAt }
+      // Meta-buffs ("Frames"): primes that scale subsequent buff applications
+      // while active. metaStrength multiplies new rateMul `value`; metaDuration
+      // multiplies every new buff's duration; metaLuck adds to new gambleLuck.
+      metaStrength:  [], // { value, duration, expiresAt }
+      metaDuration:  [], // { value, duration, expiresAt }
+      metaLuck:      [], // { value, duration, expiresAt }
     },
     gambleCd: {},
     shop: {
@@ -324,16 +330,43 @@ export function pruneBuffs(state, now) {
   }
 }
 
+// Combined live multiplier from a list of meta-buffs. Each active entry's
+// value compounds (so two ×1.5 strength frames give ×2.25); inactives return 1.
+function metaMulAt(list, now) {
+  if (!list || !list.length) return 1;
+  let m = 1;
+  for (const x of list) if (now < x.expiresAt) m *= x.value;
+  return m;
+}
+// Additive bonus from a list of meta-buffs (used by metaLuck). Stacks linearly.
+function metaSumAt(list, now) {
+  if (!list || !list.length) return 0;
+  let s = 0;
+  for (const x of list) if (now < x.expiresAt) s += x.value;
+  return s;
+}
+
 function applyBuff(state, u, now) {
   pruneBuffs(state, now);
   const b = state.buffs;
   const dMul = patternBuffDurationMul(state);
   const sMul = patternBuffRateMulStrength(state);
-  const duration = u.duration * dMul;
+  // Meta-buffs are *primes* — they don't fire themselves; they just sit on the
+  // file and scale anything applied while they hold. They have to compose with
+  // pattern modifiers, not replace them.
+  if (u.buffType === 'metaStrength' || u.buffType === 'metaDuration' || u.buffType === 'metaLuck') {
+    const duration = u.duration * dMul;
+    b[u.buffType].push({ value: u.value, duration, expiresAt: now + duration });
+    return;
+  }
+  const metaDur = metaMulAt(b.metaDuration, now);
+  const metaStr = metaMulAt(b.metaStrength, now);
+  const metaLuck = metaSumAt(b.metaLuck, now);
+  const duration = u.duration * dMul * metaDur;
   if (u.buffType === 'rateMul') {
-    b.rateMul.push({ value: u.mult * sMul, duration, expiresAt: now + duration });
+    b.rateMul.push({ value: u.mult * sMul * metaStr, duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleLuck') {
-    b.gambleLuck.push({ value: u.bonus, duration, expiresAt: now + duration });
+    b.gambleLuck.push({ value: u.bonus + metaLuck, duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleCushion') {
     b.gambleCushion.push({ value: u.refund, duration, expiresAt: now + duration });
   } else if (u.buffType === 'compound') {

@@ -307,7 +307,7 @@ export function enqueue(state, id) {
   }
   m.queue.push(id);
   // If this interstitial corresponds to a contacted world, add it to the
-  // persistent Contact Log immediately. The log is the prestige currency —
+  // persistent Contact Log immediately. The log is the cycle-close currency —
   // it must reflect the *act* of contact, not the player reading the beat.
   if (isContact) {
     if (recordContact(state.contactLog, id, Date.now() / 1000)) {
@@ -414,8 +414,8 @@ export function checkEngraving(state, _id) {
   enqueue(state, 'first_engraving');
 }
 
-// Called from main on cycle open. If the player has prestiged before but the
-// first-close beat has not yet shown (the close itself wipes the gameplay
+// Called from main on cycle open. If the player has closed a cycle before but
+// the first-close beat has not yet shown (the close itself wipes the gameplay
 // save, so we use the log to gate this), queue it now.
 export function enqueueFirstCloseBeat(state) {
   const log = state.contactLog;

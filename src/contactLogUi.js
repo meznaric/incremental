@@ -5,12 +5,13 @@ import {
   getMass, getEngraving, massForPeak, worldFor,
   worldDetail, STATUS_MEANING,
   echoLoopLevel, isLoopMode,
+  ALL_WORLDS,
 } from './contactLog.js';
 import { nextContactMilestone, MILESTONE_THRESHOLDS, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
 import { getPattern } from './cyclePatterns.js';
 
-// The Contact Log is the only player-facing surface for the prestige loop.
+// The Contact Log is the only player-facing surface for the cycle-close loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
 // reveals a two-stage confirm — first click arms it, second click commits.
 // The list groups worlds by the cycle that recorded them so the player can
@@ -381,9 +382,17 @@ export function initContactLogUi(state, opts = {}) {
   }
 
   function renderEntryDetail(w, detail) {
+    const def = ALL_WORLDS[w.id];
+    const img = def && def.image;
+    const portrait = img
+      ? `<img class="cl-detail-img" loading="lazy" alt="${w.name}" src="${img}"
+            onerror="this.style.display='none';var f=this.nextElementSibling;if(f)f.style.display='flex';" />
+         <div class="cl-detail-fallback" aria-hidden="true" style="display:none"></div>`
+      : `<div class="cl-detail-fallback" aria-hidden="true"></div>`;
     if (!detail) {
       return `
         <div class="cl-detail">
+          ${portrait}
           <p class="cl-detail-empty">The folder is thin. The recordings remain.</p>
         </div>
       `;
@@ -391,6 +400,7 @@ export function initContactLogUi(state, opts = {}) {
     // Order: method → biology → politics → cost. Kalen's note last, italic.
     return `
       <div class="cl-detail">
+        ${portrait}
         <dl class="cl-detail-rows">
           <div class="cl-detail-row"><dt>Method</dt><dd>${detail.method}</dd></div>
           <div class="cl-detail-row"><dt>World</dt><dd>${detail.biology}</dd></div>
@@ -418,10 +428,10 @@ export function initContactLogUi(state, opts = {}) {
   const close = () => { armed = false; modal.classList.remove('open'); };
 
   // Reflect cycle-complete on the top-right contact-log button so the player
-  // notices the prestige is available without having to open the modal first.
+  // notices the cycle close is available without having to open the modal first.
   // main.js calls this from the tick loop after checkAmount runs. In Loop
   // mode the button stays pulsing as long as the close is legal — the player
-  // can prestige whenever they like.
+  // can close the cycle whenever they like.
   const updateAffordance = () => {
     const log = state.contactLog;
     const ready = canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state));

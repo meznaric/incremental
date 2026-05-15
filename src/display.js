@@ -48,6 +48,116 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
+// Path curves: map t in [0,1] to a 3D offset (dx, dy, dz) added on top of the
+// straight-line spawn->slot interpolation. Each curve fades its swing to 0 at
+// t=1 so particles still land exactly in their grid slot. Amplitudes capped at
+// ~CELL_W * 2 horizontally and similar in depth so columns stay readable.
+// `seed` is per-particle (p.spin); `period` is the column's period index.
+const PI2 = Math.PI * 2;
+const CURVE_MAX_XY = CELL_W * 2;
+const CURVE_MAX_Z = CELL_W * 2;
+
+function curveStraight() {
+  return { dx: 0, dy: 0, dz: 0 };
+}
+
+function curveSineS(t, seed, period) {
+  const fade = Math.sin(Math.PI * t);
+  const amp = CELL_W * 0.9;
+  return { dx: Math.sin(t * Math.PI + seed * 0.5) * amp * fade, dy: 0, dz: 0 };
+}
+
+function curveHelix(t, seed, period) {
+  // Spiral around column axis. Higher period = more turns + a bit more depth.
+  const turns = 1.5 + Math.min(period, 3) * 0.4;
+  const a = t * PI2 * turns + seed;
+  const fade = 1 - t;
+  const rxy = CELL_W * 0.85 * fade;
+  const rz = CELL_W * 0.9 * fade;
+  return { dx: Math.cos(a) * rxy, dy: 0, dz: Math.sin(a) * rz };
+}
+
+function curveLissajous(t, seed, period) {
+  // Figure-8-ish in XZ. Period tilts the frequency ratio.
+  const fx = 1 + ((period - 4) % 3) * 0.5;
+  const fz = 2 + ((period - 4) % 2);
+  const phase = seed * 0.7;
+  const fade = Math.sin(Math.PI * t);
+  return {
+    dx: Math.sin(t * Math.PI * fx + phase) * CELL_W * 1.1 * fade,
+    dy: 0,
+    dz: Math.sin(t * Math.PI * fz + phase * 1.3) * CELL_W * 1.2 * fade,
+  };
+}
+
+function curveCone(t, seed, period) {
+  // Helix whose radius grows with t (wide at top, narrow at landing).
+  const turns = 2 + Math.min(period - 7, 4) * 0.35;
+  const a = t * PI2 * turns + seed;
+  const r = CELL_W * 1.6 * (1 - t) * (0.4 + (1 - t) * 0.8);
+  const rz = CELL_W * 1.6 * (1 - t) * (0.4 + (1 - t) * 0.8);
+  return { dx: Math.cos(a) * r, dy: 0, dz: Math.sin(a) * rz };
+}
+
+function curveDoubleHelix(t, seed, period) {
+  // Two interleaved spirals + depth pulse. Used for the biggest periods.
+  const turns = 3 + Math.min(period - 11, 10) * 0.25;
+  const a = t * PI2 * turns + seed;
+  const wobble = Math.sin(t * Math.PI * 3 + seed);
+  const fade = 1 - t * t;
+  const ampXY = Math.min(CURVE_MAX_XY, CELL_W * (1.0 + Math.min(period - 11, 8) * 0.08));
+  const ampZ = Math.min(CURVE_MAX_Z, CELL_W * (1.1 + Math.min(period - 11, 8) * 0.1));
+  return {
+    dx: Math.cos(a) * ampXY * fade,
+    dy: wobble * 0.18 * fade,
+    dz: (Math.sin(a) * 0.85 + Math.cos(a * 0.5) * 0.4) * ampZ * fade,
+  };
+}
+
+const CURVE_BY_PERIOD = [
+  curveStraight,    // 0 unit
+  curveSineS,       // 1 thousand
+  curveHelix,       // 2 million
+  curveHelix,       // 3 billion
+  curveLissajous,   // 4 trillion
+  curveLissajous,   // 5 quadrillion
+  curveLissajous,   // 6 quintillion
+  curveCone,        // 7 sextillion
+  curveCone,        // 8 septillion
+  curveCone,        // 9 octillion
+  curveCone,        // 10 nonillion
+];
+
+function curveForPeriod(period) {
+  if (period < CURVE_BY_PERIOD.length) return CURVE_BY_PERIOD[period];
+  return curveDoubleHelix;
+}
+
+// Per-period rotation speeds (rad/s) on the three axes. Higher periods spin
+// harder on more axes so they look more frantic / dimensional.
+function rotSpeedsForPeriod(period) {
+  const p = Math.max(0, period);
+  return {
+    sx: 2.0 + p * 0.12,
+    sy: 3.0 + p * 0.18,
+    sz: 0.4 + p * 0.22,
+  };
+}
+
+// Streaming-mode horizontal wobble. Cheap sin of time, scaled by period.
+function streamWobbleX(period, now, seed) {
+  if (period === 0) return 0;
+  const amp = Math.min(CELL_W * 0.6, CELL_W * 0.08 * period);
+  const freq = 1.2 + period * 0.08;
+  return Math.sin(now * freq + seed) * amp;
+}
+function streamWobbleZ(period, now, seed) {
+  if (period < 2) return 0;
+  const amp = Math.min(CELL_W * 0.8, CELL_W * 0.12 * period);
+  const freq = 0.9 + period * 0.07;
+  return Math.cos(now * freq * 0.85 + seed * 1.3) * amp;
+}
+
 function slotPos(slotIndex) {
   const col = slotIndex % GRID_W;
   const row = Math.floor(slotIndex / GRID_W);
@@ -128,8 +238,10 @@ class Column {
         spin: Math.random() * 6.28,
         x: 0,
         y: 0,
+        z: 0,
         rotX: 0,
         rotY: 0,
+        rotZ: 0,
         scale: 0,
         opacity: 1,
       });
@@ -148,6 +260,8 @@ class Column {
     this._rateEstimate = 0;
     this._streamSpeed = CONTINUOUS_FALL_SPEED;
     this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
+    this._curve = curveStraight;
+    this._rotSpeeds = rotSpeedsForPeriod(0);
   }
 
   animate(dt) {
@@ -187,6 +301,8 @@ class Column {
     p.state = 'idle';
     p.scale = 0;
     p.opacity = 1;
+    p.z = 0;
+    p.rotZ = 0;
     this.freeList.push(p.index);
   }
 
@@ -207,6 +323,7 @@ class Column {
     p.spawnT = now;
     p.x = slot.x;
     p.y = p.spawnY;
+    p.z = 0;
     p.state = 'flying';
     this.cycleSpawnCount++;
     this.processed++;
@@ -229,6 +346,7 @@ class Column {
     p.spawnT = now;
     p.x = x;
     p.y = p.spawnY;
+    p.z = 0;
     p.velY = -this._streamSpeed;
     p.state = 'streaming';
     this.aliveCount++;
@@ -251,6 +369,7 @@ class Column {
   _onArrive(p, now) {
     p.x = p.slotX;
     p.y = p.slotY;
+    p.z = 0;
     if (this.mode === 'discrete' && this.phase === 'filling') {
       p.state = 'settled';
     } else {
@@ -285,6 +404,7 @@ class Column {
       p.slotIndex = i;
       p.x = slot.x;
       p.y = slot.y;
+      p.z = 0;
       p.state = 'settled';
     }
   }
@@ -327,6 +447,7 @@ class Column {
       p.spawnT = now + Math.random() * 0.2;
       p.x = slot.x;
       p.y = p.spawnY;
+      p.z = 0;
       p.state = 'flying';
       this.aliveCount++;
     }
@@ -361,6 +482,8 @@ class Column {
     this.outline.material.color.setHex(pDef.color);
     this._periodColor.setHex(pDef.color);
     this.imesh.geometry = geometryFor(this.period);
+    this._curve = curveForPeriod(this.period);
+    this._rotSpeeds = rotSpeedsForPeriod(this.period);
     this.mode = 'discrete';
     this._rateEstimate = 0;
     this._snapHard(amount, now);
@@ -404,6 +527,9 @@ class Column {
       }
     }
 
+    const curve = this._curve || curveStraight;
+    const rs = this._rotSpeeds || rotSpeedsForPeriod(this.period);
+    const periodIdx = this.period;
     for (const p of this.particles) {
       if (p.state === 'flying') {
         const t = Math.max(0, (now - p.spawnT) / FLIGHT_TIME);
@@ -411,18 +537,26 @@ class Column {
           this._onArrive(p, now);
         } else {
           const e = easeOutCubic(t);
-          p.x = p.slotX;
-          p.y = p.spawnY + (p.slotY - p.spawnY) * e;
-          p.rotX = now * 2 + p.spin;
-          p.rotY = now * 3 + p.spin;
+          const baseY = p.spawnY + (p.slotY - p.spawnY) * e;
+          const o = curve(e, p.spin, periodIdx);
+          p.x = p.slotX + o.dx;
+          p.y = baseY + o.dy;
+          p.z = o.dz;
+          p.rotX = now * rs.sx + p.spin;
+          p.rotY = now * rs.sy + p.spin * 0.7;
+          p.rotZ = now * rs.sz + p.spin * 0.4;
         }
       } else if (p.state === 'settled') {
         p.rotX += dt * 0.3;
         p.rotY += dt * 0.45;
+        p.rotZ += dt * 0.2;
       } else if (p.state === 'streaming') {
         p.y -= this._streamSpeed * dt;
-        p.rotX += dt * 2.5;
-        p.rotY += dt * 3.5;
+        p.x = p.slotX + streamWobbleX(periodIdx, now, p.spin);
+        p.z = streamWobbleZ(periodIdx, now, p.spin);
+        p.rotX += dt * rs.sx;
+        p.rotY += dt * rs.sy;
+        p.rotZ += dt * rs.sz;
         if (p.y < BOTTOM_EXIT_Y) {
           this._release(p);
           this.aliveCount = Math.max(0, this.aliveCount - 1);
@@ -432,8 +566,9 @@ class Column {
         p.y += p.velY * dt;
         const fallRange = Math.max(0.5, p.leaveStartY - BOTTOM_EXIT_Y);
         p.opacity = Math.max(0, (p.y - BOTTOM_EXIT_Y) / fallRange);
-        p.rotX += dt * 2.5;
-        p.rotY += dt * 3.5;
+        p.rotX += dt * (rs.sx * 0.9);
+        p.rotY += dt * (rs.sy * 0.9);
+        p.rotZ += dt * (rs.sz * 0.9);
         if (p.y < BOTTOM_EXIT_Y) {
           this._release(p);
           this.aliveCount = Math.max(0, this.aliveCount - 1);
@@ -468,8 +603,8 @@ class Column {
         im.setMatrixAt(p.index, _hiddenMat);
         continue;
       }
-      _pos.set(p.x, p.y, 0);
-      _euler.set(p.rotX, p.rotY, 0);
+      _pos.set(p.x, p.y, p.z || 0);
+      _euler.set(p.rotX, p.rotY, p.rotZ || 0);
       _quat.setFromEuler(_euler);
       _scl.setScalar(p.scale);
       if (p.state === 'streaming' && stretchY > 1) {

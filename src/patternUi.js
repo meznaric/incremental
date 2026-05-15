@@ -1,4 +1,4 @@
-// Cycle Pattern selector — the post-prestige choice screen.
+// Cycle Pattern selector — the post-cycle-close choice screen.
 //
 // Shown on a fresh cycle boot when the Contact Log carries
 // `pendingPatternChoice`. Blocks input until the player taps a card. After a

@@ -49,7 +49,7 @@ initMenu();
 // any cycle_open/milestone enqueue picks up the EP's content.
 bindEpisode(getRun(state.contactLog));
 const contactLogUi = initContactLogUi(state, {
-  // "Close the Cycle" — soft prestige. Wipes the gameplay save, advances the
+  // "Close the Cycle" — the cycle-close action. Wipes the gameplay save, advances the
   // log's run counter so milestones can fire again, leaves the world list
   // (and therefore Echo Memory) intact, banks Carrier Mass against the
   // cycle's peakAmount, then reloads.
@@ -80,6 +80,7 @@ const amountInput = document.getElementById('amountInput');
 const rateInput = document.getElementById('rateInput');
 const slotsEl = document.getElementById('slots');
 const buffsEl = document.getElementById('buffs');
+const metaBuffsEl = document.getElementById('metaBuffs');
 const buffModalEl = document.getElementById('buffModal');
 const resultEl = document.getElementById('result');
 
@@ -428,14 +429,9 @@ function ensureSlotEls() {
     el.className = 'slot';
     el.innerHTML = `
       <button class="pin" type="button" aria-label="Pin"><i class="ri ri-pushpin-2-fill"></i></button>
-      <div class="head">
-        <i class="kind-icon"></i>
-        <div class="rarity"></div>
-      </div>
-      <div class="name"></div>
-      <div class="desc"></div>
+      <i class="kind-icon"></i>
+      <div class="rarity"></div>
       <div class="cost"></div>
-      <div class="outcomes"></div>
       <div class="meta"></div>
       <div class="foot">
         <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
@@ -606,14 +602,13 @@ function renderShop() {
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
     const theme = KIND_THEME[u.kind] || {};
     el.dataset.kind = u.kind;
+    // Type-preview card: kind icon + rarity tag + price. Detail (name/desc/
+    // outcomes) lives behind the info button — slot index already signals type.
+    el.style.setProperty('--kind-color', theme.color || '#8aa0ff');
     el.querySelector('.kind-icon').className = `kind-icon ri ${theme.icon || ''}`;
-    el.querySelector('.rarity').textContent = `${u.rarity} · ${kindLabel(u)}`;
+    el.querySelector('.rarity').textContent = u.rarity;
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
-    el.querySelector('.name').textContent = u.name;
-    el.querySelector('.desc').textContent = u.desc;
     // Pattern free-purchase coverage applies to any non-hail, non-bleed slot.
-    // Surface it as "FREE" on the cost cell so the player sees the charge being
-    // used before they tap.
     const patternFree = (state.patternFreeLeft || 0) > 0 && u.kind !== 'gamble' && u.kind !== 'gift';
     const costHtml = u.kind === 'gift'
       ? 'FREE'
@@ -621,26 +616,6 @@ function renderShop() {
         ? `<span class="cc">FREE</span> <span class="cc-strike">${ECHO_ICON}${formatAbbrev(cost)}</span>`
         : `${ECHO_ICON}${formatAbbrev(cost)}`;
     setHtmlIfChanged(el.querySelector('.cost'), costHtml);
-
-    let outcomes = '';
-    if (u.kind === 'gamble') {
-      const winNet = cost * (u.payout - 1);
-      const winPct = fmtPct(u.chance);
-      const losePct = fmtPct(1 - u.chance);
-      outcomes =
-        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
-        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
-    } else if (u.kind === 'convert' || (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul'))) {
-      // Show the *effective* rate change at current multipliers. This is what
-      // actually lands on the HUD pulse the instant the player taps buy —
-      // hiding the multiplier stack behind the upgrade's spec sheet has been
-      // confusing players ("+100 base" silently becoming +2000/s effective).
-      const eff = marginalRateForPurchase(state, slot, now);
-      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
-    } else if (u.kind === 'gift') {
-      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
-    }
-    setHtmlIfChanged(el.querySelector('.outcomes'), outcomes);
 
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
@@ -782,6 +757,42 @@ function renderBuffs(now) {
   buffsEl.innerHTML = cards.join('') + tiles.join('');
 }
 
+const META_DEFS = {
+  metaStrength: { kind: 'strength', icon: 'ri-flashlight-line',    fmt: (v) => `×${v}` },
+  metaDuration: { kind: 'duration', icon: 'ri-time-line',          fmt: (v) => `×${v}` },
+  metaLuck:     { kind: 'luck',     icon: 'ri-sparkling-2-line',   fmt: (v) => `+${Math.round(v * 100)}%` },
+};
+
+function renderMetaBuffs(now) {
+  const b = state.buffs;
+  if (!b.metaStrength && !b.metaDuration && !b.metaLuck) {
+    metaBuffsEl.style.display = 'none';
+    return;
+  }
+  const pills = [];
+  for (const key of ['metaStrength', 'metaDuration', 'metaLuck']) {
+    const def = META_DEFS[key];
+    const list = (b[key] || []).filter((x) => x.expiresAt > now)
+      .sort((a, c) => a.expiresAt - c.expiresAt);
+    for (const x of list) {
+      const remain = Math.max(0, x.expiresAt - now);
+      const pct = Math.max(0, Math.min(1, remain / x.duration));
+      pills.push(`
+        <span class="meta-pill kind-${def.kind}">
+          <span class="meta-bar" style="transform: scaleX(${pct});"></span>
+          <span class="meta-fg">
+            <i class="ri ${def.icon}"></i>
+            <span class="meta-val">${def.fmt(x.value)}</span>
+            <span class="meta-time">${fmtDuration(remain)}</span>
+          </span>
+        </span>
+      `);
+    }
+  }
+  metaBuffsEl.style.display = pills.length ? 'flex' : 'none';
+  setHtmlIfChanged(metaBuffsEl, pills.join(''));
+}
+
 function renderResult(now) {
   const r = state.lastResult;
   if (!r) { resultEl.style.display = 'none'; return; }
@@ -845,6 +856,7 @@ function tick(raf) {
   if (raf - lastHud > 100) {
     renderShop();
     renderBuffs(t);
+    renderMetaBuffs(t);
     renderResult(t);
     lastHud = raf;
   }

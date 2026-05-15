@@ -66,12 +66,13 @@ test('permanent: refused when balance < cost', () => {
 
 test('buff: deducts cost and pushes a buff entry', () => {
   const s = freshState({ amount: 1000 });
-  installSlot(s, 1, 'espresso', 200); // espresso: buff, rateMul, mult=3, duration=120
+  const u = getUpgrade('espresso'); // rateMul buff — exact mult/duration may retune over time
+  installSlot(s, 1, 'espresso', 200);
   tryBuy(s, 1, 1000);
   assert.equal(s.amount, 800);
   assert.equal(s.buffs.rateMul.length, 1);
-  assert.equal(s.buffs.rateMul[0].value, 3);
-  assert.equal(s.buffs.rateMul[0].expiresAt, 1120);
+  assert.equal(s.buffs.rateMul[0].value, u.mult);
+  assert.equal(s.buffs.rateMul[0].expiresAt, 1000 + u.duration);
 });
 
 test('buff: compound buffs land in the compound queue', () => {
@@ -188,15 +189,18 @@ test('gamble: single cushion keeps coin_flip EV negative', () => {
   assert.ok(ev < 0, `expected negative EV, got ${ev}`);
 });
 
-test('gamble: max-stacked cushions keep EV below tiny edge', () => {
-  // worst case for the house: every cushion buff stacked
+test('gamble: max-stacked cushions still leave the house ahead', () => {
+  // Worst case for the house: every cushion buff stacked, *and* the chance
+  // shading on coin_flip (now 0.47, was 0.5). The 10% cushion cap is the
+  // backstop — even at max cushion, EV per unit wager must stay negative so
+  // farming the loop forever can't print Echoes.
   const cushionIds = ['insurance', 'steady', 'iron_will', 'bastion', 'last_stand'];
   let lose = 1;
   for (const id of cushionIds) lose *= 1 - getUpgrade(id).refund;
   const c = Math.min(0.1, 1 - lose);
   const cf = getUpgrade('coin_flip');
   const ev = cf.chance * (cf.payout - 1) - (1 - cf.chance) * (1 - c);
-  assert.ok(ev > 0 && ev < 0.06, `expected tiny positive edge, got ${ev}`);
+  assert.ok(ev < 0, `expected house-edge EV, got ${ev}`);
 });
 
 test('tryReroll: refused when reroll is locked', () => {
@@ -208,8 +212,8 @@ test('tryReroll: refused when reroll is locked', () => {
   assert.equal(s.amount, 1000);
 });
 
-test('tryReroll: deducts cost (max of pct and 60s of rate) and replaces slots', () => {
-  // basePerSecond 0 → 60s × rate × N collapses to 0, so pct dominates: 2 × 3% × 100000 = 6000
+test('tryReroll: deducts cost (max of pct and 15s of rate) and replaces slots', () => {
+  // basePerSecond 0 → 15s × rate × N collapses to 0, so pct dominates: 2 × 1.5% × 100000 = 3000
   const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
   installSlot(s, 0, 'mult5', 50);
@@ -217,7 +221,7 @@ test('tryReroll: deducts cost (max of pct and 60s of rate) and replaces slots', 
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
   assert.equal(res.rerolled, 2);
-  assert.equal(s.amount, 100000 - 6000);
+  assert.equal(s.amount, 100000 - 3000);
   assert.equal(typeof s.shop.slots[0]?.id, 'string');
   assert.equal(typeof s.shop.slots[1]?.id, 'string');
 });
@@ -233,19 +237,19 @@ test('tryReroll: pinned slot is preserved and not charged', () => {
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
   assert.equal(res.rerolled, 1);
-  // 1 slot × 3% × 100000 = 3000
-  assert.equal(s.amount, 100000 - 3000);
+  // 1 slot × 1.5% × 100000 = 1500
+  assert.equal(s.amount, 100000 - 1500);
   assert.equal(s.shop.slots[0], before);
 });
 
-test('tryReroll: cost floor is 30s of offered rate per non-pinned slot', () => {
-  // offeredRate frozen at 100/s: 30s × 100/s × 2 slots = 6000 > 3% × 2 × 1000 = 60
+test('tryReroll: cost floor is 15s of offered rate per non-pinned slot', () => {
+  // offeredRate frozen at 100/s: 15s × 100/s × 2 slots = 3000 > 1.5% × 2 × 1000 = 30
   const s = freshState({ amount: 1000, basePerSecond: 100 });
   s.shop.rerollUnlocked = true;
   s.shop.offeredRate = 100;
   installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
-  // Cost would be 6000 but balance is 1000 — reroll refused.
+  // Cost would be 3000 but balance is 1000 — reroll refused.
   const res = tryReroll(s, 0);
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'broke');
@@ -253,7 +257,7 @@ test('tryReroll: cost floor is 30s of offered rate per non-pinned slot', () => {
 
 test('tryReroll: cost uses offered rate, not live rate', () => {
   // Live rate explodes (basePerSecond=10000) but offeredRate was frozen at 10/s.
-  // Floor = 30s × 10/s × 2 = 600, pct = 3% × 2 × 1000 = 60 → cost 600.
+  // Floor = 15s × 10/s × 2 = 300, pct = 1.5% × 2 × 1000 = 30 → cost 300.
   const s = freshState({ amount: 1000, basePerSecond: 10000 });
   s.shop.rerollUnlocked = true;
   s.shop.offeredRate = 10;
@@ -261,8 +265,8 @@ test('tryReroll: cost uses offered rate, not live rate', () => {
   installSlot(s, 1, 'coin_flip', 100);
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
-  assert.equal(res.cost, 600);
-  assert.equal(s.amount, 400);
+  assert.equal(res.cost, 300);
+  assert.equal(s.amount, 700);
 });
 
 test('tryUnlockSlot: deducts cost and grows the slate', () => {
@@ -304,8 +308,8 @@ test('tryTogglePin: toggles only when pin is unlocked', () => {
 });
 
 // Reference the imported constant so unused-import lint stays quiet.
-test('REROLL_PCT_PER_SLOT is 3%', () => {
-  assert.equal(REROLL_PCT_PER_SLOT, 0.03);
+test('REROLL_PCT_PER_SLOT is 1.5%', () => {
+  assert.equal(REROLL_PCT_PER_SLOT, 0.015);
 });
 
 function installDynGift(state, idx, rarity, ctx) {

@@ -155,7 +155,11 @@ export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }
     setTimeout(() => {
       root.style.display = 'none';
       numberEl.classList.remove('wb-number-settled');
-      collectBtn.removeEventListener('click', dismiss);
+      collectBtn.removeEventListener('pointerdown', onBtnPointerDown);
+      collectBtn.removeEventListener('pointermove', onBtnPointerMove);
+      collectBtn.removeEventListener('pointercancel', onBtnPointerCancel);
+      collectBtn.removeEventListener('pointerup', onBtnPointerUp);
+      collectBtn.removeEventListener('click', onBtnClick);
       root.removeEventListener('click', onBackdrop);
       window.removeEventListener('keydown', onKey);
       onDismiss && onDismiss();
@@ -173,7 +177,41 @@ export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }
     }
   }
 
-  collectBtn.addEventListener('click', dismiss);
+  // pointerup resolves before iOS Chrome's synthesized click, which can drop
+  // taps on a button whose ancestor is re-rendering (the .wb-number animates
+  // every frame). Track pointerdown→pointerup with a small move tolerance so a
+  // scroll-drag doesn't fire dismiss. Click stays as a fallback for keyboard /
+  // a11y synthesis and is deduped against the pointerup timestamp.
+  let lastPointerAt = 0;
+  let tap = null;
+  function onBtnPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  }
+  function onBtnPointerMove(e) {
+    if (!tap || e.pointerId !== tap.id) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+  }
+  function onBtnPointerCancel(e) {
+    if (tap && e.pointerId === tap.id) tap = null;
+  }
+  function onBtnPointerUp(e) {
+    if (!tap || e.pointerId !== tap.id) return;
+    const t = tap; tap = null;
+    if (t.moved) return;
+    lastPointerAt = performance.now();
+    dismiss();
+  }
+  function onBtnClick() {
+    if (lastPointerAt && performance.now() - lastPointerAt < 700) return;
+    dismiss();
+  }
+
+  collectBtn.addEventListener('pointerdown', onBtnPointerDown);
+  collectBtn.addEventListener('pointermove', onBtnPointerMove);
+  collectBtn.addEventListener('pointercancel', onBtnPointerCancel);
+  collectBtn.addEventListener('pointerup', onBtnPointerUp);
+  collectBtn.addEventListener('click', onBtnClick);
   root.addEventListener('click', onBackdrop);
   window.addEventListener('keydown', onKey);
 

@@ -45,14 +45,17 @@ test('long-duration buffs exist: at least one day+ and one week+', () => {
   }
 });
 
-test("Friend's Bet: fair 50/50, EV = 0", () => {
+test("Friend's Bet: small house edge, EV per unit wager < 0", () => {
+  // Was a fair 50/50; the band-floor now takes a small slice off every Hail
+  // (see chance shading in upgrades.js). Test asserts the *direction* of the
+  // edge, not a fixed magnitude, so future tuning can move the dial.
   const u = getUpgrade('friend_bet');
   assert.ok(u, "friend_bet exists");
   assert.equal(u.kind, 'gamble');
-  assert.equal(u.chance, 0.5);
   assert.equal(u.payout, 2);
-  const ev = u.chance * u.payout - 1; // per-unit-wager expected value, fair when 0
-  assert.equal(ev, 0, `expected EV=0, got ${ev}`);
+  assert.ok(u.chance < 0.5, `expected chance shaded below 0.5, got ${u.chance}`);
+  const ev = u.chance * u.payout - 1; // per-unit-wager expected value
+  assert.ok(ev < 0, `expected negative EV, got ${ev}`);
 });
 
 test('mul cost scales with total mul owned (category-wide ramp)', () => {

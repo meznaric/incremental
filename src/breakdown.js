@@ -18,6 +18,7 @@
 // `op` is the display operator for the leftmost column ('+ /s', '×', '^', '=').
 
 import { patternBaseRateMul, getActivePattern } from './cyclePatterns.js';
+import { applyDampening, DAMPEN_AT } from './shop.js';
 
 const MEMORY_PER_SHARD = 0.10; // mirror of contactLog.ECHO_MEMORY_PER_SHARD
 
@@ -112,17 +113,32 @@ export function breakdownRate(state, now) {
     });
   }
 
-  // Pre-exponent product — the rate before Ascent lifts it.
+  // Pre-exponent product — the rate before dampening compresses it.
   const linear = rows.reduce((acc, r) => {
     if (r.kind === 'base') return r.factor;
     if (r.kind === 'mul') return acc * r.factor;
     return acc;
   }, 0);
 
+  // Log-dampening kicks in once raw output passes DAMPEN_AT. Surface it as a
+  // multiplicative factor (dampened / raw) so the diagnostic stays additive in
+  // log space and the total row matches effectiveRate.
+  let postDampen = linear;
+  if (linear > DAMPEN_AT) {
+    postDampen = applyDampening(linear);
+    rows.push({
+      kind: 'mul',
+      label: 'Log dampening',
+      op: '×',
+      factor: postDampen / linear,
+      note: 'High-rate compression — each decade past trillion yields less than a full decade of output',
+    });
+  }
+
   const ascentExp = Number.isFinite(state.ascentExp) && state.ascentExp > 0 ? state.ascentExp : 0;
-  let final = linear;
-  if (ascentExp > 0 && linear > 1) {
-    final = Math.pow(linear, 1 + ascentExp);
+  let final = postDampen;
+  if (ascentExp > 0 && postDampen > 1) {
+    final = Math.pow(postDampen, 1 + ascentExp);
     const lvl = Math.round(ascentExp / 0.02);
     rows.push({
       kind: 'exp',

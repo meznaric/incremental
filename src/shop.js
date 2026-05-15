@@ -9,6 +9,13 @@ import {
 export const DEFAULT_SLOTS = 2;
 export const MAX_SLOTS = 10;
 
+// Hard ceiling on the effective Hail win-chance after Carry windows + pattern
+// luck stack on top of the base. A 100% guaranteed win drains the danger out
+// of the loop — the dark, the static, the *might not work* is what makes
+// landing a phrase mean something. Stack as much luck as you like; the last
+// few percent stay on the other side.
+export const GAMBLE_CHANCE_CAP = 0.85;
+
 // Cost to unlock the Nth slot (the slot whose index === N). Slots 0 and 1 are free.
 // 10× growth starting at 1k for slot index 2.
 export const SLOT_UNLOCK_COSTS = (() => {
@@ -22,8 +29,8 @@ export const REROLL_UNLOCK_COST = 1000;
 export const REROLL_UNLOCK_AT = 1000;
 export const PIN_UNLOCK_COST = 5000;
 export const PIN_UNLOCK_AT = 5000;
-export const REROLL_PCT_PER_SLOT = 0.03;
-export const REROLL_FLOOR_SECONDS = 30;
+export const REROLL_PCT_PER_SLOT = 0.015;
+export const REROLL_FLOOR_SECONDS = 15;
 
 // Reroll cost is based on the rate captured at the time the slate was rolled
 // (state.shop.offeredRate), not the live rate. This keeps the displayed price
@@ -131,11 +138,24 @@ function applyAscent(rate, exp) {
   return Math.pow(rate, 1 + exp);
 }
 
+// Log-dampening on the final pre-ascent rate. Below DAMPEN_AT the rate is
+// untouched; above, it is compressed so each decade of raw production yields
+// only DAMPEN_ALPHA decades of effective production. Without this, additive
+// permanents and multiplier stacks both compound past trillion into runaway.
+// Tunable: dropping ALPHA tightens the cap; raising AT delays its bite.
+export const DAMPEN_AT = 1e12;
+export const DAMPEN_ALPHA = 0.85;
+export function applyDampening(rate) {
+  if (!(rate > DAMPEN_AT)) return rate;
+  return DAMPEN_AT * Math.pow(rate / DAMPEN_AT, DAMPEN_ALPHA);
+}
+
 export function effectiveRate(state, now) {
   let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   rate *= patternBaseRateMul(state);
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
   rate *= memoryFactor(state);
+  rate = applyDampening(rate);
   return applyAscent(rate, ascentExp(state));
 }
 
@@ -178,19 +198,25 @@ export function integrateRate(state, t0, t1) {
         factor *= desc.multAt(xs, (a + c) / 2);
       }
     }
-    // When Ascent is active, lift the *whole* segment's rate by (1+exp). For
-    // continuous (compound) segments we lose strict closed-form accuracy and
-    // accept a tiny mid-segment approximation: lift the time integral by the
-    // mid-segment ascent factor. Discrete segments stay exact.
-    if (exp > 0) {
-      const liftedBase = applyAscent(base * factor, exp);
-      const linearBase = base * factor;
-      // Scale the (possibly-continuous) timeIntegral by liftedBase/linearBase,
-      // guarding division by zero when base*factor === 0.
-      if (linearBase > 0) total += timeIntegral * liftedBase;
-      else total += 0;
-    } else {
-      total += base * factor * timeIntegral;
+    // Log-dampening + Ascent both apply to the segment's rate. Discrete
+    // segments dampen exactly; continuous (compound) segments dampen the
+    // segment-average rate, which is the strictest closed-form available
+    // without numerical integration. Ascent stacks on top of dampening.
+    const linearBase = base * factor;
+    if (linearBase > 0) {
+      const dt = c - a;
+      let segmentTotal;
+      if (continuousFound && dt > 0) {
+        const avgRate = linearBase * (timeIntegral / dt);
+        const dampened = applyDampening(avgRate);
+        const lifted = exp > 0 ? applyAscent(dampened, exp) : dampened;
+        segmentTotal = lifted * dt;
+      } else {
+        const dampened = applyDampening(linearBase);
+        const lifted = exp > 0 ? applyAscent(dampened, exp) : dampened;
+        segmentTotal = lifted * timeIntegral;
+      }
+      total += segmentTotal;
     }
   }
   return total;
@@ -251,7 +277,7 @@ export function tryBuy(state, slotIdx, now) {
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
     const luck = state.buffs.gambleLuck.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
-    const won = Math.random() < Math.min(1, u.chance + luck + patternGambleLuckBonus(state));
+    const won = Math.random() < Math.min(GAMBLE_CHANCE_CAP, u.chance + luck + patternGambleLuckBonus(state));
     let result;
     if (won) {
       const payout = cost * u.payout;

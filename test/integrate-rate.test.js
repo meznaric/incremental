@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { effectiveRate, integrateRate, pruneBuffs } from '../src/shop.js';
+import { effectiveRate, integrateRate, pruneBuffs, applyDampening, DAMPEN_AT, DAMPEN_ALPHA } from '../src/shop.js';
 
 // Minimal state factory — only the fields integrateRate / effectiveRate read.
 function makeState(over = {}) {
@@ -182,6 +182,42 @@ test('Ascent exponent: stacks on top of rateMul buffs', () => {
   // pre-ascent = 100*2 = 200; lifted = 200^1.1.
   const expected = Math.pow(200, 1.1);
   assert.ok(Math.abs(effectiveRate(s, 0) - expected) < 1e-9);
+});
+
+test('applyDampening: no-op below threshold', () => {
+  assert.equal(applyDampening(0), 0);
+  assert.equal(applyDampening(1e6), 1e6);
+  assert.equal(applyDampening(DAMPEN_AT), DAMPEN_AT);
+});
+
+test('applyDampening: compresses each decade above threshold by alpha', () => {
+  // raw = 10× threshold → dampened = threshold × 10^alpha.
+  const raw = 10 * DAMPEN_AT;
+  const expected = DAMPEN_AT * Math.pow(10, DAMPEN_ALPHA);
+  assert.ok(Math.abs(applyDampening(raw) - expected) < 1e-3);
+});
+
+test('effectiveRate: rates well below threshold are untouched', () => {
+  const s = makeState({ basePerSecond: 1e9 });
+  assert.equal(effectiveRate(s, 0), 1e9);
+});
+
+test('effectiveRate: huge rates collapse via the dampening curve', () => {
+  // basePerSecond pushes the raw rate well past the threshold; the HUD/integral
+  // sees the dampened figure, not the runaway raw value.
+  const s = makeState({ basePerSecond: 1e15 });
+  const r = effectiveRate(s, 0);
+  assert.ok(r < 1e15, 'huge rate should be dampened below raw');
+  const expected = DAMPEN_AT * Math.pow(1e15 / DAMPEN_AT, DAMPEN_ALPHA);
+  assert.ok(Math.abs(r - expected) / expected < 1e-6);
+});
+
+test('integrateRate: dampening applies segment-by-segment', () => {
+  // Pure-additive state at 1e15/s → dampened rate over 10s.
+  const s = makeState({ basePerSecond: 1e15 });
+  const dampened = DAMPEN_AT * Math.pow(1e15 / DAMPEN_AT, DAMPEN_ALPHA);
+  const expected = dampened * 10;
+  assert.ok(Math.abs(integrateRate(s, 0, 10) - expected) / expected < 1e-6);
 });
 
 test('pruneBuffs drops expired entries across all keys', () => {

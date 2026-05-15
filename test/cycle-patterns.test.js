@@ -134,13 +134,14 @@ test('surge_tide: combined first-5-min rate equals 2.5x base', () => {
 test('cold_sky: rateMul buff value is doubled and duration halved at apply time', () => {
   const s = freshState({ amount: 10_000 });
   setActivePattern(s.contactLog, 'cold_sky');
-  installSlot(s, 1, 'espresso', 200); // espresso: rateMul, mult=3, duration=120
+  const u = getUpgrade('espresso'); // rateMul buff; exact mult retunes over time
+  installSlot(s, 1, 'espresso', 200);
   const ok = tryBuy(s, 1, 1000);
   assert.ok(ok.ok);
   assert.equal(s.buffs.rateMul.length, 1);
-  // Strength: 3 * 2 = 6. Duration: 120 * 0.5 = 60.
-  assert.equal(s.buffs.rateMul[0].value, 6);
-  assert.equal(s.buffs.rateMul[0].duration, 60);
+  // cold_sky doubles strength, halves duration at apply time.
+  assert.equal(s.buffs.rateMul[0].value, u.mult * 2);
+  assert.equal(s.buffs.rateMul[0].duration, u.duration * 0.5);
 });
 
 test('patched_frame: free-purchase covers buff cost without spending Echoes', () => {
@@ -198,11 +199,11 @@ test('patched_frame: reroll cost is doubled', () => {
   s.shop.rerollUnlocked = true;
   installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
-  // Without pattern: 2 slots × 3% × 100k = 6000
+  // Without pattern: 2 slots × 1.5% × 100k = 3000
   const baseline = computeRerollCost(s, 0, 2);
-  assert.equal(baseline, 6000);
+  assert.equal(baseline, 3000);
   setActivePattern(s.contactLog, 'patched_frame');
-  assert.equal(computeRerollCost(s, 0, 2), 12_000);
+  assert.equal(computeRerollCost(s, 0, 2), 6_000);
 });
 
 test('bare_wire: base rate halved, gamble luck +5%, durations doubled', () => {
@@ -217,10 +218,11 @@ test('bare_wire: base rate halved, gamble luck +5%, durations doubled', () => {
 });
 
 test('bare_wire: gamble luck bonus tips a coinflip win when forced', () => {
-  // A coin_flip with chance 0.5; force RNG just above 0.5 so the bonus
-  // (which adds 0.05) lifts the player into the win bracket.
+  // coin_flip now sits at chance 0.47 (the band-floor takes a small slice);
+  // force RNG just above 0.47 so the bare_wire +0.05 luck bonus lifts the
+  // player into the win bracket. Effective threshold: 0.52.
   const origRandom = Math.random;
-  Math.random = () => 0.52;
+  Math.random = () => 0.49;
   try {
     const s = freshState({ amount: 1000 });
     setActivePattern(s.contactLog, 'bare_wire');

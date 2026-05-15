@@ -356,6 +356,19 @@ function playSlotFx(el, cls) {
   void el.offsetWidth;
   el.classList.add(cls);
 }
+// On purchase: fly the current card up + out, then run renderShop and fly the
+// new card in from below. The slot DOM is reused, so we gate renderShop on the
+// fx-fly-up class to keep the outgoing content stable mid-animation.
+function flyOutAndReplace(el) {
+  el.classList.remove('fx-content', 'fx-fly-up');
+  void el.offsetWidth;
+  el.classList.add('fx-fly-up');
+  setTimeout(() => {
+    el.classList.remove('fx-fly-up');
+    renderShop();
+    markContentFresh(el);
+  }, 170);
+}
 function markContentFresh(el) {
   el.classList.remove('fx-content');
   void el.offsetWidth;
@@ -368,6 +381,53 @@ function spawnEchoBurn(el) {
   c.addEventListener('animationend', () => c.remove(), { once: true });
   // Safety fallback if animationend doesn't fire (reduced motion hides it).
   setTimeout(() => { if (c.parentNode) c.remove(); }, 600);
+}
+
+// Hail win burst — a wave of carrier returning. The card pulses, a triple-arc
+// glyph blooms outward, twelve ringed dots radiate, the page rim glows once.
+// All DOM, all CSS-keyframed, self-collected under one container so a single
+// remove() tears the whole thing down. Total wall-clock budget: 1.2s.
+const winFxRootId = 'winFxRoot';
+function ensureWinFxRoot() {
+  let r = document.getElementById(winFxRootId);
+  if (!r) {
+    r = document.createElement('div');
+    r.id = winFxRootId;
+    document.body.appendChild(r);
+  }
+  return r;
+}
+function fireWinBurst(slotEl) {
+  const root = ensureWinFxRoot();
+  const burst = document.createElement('div');
+  burst.className = 'win-burst';
+  // Anchor the burst at the centre of the card the player just tapped, so the
+  // wave feels like it came *from* the Hail, not from the page.
+  const rect = slotEl.getBoundingClientRect();
+  burst.style.left = `${rect.left + rect.width / 2}px`;
+  burst.style.top = `${rect.top + rect.height / 2}px`;
+  // Build the parts: a central glyph, three expanding rings, twelve radiating
+  // motes. innerHTML keeps the markup terse — there is no per-element JS.
+  const motes = Array.from({ length: 12 }, (_, i) => {
+    const angle = (i / 12) * 360;
+    return `<span class="wb-mote" style="--a:${angle}deg; --d:${80 + (i % 3) * 30}ms"></span>`;
+  }).join('');
+  burst.innerHTML = `
+    <span class="wb-flash"></span>
+    <i class="wb-glyph ri-broadcast-fill"></i>
+    <span class="wb-ring wb-ring-1"></span>
+    <span class="wb-ring wb-ring-2"></span>
+    <span class="wb-ring wb-ring-3"></span>
+    ${motes}
+  `;
+  root.appendChild(burst);
+  // Card-level kick: a glow halo on the slot itself so the card stays a
+  // present, on-stage object inside the burst.
+  slotEl.classList.add('fx-win-glow');
+  setTimeout(() => slotEl.classList.remove('fx-win-glow'), 900);
+  // Cleanup after the longest sub-animation. setTimeout guards against
+  // animationend not firing under reduced-motion or backgrounded tabs.
+  setTimeout(() => { if (burst.parentNode) burst.remove(); }, 1300);
 }
 
 // Lightweight toast — used by the stall-help grant. Stacks bottom-right; each
@@ -420,6 +480,9 @@ slotsEl.addEventListener('animationend', (e) => {
   if (e.animationName === 'slot-reject' || e.animationName === 'slot-flash') slot.classList.remove('fx-reject');
   if (e.animationName === 'slot-content-in') {
     slot.classList.remove('fx-content');
+  }
+  if (e.animationName === 'slot-content-out') {
+    slot.classList.remove('fx-fly-up');
   }
 });
 
@@ -488,7 +551,8 @@ function ensureSlotEls() {
       if (target.closest('.slot-info')) { openSlotModal(idx); return; }
       const res = tryBuy(state, idx, nowSeconds());
       if (res.ok) {
-        playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); renderShop(); markContentFresh(el);
+        playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); flyOutAndReplace(el);
+        if (res.result && res.result.won) fireWinBurst(el);
         scheduleFreeRerollCheck();
       } else { playSlotFx(el, 'fx-reject'); }
     };
@@ -523,6 +587,8 @@ function ensureSlotEls() {
       slotsEl.appendChild(el);
     }
     slotEls.push(el);
+    // Fly the brand-new slot in from below on first paint.
+    requestAnimationFrame(() => markContentFresh(el));
   }
   while (slotEls.length > state.shop.slotsUnlocked) {
     const el = slotEls.pop();
@@ -693,6 +759,10 @@ function renderShop() {
     const u = slot ? resolveUpgrade(slot) : null;
     const el = slotEls[i];
     if (!u || !slot) { el.style.display = 'none'; continue; }
+    // While the card is flying up after a purchase, freeze its rendering so the
+    // outgoing content stays put. renderShop fires every 100ms; without this the
+    // mid-animation HUD tick would swap in the new card under the fly-up motion.
+    if (el.classList.contains('fx-fly-up')) continue;
     el.style.display = '';
     const cost = slot.cost;
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
@@ -934,14 +1004,25 @@ function renderMetaBuffs(now) {
 
 function renderResult(now) {
   const r = state.lastResult;
-  if (!r) { resultEl.style.display = 'none'; return; }
+  if (!r) { resultEl.style.display = 'none'; resultEl._fxFiredAt = 0; return; }
+  // Wins linger longer than losses — the win burst itself eats the first
+  // ~1.2s, so the readout needs to be there to be read after the bloom fades.
+  const ttl = r.won ? 3.6 : 2.5;
   const age = now - r.at;
-  if (age > 2.5) { resultEl.style.display = 'none'; return; }
+  if (age > ttl) { resultEl.style.display = 'none'; resultEl._fxFiredAt = 0; return; }
   resultEl.style.display = '';
-  resultEl.style.opacity = String(Math.max(0, 1 - age / 2.5));
+  resultEl.style.opacity = String(Math.max(0, 1 - age / ttl));
   resultEl.className = `result ${r.won ? 'win' : 'lose'}`;
   const sign = r.delta >= 0 ? '+' : '−';
   resultEl.textContent = `${r.won ? 'WIN' : 'LOSS'} ${sign}${formatAbbrev(Math.abs(r.delta))}`;
+  // One-shot pop the moment a fresh win lands. Re-firing on every HUD tick
+  // would lock the element into a permanent loop.
+  if (r.won && resultEl._fxFiredAt !== r.at) {
+    resultEl._fxFiredAt = r.at;
+    resultEl.classList.remove('fx-pop');
+    void resultEl.offsetWidth;
+    resultEl.classList.add('fx-pop');
+  }
 }
 
 const anomalyEl = document.getElementById('anomalyCounter');

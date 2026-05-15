@@ -90,3 +90,18 @@ test('breakdown omits Ascent row when exp is 0', () => {
   const rows = breakdownRate(s, 0);
   assert.equal(rows.find((r) => r.kind === 'exp'), undefined);
 });
+
+test('breakdown surfaces log dampening row above threshold and totals match effectiveRate', () => {
+  const s = makeState({ basePerSecond: 1e15 });
+  const rows = breakdownRate(s, 0);
+  const damp = rows.find((r) => r.label === 'Log dampening');
+  assert.ok(damp, 'dampening row should appear at huge rates');
+  assert.ok(damp.factor < 1, 'dampening factor compresses the running product');
+  assert.equal(lastRow(rows).factor, effectiveRate(s, 0));
+});
+
+test('breakdown omits dampening row below threshold', () => {
+  const s = makeState({ basePerSecond: 1e9 });
+  const rows = breakdownRate(s, 0);
+  assert.equal(rows.find((r) => r.label === 'Log dampening'), undefined);
+});

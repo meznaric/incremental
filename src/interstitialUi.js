@@ -2,6 +2,12 @@ import { INTERSTITIALS, FIRST_CONTACT_ID } from './interstitial.js';
 import { worldFor } from './contactLog.js';
 
 const TYPE_MS_PER_CHAR = 22;
+// Contact-bearing interstitials (first_contact + milestones) auto-progress
+// slower than narrative beats — a new world arriving is something the player
+// should have time to absorb, not blink past. Multiplier on top of the
+// per-step `autoMs`, with a floor so very short waits still get a beat.
+const CONTACT_AUTOMS_MULTIPLIER = 1.9;
+const CONTACT_AUTOMS_FLOOR = 4200;
 
 export function makeInterstitialUi(state, onShown) {
   const root = document.getElementById('interstitial');
@@ -14,8 +20,11 @@ export function makeInterstitialUi(state, onShown) {
   const contactStatusEl = root.querySelector('.it-contact-status');
   const contactFlavorEl = root.querySelector('.it-contact-flavor');
   const contactTagEl = root.querySelector('.it-contact-tag');
+  const prevBtn = root.querySelector('.it-prev');
+  const nextBtn = root.querySelector('.it-next');
+  const closeBtn = root.querySelector('.it-close');
 
-  let active = null;       // { id, def, stepIdx }
+  let active = null;       // { id, def, stepIdx, isContact }
   let typing = null;       // { i, full, raf, doneAt }
   let waitingInput = false;
   let autoTimer = 0;
@@ -102,12 +111,18 @@ export function makeInterstitialUi(state, onShown) {
     }
   }
 
+  function isContactBearing(id) {
+    if (id === FIRST_CONTACT_ID) return true;
+    return !!(state.contactLog && worldFor(state.contactLog, id));
+  }
+
   function open(id) {
     const def = INTERSTITIALS[id];
     if (!def) return;
-    active = { id, def, stepIdx: 0 };
+    active = { id, def, stepIdx: 0, isContact: isContactBearing(id) };
     applyContactFrame(id);
     applyCustomFrame(def);
+    if (card) card.classList.toggle('it-single', def.steps.length <= 1);
     root.style.display = 'flex';
     root.classList.add('it-guard');
     if (guardTimer) clearTimeout(guardTimer);
@@ -125,6 +140,7 @@ export function makeInterstitialUi(state, onShown) {
     autoTimer = 0;
     if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
     clearCustomFrame();
+    if (card) card.classList.remove('it-single');
     root.classList.remove('it-visible', 'it-guard');
     setTimeout(() => { if (!active) root.style.display = 'none'; }, 180);
     state.messages.shown[id] = true;
@@ -134,9 +150,18 @@ export function makeInterstitialUi(state, onShown) {
     drain();
   }
 
+  function updateNav() {
+    if (!active) return;
+    const n = active.def.steps.length;
+    const i = active.stepIdx;
+    if (prevBtn) prevBtn.disabled = i <= 0;
+    if (nextBtn) nextBtn.disabled = i >= n - 1;
+  }
+
   function showStep() {
     const step = active.def.steps[active.stepIdx];
     renderDots();
+    updateNav();
     waitingInput = false;
     autoTimer = 0;
     hintEl.style.opacity = '0';
@@ -160,9 +185,31 @@ export function makeInterstitialUi(state, onShown) {
 
   function advance() {
     if (!active) return;
+    if (active.stepIdx >= active.def.steps.length - 1) {
+      // Last step: dismiss only on explicit input (tap / space / enter / close
+      // button). Never auto-dismiss.
+      close();
+      return;
+    }
     active.stepIdx++;
-    if (active.stepIdx >= active.def.steps.length) close();
-    else showStep();
+    showStep();
+  }
+
+  function goPrev() {
+    if (!active) return;
+    if (active.stepIdx <= 0) return;
+    active.stepIdx--;
+    showStep();
+  }
+
+  function goNext() {
+    if (!active) return;
+    // Don't let the side button close the card — only the tap-to-continue /
+    // close button can do that. This way the player who hits next on the
+    // final step still has a chance to re-read before committing to dismiss.
+    if (active.stepIdx >= active.def.steps.length - 1) return;
+    active.stepIdx++;
+    showStep();
   }
 
   function tick(dtMs) {
@@ -175,8 +222,18 @@ export function makeInterstitialUi(state, onShown) {
         typing = null;
         textEl.classList.remove('it-typing');
         const step = active.def.steps[active.stepIdx];
-        if (typeof step.autoMs === 'number') autoTimer = step.autoMs;
-        else { waitingInput = true; hintEl.style.opacity = '0.7'; }
+        const isLast = active.stepIdx >= active.def.steps.length - 1;
+        // The final step never auto-dismisses; it always waits for input.
+        // Earlier steps may auto-advance per their `autoMs`. Contact-bearing
+        // beats get a generous multiplier + floor so new-world reveals breathe.
+        if (!isLast && typeof step.autoMs === 'number') {
+          let ms = step.autoMs;
+          if (active.isContact) ms = Math.max(CONTACT_AUTOMS_FLOOR, ms * CONTACT_AUTOMS_MULTIPLIER);
+          autoTimer = ms;
+        } else {
+          waitingInput = true;
+          hintEl.style.opacity = '0.7';
+        }
       }
       return;
     }
@@ -188,6 +245,9 @@ export function makeInterstitialUi(state, onShown) {
 
   function onKey(e) {
     if (!active) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (e.key !== ' ' && e.key !== 'Enter') return;
     e.preventDefault();
     handleInput();
@@ -202,8 +262,15 @@ export function makeInterstitialUi(state, onShown) {
       typing = null;
       textEl.classList.remove('it-typing');
       const step = active.def.steps[active.stepIdx];
-      if (typeof step.autoMs === 'number') autoTimer = step.autoMs;
-      else { waitingInput = true; hintEl.style.opacity = '0.7'; }
+      const isLast = active.stepIdx >= active.def.steps.length - 1;
+      if (!isLast && typeof step.autoMs === 'number') {
+        let ms = step.autoMs;
+        if (active.isContact) ms = Math.max(CONTACT_AUTOMS_FLOOR, ms * CONTACT_AUTOMS_MULTIPLIER);
+        autoTimer = ms;
+      } else {
+        waitingInput = true;
+        hintEl.style.opacity = '0.7';
+      }
       return;
     }
     advance();
@@ -221,10 +288,27 @@ export function makeInterstitialUi(state, onShown) {
   // misfires on iOS when the target re-renders between mousedown and mouseup —
   // the typewriter rewrites `.it-text` ~45×/sec, so any tap that lands during
   // typing risks losing target ancestry. Pointer events resolve on pointerdown.
+  // The nav buttons (prev/next/close) record their action on pointerdown via
+  // the `data-it-action` attribute and resolve on pointerup; this matches
+  // the existing pattern and stays reliable on iOS Chrome.
   let tap = null;
+  function actionForTarget(target) {
+    let n = target;
+    while (n && n !== root) {
+      if (n.dataset && n.dataset.itAction) return n.dataset.itAction;
+      n = n.parentNode;
+    }
+    return null;
+  }
   root.addEventListener('pointerdown', (e) => {
     if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    tap = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+      action: actionForTarget(e.target),
+    };
   });
   root.addEventListener('pointermove', (e) => {
     if (!tap || e.pointerId !== tap.id) return;
@@ -240,13 +324,26 @@ export function makeInterstitialUi(state, onShown) {
     // The 400ms input-guard window uses `pointer-events:none` so we shouldn't
     // even receive this — defensive check in case CSS is overridden.
     if (root.classList.contains('it-guard')) return;
+    // Pointerup landed on the same action target as pointerdown? Honour it.
+    const upAction = actionForTarget(e.target);
+    if (s.action && s.action === upAction) {
+      root._tapAt = performance.now();
+      if (s.action === 'prev') goPrev();
+      else if (s.action === 'next') goNext();
+      else if (s.action === 'close') close();
+      return;
+    }
     root._tapAt = performance.now();
     handleInput();
   });
   // Fallback click for environments without PointerEvent and for synthesized
   // a11y/keyboard clicks. Deduped against the pointerup timestamp.
-  root.addEventListener('click', () => {
+  root.addEventListener('click', (e) => {
     if (root._tapAt && performance.now() - root._tapAt < 700) return;
+    const action = actionForTarget(e.target);
+    if (action === 'prev') { goPrev(); return; }
+    if (action === 'next') { goNext(); return; }
+    if (action === 'close') { close(); return; }
     handleInput();
   });
 

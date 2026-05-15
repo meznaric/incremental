@@ -96,8 +96,11 @@ test('save coerces non-finite amounts on load (defense in depth)', () => {
   beforeEach();
   // Manually inject a corrupted save where amount serializes to null
   // (this is what would happen if Infinity/NaN snuck into state.amount).
+  // basePerSecond: 0 so the offline-accrual pass (savedAt → now elapsed)
+  // adds zero regardless of how long the test runner takes. Otherwise this
+  // is racy on slower CI: a few ms × any rate produces a tiny non-zero amount.
   const snap = {
-    amount: null, basePerSecond: 5, flatBonus: 0, permMul: 1,
+    amount: null, basePerSecond: 0, flatBonus: 0, permMul: 1,
     owned: {}, buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
     gambleCd: {}, shop: { slots: [null, null], slotsUnlocked: 2 },
     messages: { shown: {}, queue: [], stats: {} },

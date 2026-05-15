@@ -488,14 +488,17 @@ function ensureSlotEls() {
       if (el._tapAt && performance.now() - el._tapAt < 700) return;
       fireTap(e.target);
     });
-    slotsEl.appendChild(el);
+    if (unlockSlotEl && unlockSlotEl.parentNode === slotsEl) {
+      slotsEl.insertBefore(el, unlockSlotEl);
+    } else {
+      slotsEl.appendChild(el);
+    }
     slotEls.push(el);
   }
   while (slotEls.length > state.shop.slotsUnlocked) {
     const el = slotEls.pop();
     el.remove();
   }
-  if (unlockSlotEl) slotsEl.appendChild(unlockSlotEl); // keep last
 }
 
 // Preview of what kind of upgrade slot N will roll. Mirrors SLOT_FILTERS in

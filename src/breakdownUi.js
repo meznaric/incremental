@@ -2,6 +2,7 @@ import { breakdownRate } from './breakdown.js';
 import { effectiveRate } from './shop.js';
 import { formatAbbrev } from './bignum.js';
 import { nowSeconds } from './save.js';
+import { installTap } from './tap.js';
 
 // Signal Diagnostic — five tabs:
 //   Pulse     — live rate factorisation (the original content)
@@ -237,38 +238,11 @@ export function initBreakdownUi(state) {
     if (timer != null) { clearInterval(timer); timer = null; }
   };
 
-  btn.addEventListener('click', open);
-
-  // Pointer-based delegation for tabs + close. iOS Chrome drops the synthetic
-  // click on tabs sometimes; pointerup resolves on its own target. Click stays
-  // for keyboard/mouse, deduped via a timestamp.
-  function handleModalAction(e) {
-    if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
-    const tab = e.target.closest('.diag-tab');
+  installTap(btn, open);
+  installTap(modal, (_e, target) => {
+    if (target === modal || target.closest('.bm-close')) { close(); return; }
+    const tab = target.closest('.diag-tab');
     if (tab && tab.dataset.tab) setActiveTab(tab.dataset.tab);
-  }
-  let tap = null;
-  modal.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-  });
-  modal.addEventListener('pointermove', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  });
-  modal.addEventListener('pointercancel', (e) => {
-    if (tap && e.pointerId === tap.id) tap = null;
-  });
-  modal.addEventListener('pointerup', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    const s = tap; tap = null;
-    if (s.moved) return;
-    modal._tapAt = performance.now();
-    handleModalAction(e);
-  });
-  modal.addEventListener('click', (e) => {
-    if (modal._tapAt && performance.now() - modal._tapAt < 700) return;
-    handleModalAction(e);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();

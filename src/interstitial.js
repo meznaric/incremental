@@ -110,6 +110,13 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
+  // voice: Anonymous. Italic. One sentence. The second (and last) sting.
+  anomaly_threshold_2: {
+    steps: [
+      { text: 'Speak louder. They are almost ready.', italic: true },
+    ],
+  },
+
   // voice: Kalen. Returned after a long absence.
   offline_returner: {
     repeat: true,
@@ -279,9 +286,13 @@ export function isCycleComplete(state) {
   return nextContactMilestone(state) === null;
 }
 
-// Anonymous-fragment cue: a low-magnitude trigger keyed to player *actions*
-// (hails, mythic rolls, long-haul buys) rather than amount. See checkAnomaly.
-const ANOMALY_AT = 25;
+// Anonymous-fragment cues: low-magnitude triggers keyed to player *actions*
+// (hails, mythic rolls, long-haul buys) rather than amount. Two thresholds —
+// the first lands around Ep 5, the second around Ep 7. See bumpAnomaly.
+const ANOMALY_THRESHOLDS = [
+  { at: 25,  id: 'anomaly_threshold_1' },
+  { at: 100, id: 'anomaly_threshold_2' },
+];
 
 // Offline accrual that earns the soft "you came back" beat.
 const OFFLINE_RETURN_S = 12 * 60 * 60;
@@ -378,27 +389,37 @@ export function checkGamble(state, result) {
 }
 
 // Call after any non-gamble purchase. Used to fire "first relay / first
-// convert" beats, and to bump the anomaly counter on rare events.
-export function checkPurchase(state, kind, rarity) {
+// convert" beats, and to bump the anomaly counter on rare events. Pass the
+// whole upgrade — we read kind, rarity, and (for long-haul buffs) group.
+export function checkPurchase(state, u) {
   const s = state.messages.stats;
-  if (kind === 'permanent') {
+  if (u.kind === 'permanent') {
     s.permanentsBought = (s.permanentsBought || 0) + 1;
     if (s.permanentsBought === 1) enqueue(state, 'first_relay');
-  } else if (kind === 'convert') {
+  } else if (u.kind === 'convert') {
     s.convertsBought = (s.convertsBought || 0) + 1;
     if (s.convertsBought === 1) enqueue(state, 'first_convert');
   }
-  if (rarity === 'mythic') bumpAnomaly(state, 2);
+  if (u.rarity === 'mythic') bumpAnomaly(state, 2);
+  if (u.kind === 'buff' && u.group === 'long') bumpAnomaly(state, 1);
 }
 
-// Bumps the (in-state, in-narrative) anomaly counter and fires a single
-// Anonymous fragment when the threshold is crossed.
+// Bumps the (in-state, in-narrative) anomaly counter and fires the first
+// not-yet-shown Anonymous fragment when its threshold is crossed.
 export function bumpAnomaly(state, by) {
   const s = state.messages.stats;
   s.anomaly = (s.anomaly || 0) + (by || 0);
-  if (s.anomaly >= ANOMALY_AT && !s.anomalyFired) {
-    s.anomalyFired = true;
-    enqueue(state, 'anomaly_threshold_1');
+  s.anomalyFiredIds = s.anomalyFiredIds || [];
+  // Old saves carried a single boolean for threshold_1; promote it.
+  if (s.anomalyFired && !s.anomalyFiredIds.includes('anomaly_threshold_1')) {
+    s.anomalyFiredIds.push('anomaly_threshold_1');
+  }
+  for (const t of ANOMALY_THRESHOLDS) {
+    if (s.anomaly < t.at) break;
+    if (s.anomalyFiredIds.includes(t.id)) continue;
+    s.anomalyFiredIds.push(t.id);
+    enqueue(state, t.id);
+    break; // never stack two stings in one bump
   }
 }
 

@@ -234,7 +234,7 @@ export const UPGRADES = [
   { kind: 'permanent', rarity: 'legendary', _dyn: 'add' },
   { kind: 'permanent', rarity: 'mythic',    _dyn: 'add' },
 
-  // One-shot coin gifts, scaled to current rate. Common/uncommon/rare are
+  // One-shot Echo bleeds, scaled to current rate. Common/uncommon/rare are
   // modest top-ups; legendary is a noticeable jump; mythic is a windfall.
   { kind: 'gift', rarity: 'common',    _dyn: 'gift' },
   { kind: 'gift', rarity: 'uncommon',  _dyn: 'gift' },

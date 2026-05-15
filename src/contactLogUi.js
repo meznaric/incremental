@@ -10,6 +10,7 @@ import {
 import { nextContactMilestone, MILESTONE_THRESHOLDS, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
 import { getPattern } from './cyclePatterns.js';
+import { installTap } from './tap.js';
 
 // The Contact Log is the only player-facing surface for the cycle-close loop.
 // Header strip shows cycle/contacts/memory. The "Close the Cycle" action
@@ -27,6 +28,7 @@ export function initContactLogUi(state, opts = {}) {
   const actionEl = modal.querySelector('.cl-action');
   const listEl = modal.querySelector('.cl-list');
   const legendEl = modal.querySelector('.cl-legend');
+  const namesHeadEl = modal.querySelector('.cl-names-head');
   const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
   const tabEls = Array.from(modal.querySelectorAll('.cl-tab'));
@@ -36,6 +38,10 @@ export function initContactLogUi(state, opts = {}) {
   // Which logged contact (by world id) has its lore panel expanded. Held in
   // closure rather than state — a session-level UI detail, not save data.
   let expandedId = null;
+  // Status lens for the Names tab. 'all' shows every cycle; a specific status
+  // hides cycles that have no matching contact.
+  let statusFilter = 'all';
+  const STATUS_ORDER = ['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'];
 
   function setActiveTab(name) {
     activeTab = name;
@@ -333,15 +339,60 @@ export function initContactLogUi(state, opts = {}) {
     `).join('');
   }
 
+  function statusCounts(worlds) {
+    const counts = { TRIGGERED: 0, COLLAPSED: 0, SHIFTED: 0, MISSING: 0 };
+    for (const w of worlds) if (counts[w.status] != null) counts[w.status]++;
+    return counts;
+  }
+
+  function renderNamesHead() {
+    if (!namesHeadEl) return;
+    const worlds = sortedWorlds(state.contactLog);
+    if (!worlds.length) { namesHeadEl.innerHTML = ''; return; }
+    const counts = statusCounts(worlds);
+    const total = worlds.length;
+    // Summary: total + each present status. Comma-separated rather than
+    // bullets so the line wraps gracefully on narrow phones.
+    const parts = [`<strong>${total}</strong> contact${total === 1 ? '' : 's'}`];
+    for (const s of STATUS_ORDER) {
+      if (counts[s] > 0) parts.push(`<span class="s-${s.toLowerCase()}"><strong>${counts[s]}</strong> ${s.toLowerCase()}</span>`);
+    }
+    // Filter chips: an All chip plus one per present status. Chip for the
+    // current filter gets is-active so the lens is obvious. Tapping the active
+    // chip falls back to All (no second tap needed).
+    const chips = [
+      `<button type="button" class="cl-filter${statusFilter === 'all' ? ' is-active' : ''}" data-act="filter-status" data-status="all">All</button>`,
+    ];
+    for (const s of STATUS_ORDER) {
+      if (counts[s] === 0) continue;
+      const cls = `s-${s.toLowerCase()}`;
+      const on = statusFilter === s ? ' is-active' : '';
+      chips.push(`<button type="button" class="cl-filter ${cls}${on}" data-act="filter-status" data-status="${s}">${s}</button>`);
+    }
+    namesHeadEl.innerHTML = `
+      <div class="cl-summary">${parts.join(' · ')}</div>
+      <div class="cl-filters">${chips.join('')}</div>
+    `;
+  }
+
   function renderList() {
     const log = state.contactLog;
-    const worlds = sortedWorlds(log);
-    if (!worlds.length) {
+    const allWorlds = sortedWorlds(log);
+    if (!allWorlds.length) {
       body.classList.add('is-empty');
       listEl.innerHTML = '';
       return;
     }
     body.classList.remove('is-empty');
+    const worlds = statusFilter === 'all'
+      ? allWorlds
+      : allWorlds.filter((w) => w.status === statusFilter);
+    if (!worlds.length) {
+      // Filter matched nothing in the current log — should be impossible if we
+      // only show chips for present statuses, but be defensive.
+      listEl.innerHTML = `<li class="cl-group"><div class="cl-group-head">No contacts match this lens.</div></li>`;
+      return;
+    }
     // Group by run, newest cycle first. Within a cycle, sortedWorlds already
     // gives newest contact first.
     const groups = new Map();
@@ -428,11 +479,12 @@ export function initContactLogUi(state, opts = {}) {
     renderAction();
     renderEngravings();
     renderLegend();
+    renderNamesHead();
     renderList();
     renderPending();
   }
 
-  const open = () => { armed = false; setActiveTab('cycle'); render(); modal.classList.add('open'); };
+  const open = () => { armed = false; statusFilter = 'all'; setActiveTab('cycle'); render(); modal.classList.add('open'); };
   const close = () => { armed = false; modal.classList.remove('open'); };
 
   // Reflect cycle-complete on the top-right contact-log button so the player
@@ -446,19 +498,14 @@ export function initContactLogUi(state, opts = {}) {
     btn.classList.toggle('is-ready', ready);
   };
 
-  btn.addEventListener('click', open);
+  installTap(btn, open);
 
-  // iOS Chrome occasionally drops the first synthetic `click` on an in-modal
-  // button (the tabs, the close, the engraving CTAs). Pointer events resolve
-  // at pointerdown's target regardless of DOM churn, so we delegate from
-  // pointerup with a movement threshold + click dedup. Click stays as the
-  // keyboard / mouse path.
-  function handleModalAction(e) {
-    if (e.target === modal || e.target.closest('.bm-close')) { close(); return; }
-    const tab = e.target.closest('.cl-tab');
+  function handleModalAction(_e, target) {
+    if (target === modal || target.closest('.bm-close')) { close(); return; }
+    const tab = target.closest('.cl-tab');
     if (tab && tab.dataset.tab) { setActiveTab(tab.dataset.tab); return; }
-    const target = e.target.closest('[data-act]');
-    const act = target?.dataset.act;
+    const t = target.closest('[data-act]');
+    const act = t?.dataset.act;
     if (!act) return;
     if (act === 'arm') { armed = true; renderAction(); return; }
     if (act === 'cancel') { armed = false; renderAction(); return; }
@@ -467,7 +514,7 @@ export function initContactLogUi(state, opts = {}) {
       return;
     }
     if (act === 'buy-engraving') {
-      const id = target.dataset.id;
+      const id = t.dataset.id;
       if (buyEngraving(state.contactLog, id)) {
         if (typeof opts.onBuyEngraving === 'function') opts.onBuyEngraving(id);
         render();
@@ -475,36 +522,21 @@ export function initContactLogUi(state, opts = {}) {
       return;
     }
     if (act === 'toggle-entry') {
-      const id = target.dataset.id;
+      const id = t.dataset.id;
       expandedId = expandedId === id ? null : id;
       renderList();
       return;
     }
+    if (act === 'filter-status') {
+      const next = t.dataset.status || 'all';
+      // Tapping the active chip clears the filter — saves a hop back to All.
+      statusFilter = (statusFilter === next) ? 'all' : next;
+      renderNamesHead();
+      renderList();
+      return;
+    }
   }
-  let tap = null;
-  modal.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-  });
-  modal.addEventListener('pointermove', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  });
-  modal.addEventListener('pointercancel', (e) => {
-    if (tap && e.pointerId === tap.id) tap = null;
-  });
-  modal.addEventListener('pointerup', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    const s = tap; tap = null;
-    if (s.moved) return;
-    modal._tapAt = performance.now();
-    handleModalAction(e);
-  });
-  modal.addEventListener('click', (e) => {
-    // Dedup against the synthetic click that follows a touch pointerup.
-    if (modal._tapAt && performance.now() - modal._tapAt < 700) return;
-    handleModalAction(e);
-  });
+  installTap(modal, handleModalAction);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();
   });

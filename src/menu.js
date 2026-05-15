@@ -1,5 +1,6 @@
 import { clearSave } from './save.js';
 import { clearContactLog } from './contactLog.js';
+import { installTap } from './tap.js';
 
 const PIN = '0011';
 
@@ -32,11 +33,13 @@ export function initMenu() {
     }
   };
 
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
+  installTap(toggle, () => {
     setOpen(!menu.classList.contains('open'));
   });
 
+  // Outside-click closes the menu. The toggle's tap fires on pointerup before
+  // this listener sees the synthetic click, and the click that does bubble has
+  // its target inside #menu (so the contains() check skips it).
   document.addEventListener('click', (e) => {
     if (!menu.classList.contains('open')) return;
     if (!menu.contains(e.target)) setOpen(false);
@@ -46,8 +49,8 @@ export function initMenu() {
     if (e.key === 'Escape' && menu.classList.contains('open')) setOpen(false);
   });
 
-  menu.addEventListener('click', (e) => {
-    const action = e.target.closest('[data-action]')?.dataset.action;
+  installTap(menu, (_e, target) => {
+    const action = target.closest('[data-action]')?.dataset.action;
     if (!action) return;
     if (action === 'open-debug')     setView('pin');
     if (action === 'open-community') setView('community');

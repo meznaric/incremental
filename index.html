@@ -198,6 +198,28 @@
     #contactLogBtn { right: 16px; }
     #diagnosticBtn { right: 64px; }
     #contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
+    /* Anomaly counter — deliberately ugly. Top-right, under the buttons.
+       No background, no border, no glow. Dirty red, low opacity, monospace.
+       The player should be able to ignore it for a long time, then notice. */
+    .anomaly-count {
+      position: fixed;
+      top: 62px;
+      right: 16px;
+      z-index: 49;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 10px;
+      font-weight: 400;
+      color: #8a4a4a;
+      opacity: 0.5;
+      letter-spacing: 0.18em;
+      pointer-events: none;
+      user-select: none;
+      text-align: right;
+    }
+    .anomaly-count:empty { display: none; }
+    @media (max-width: 820px) {
+      .anomaly-count { top: max(54px, calc(env(safe-area-inset-top) + 46px)); right: max(8px, env(safe-area-inset-right)); font-size: 9px; }
+    }
     #contactLogBtn .ri, #diagnosticBtn .ri { line-height: 1; }
     /* Green pulse on the contact-log button once every contact of the
        current EP has been logged. The player is invited to close the cycle; the
@@ -749,6 +771,59 @@
       color: #aab0d0;
       letter-spacing: 0.02em;
     }
+    /* Names-tab head: count summary + status filter chips. Sits between
+       the legend and the cycle-grouped list. Lets Kalen lens the log by
+       outcome instead of just scrolling cycle by cycle. */
+    .cl-names-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+      margin-bottom: 12px;
+    }
+    .cl-names-head:empty { display: none; }
+    .cl-summary {
+      font-size: 11px;
+      color: #aab0d0;
+      letter-spacing: 0.02em;
+      line-height: 1.4;
+    }
+    .cl-summary strong { color: #e8e8f0; font-weight: 600; }
+    .cl-summary .s-triggered { color: #d9803a; }
+    .cl-summary .s-collapsed { color: #d96675; }
+    .cl-summary .s-shifted   { color: #9d8edc; }
+    .cl-summary .s-missing   { color: #6aa3d8; }
+    .cl-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .cl-filter {
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(120, 140, 255, 0.25);
+      background: rgba(20, 20, 40, 0.55);
+      color: #aab0d0;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cl-filter:hover { color: #e8e8f0; border-color: rgba(120, 140, 255, 0.5); }
+    .cl-filter.is-active {
+      color: #e8e8f0;
+      border-color: rgba(212, 154, 85, 0.7);
+      background: rgba(212, 154, 85, 0.12);
+    }
+    .cl-filter.s-triggered.is-active { border-color: rgba(255, 138, 58, 0.7); background: rgba(255, 138, 58, 0.12); color: #ff8a3a; }
+    .cl-filter.s-collapsed.is-active { border-color: rgba(255, 90, 110, 0.7); background: rgba(255, 90, 110, 0.12); color: #ff5a6e; }
+    .cl-filter.s-shifted.is-active   { border-color: rgba(157, 110, 224, 0.7); background: rgba(157, 110, 224, 0.12); color: #9d6ee0; }
+    .cl-filter.s-missing.is-active   { border-color: rgba(78, 168, 255, 0.7); background: rgba(78, 168, 255, 0.12); color: #4ea8ff; }
     .cl-hook {
       font-size: 12px;
       color: #aab0d0;
@@ -1187,8 +1262,8 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* Coin-burn glyph floating up from cost line on purchase */
-    .slot .coin-burn {
+    /* Echo glyph floating up from cost line on purchase */
+    .slot .echo-burn {
       position: absolute;
       left: 50%;
       bottom: 38px;
@@ -1198,9 +1273,9 @@
       line-height: 1;
       pointer-events: none;
       text-shadow: 0 0 8px rgba(212, 154, 85, 0.8);
-      animation: coin-burn 0.5s ease-out forwards;
+      animation: echo-burn 0.5s ease-out forwards;
     }
-    @keyframes coin-burn {
+    @keyframes echo-burn {
       0%   { opacity: 0; transform: translate(-50%, 0) scale(0.7); }
       20%  { opacity: 1; transform: translate(-50%, -8px) scale(1.1); }
       100% { opacity: 0; transform: translate(-50%, -34px) scale(0.9); }
@@ -1220,7 +1295,7 @@
       .slot.fx-content > .meta {
         animation: none;
       }
-      .slot .coin-burn { display: none; }
+      .slot .echo-burn { display: none; }
       @keyframes slot-flash {
         0%, 100% { background: rgba(28, 28, 56, 0.78); }
         50%      { background: rgba(80, 80, 140, 0.85); }
@@ -1363,14 +1438,21 @@
     .buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #ff4ad0; }
     .buff-tile:active { transform: scale(0.97); }
 
-    /* Meta-buff minibar — smaller, dimmer pills than .buff-tile, stacked
-       just above the shop toolbar. Hidden when no metas are active. */
+    /* Meta-buff minibar — smaller, dimmer pills than .buff-tile. Sits just
+       above the buff list (which itself sits in a different fixed position on
+       desktop vs mobile), so we share the same coordinate system as #buffs.
+       Hidden when no metas are active. */
     #metaBuffs {
+      position: fixed;
+      top: 130px;
+      left: 16px;
+      width: 190px;
+      z-index: 5;
       display: none;
       flex-wrap: wrap;
       gap: 4px;
       align-items: center;
-      padding-bottom: 2px;
+      pointer-events: auto;
     }
     .meta-pill {
       display: inline-flex;
@@ -2209,6 +2291,16 @@
       }
       #buffs::-webkit-scrollbar { display: none; }
       #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
+      /* On mobile #buffs is a horizontal strip at the bottom. Place metaBuffs
+         just above it — buff-tile height is 44px + gap, plus a small breath. */
+      #metaBuffs {
+        top: auto;
+        left: 8px;
+        right: 8px;
+        width: auto;
+        bottom: calc(var(--shop-h, 200px) + 60px);
+        justify-content: center;
+      }
       #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
       #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
       #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
@@ -2399,8 +2491,9 @@
     <i class="ri ri-radar-line"></i>
   </button>
 
+  <div id="anomalyCounter" class="anomaly-count" aria-hidden="true"></div>
+
   <div id="shop" class="panel">
-    <div id="metaBuffs"></div>
     <div id="shopToolbar"></div>
     <div id="slotsWrap">
       <button id="slotsLeft" class="slots-nav left hidden" type="button" aria-label="Scroll upgrades left"><i class="ri ri-arrow-left-s-line"></i></button>
@@ -2409,6 +2502,7 @@
     </div>
   </div>
 
+  <div id="metaBuffs"></div>
   <div id="buffs"></div>
 
   <div id="result" class="result"></div>
@@ -2445,6 +2539,7 @@
         </div>
         <div class="cl-panel" data-panel="names" role="tabpanel">
           <div class="cl-legend"></div>
+          <div class="cl-names-head"></div>
           <ul class="cl-list"></ul>
           <div class="cl-empty">The log is empty. The dark is still listening.</div>
           <div class="cl-pending"></div>

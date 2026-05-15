@@ -64,7 +64,7 @@ When `state` shape changes:
 
 All story, world, character, naming, voice, and image references live under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). The mapping from existing mechanics to in-world names is in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — that is the canonical naming source for any new upgrade / buff / gamble / convert.
 
-The codebase has **not yet been lore-renamed**: ids, save key, and many UI strings are still the original casino-flavoured names. That's intentional — the docs are the contract, the rename rolls out in the order listed in [`game-mapping.md`](./docs/lore/game-mapping.md#conversion-order-ifwhen-we-do-the-rename). Don't ship a partial rename that mixes voices.
+The lore rename has rolled out for **display strings**: currency reads as Echoes, and the gamble / buff / permanent-mul / convert tables in `src/upgrades.js` carry their lore names (Stim Patch, Adaptive Filter, Carrier Bleed, etc.). What's intentionally still casino-flavoured: **ids** (`coin_flip`, `mult_starter`, `red_black`) and the **save key** (`incremental.save.v1`). That's by design — ids are stable across the rename, and the save-key migration is the last item in [`game-mapping.md`](./docs/lore/game-mapping.md#conversion-order-ifwhen-we-do-the-rename). When you write copy, use the lore names; when you reference upgrades in code, use the ids.
 
 ### Non-negotiable when writing in-world copy
 

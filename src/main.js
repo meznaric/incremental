@@ -27,6 +27,7 @@ import { showWelcomeBack } from './welcomeBack.js';
 import { initBreakdownUi } from './breakdownUi.js';
 import { hasPendingPatternChoice } from './cyclePatterns.js';
 import { showPatternSelect } from './patternUi.js';
+import { installTap } from './tap.js';
 
 const state = {
   amount: 0,
@@ -86,40 +87,8 @@ const resultEl = document.getElementById('result');
 
 const openBuffModal = () => buffModalEl.classList.add('open');
 const closeBuffModal = () => buffModalEl.classList.remove('open');
-buffsEl.addEventListener('click', (e) => {
-  if (e.target.closest('.buff-info')) openBuffModal();
-});
 
-// Tap-stable delegation for in-modal buttons on iOS Chrome. Pointer events
-// resolve at pointerdown's target regardless of DOM churn; click stays as the
-// keyboard / mouse path, deduped against a timestamp set on pointerup.
-function bindModalTaps(el, handler) {
-  let tap = null;
-  el.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-  });
-  el.addEventListener('pointermove', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  });
-  el.addEventListener('pointercancel', (e) => {
-    if (tap && e.pointerId === tap.id) tap = null;
-  });
-  el.addEventListener('pointerup', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    const s = tap; tap = null;
-    if (s.moved) return;
-    el._tapAt = performance.now();
-    handler(e);
-  });
-  el.addEventListener('click', (e) => {
-    if (el._tapAt && performance.now() - el._tapAt < 700) return;
-    handler(e);
-  });
-}
-
-bindModalTaps(buffModalEl, (e) => {
+installTap(buffModalEl, (e) => {
   if (e.target === buffModalEl || e.target.closest('.bm-close')) closeBuffModal();
 });
 
@@ -127,7 +96,7 @@ const slotModalEl = document.getElementById('slotModal');
 const slotModalTitleEl = document.getElementById('slotModalTitle');
 const slotModalBodyEl = document.getElementById('slotModalBody');
 const closeSlotModal = () => slotModalEl.classList.remove('open');
-bindModalTaps(slotModalEl, (e) => {
+installTap(slotModalEl, (e) => {
   if (e.target === slotModalEl || e.target.closest('.bm-close')) { closeSlotModal(); return; }
   // Cross-link: a buff-kind upgrade card surfaces a "What's a Window?" link
   // that hands the player straight to the four-kind overview. The detail
@@ -392,9 +361,9 @@ function markContentFresh(el) {
   void el.offsetWidth;
   el.classList.add('fx-content');
 }
-function spawnCoinBurn(el) {
+function spawnEchoBurn(el) {
   const c = document.createElement('i');
-  c.className = 'ri-broadcast-fill coin-burn';
+  c.className = 'ri-broadcast-fill echo-burn';
   el.appendChild(c);
   c.addEventListener('animationend', () => c.remove(), { once: true });
   // Safety fallback if animationend doesn't fire (reduced motion hides it).
@@ -466,8 +435,8 @@ function scrollSlotsBy(dir) {
   const step = Math.max(slotsEl.clientWidth * 0.8, 200);
   slotsEl.scrollBy({ left: dir * step, behavior: 'smooth' });
 }
-slotsLeftBtn.addEventListener('click', () => scrollSlotsBy(-1));
-slotsRightBtn.addEventListener('click', () => scrollSlotsBy(1));
+installTap(slotsLeftBtn, () => scrollSlotsBy(-1));
+installTap(slotsRightBtn, () => scrollSlotsBy(1));
 slotsEl.addEventListener('scroll', updateSlotsNav, { passive: true });
 slotsEl.addEventListener('wheel', (e) => {
   const dy = e.deltaY;
@@ -519,7 +488,7 @@ function ensureSlotEls() {
       if (target.closest('.slot-info')) { openSlotModal(idx); return; }
       const res = tryBuy(state, idx, nowSeconds());
       if (res.ok) {
-        playSlotFx(el, 'fx-buy'); spawnCoinBurn(el); renderShop(); markContentFresh(el);
+        playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); renderShop(); markContentFresh(el);
         scheduleFreeRerollCheck();
       } else { playSlotFx(el, 'fx-reject'); }
     };
@@ -689,8 +658,12 @@ function countRerollableForUi() {
   return n;
 }
 
-toolbarEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-act]');
+// Tap-stable: the toolbar buttons (reroll, unlock-pin, unlock-reroll) share
+// the same iOS Chrome failure mode as the upgrade cards — renderShop rewrites
+// their innerHTML every 100ms, and a tap whose pointerdown lands on a child
+// that gets replaced before pointerup drops the synthetic click.
+installTap(toolbarEl, (_e, target) => {
+  const btn = target.closest('[data-act]');
   if (!btn) return;
   const act = btn.dataset.act;
   let res;
@@ -832,7 +805,7 @@ const buffDetailModalEl = document.getElementById('buffDetailModal');
 const buffDetailTitleEl = document.getElementById('buffDetailTitle');
 const buffDetailBodyEl = document.getElementById('buffDetailBody');
 const closeBuffDetailModal = () => buffDetailModalEl.classList.remove('open');
-bindModalTaps(buffDetailModalEl, (e) => {
+installTap(buffDetailModalEl, (e) => {
   if (e.target === buffDetailModalEl || e.target.closest('.bm-close')) { closeBuffDetailModal(); return; }
   if (e.target.closest('[data-act="open-buff-overview"]')) openBuffModal();
 });
@@ -868,8 +841,11 @@ function openBuffDetail(idx) {
   buffDetailModalEl.classList.add('open');
 }
 
-buffsEl.addEventListener('click', (e) => {
-  const tile = e.target.closest('.buff-tile');
+// Tap-stable: buff-tile and buff-info both live inside #buffs and get their
+// innerHTML rewritten by renderBuffs on each 100ms tick.
+installTap(buffsEl, (_e, target) => {
+  if (target.closest('.buff-info')) { openBuffModal(); return; }
+  const tile = target.closest('.buff-tile');
   if (!tile) return;
   const idx = Number(tile.dataset.idx);
   if (Number.isInteger(idx)) openBuffDetail(idx);
@@ -968,6 +944,17 @@ function renderResult(now) {
   resultEl.textContent = `${r.won ? 'WIN' : 'LOSS'} ${sign}${formatAbbrev(Math.abs(r.delta))}`;
 }
 
+const anomalyEl = document.getElementById('anomalyCounter');
+let _anomalyLast = -1;
+function renderAnomaly() {
+  if (!anomalyEl) return;
+  const n = (state.messages && state.messages.stats && state.messages.stats.anomaly) || 0;
+  if (n === _anomalyLast) return;
+  _anomalyLast = n;
+  // Zero-padded 4 digits: visually quiet, escalates without changing layout.
+  anomalyEl.textContent = n > 0 ? String(n).padStart(4, '0') : '';
+}
+
 renderShop();
 
 const interstitialUi = makeInterstitialUi(state, (id) => {
@@ -1021,6 +1008,7 @@ function tick(raf) {
     renderBuffs(t);
     renderMetaBuffs(t);
     renderResult(t);
+    renderAnomaly();
     lastHud = raf;
   }
   if (raf - lastSave > SAVE_INTERVAL_MS) {

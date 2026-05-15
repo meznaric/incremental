@@ -527,11 +527,39 @@ unlockSlotEl.innerHTML = `
   <div class="meta"></div>
   <div class="foot"></div>
 `;
-unlockSlotEl.addEventListener('click', () => {
-  const res = tryUnlockSlot(state, nowSeconds());
-  if (res.ok) { playSlotFx(unlockSlotEl, 'fx-buy'); renderShop(); }
-  else { playSlotFx(unlockSlotEl, 'fx-reject'); }
-});
+// Same pointer-based tap as the regular slots — see ensureSlotEls for the
+// reasoning. Plain click() loses the first tap on iOS when renderShop's
+// 100ms tick rewrites the cost between mousedown and mouseup.
+{
+  let tap = null;
+  const fire = () => {
+    const res = tryUnlockSlot(state, nowSeconds());
+    if (res.ok) { playSlotFx(unlockSlotEl, 'fx-buy'); renderShop(); }
+    else { playSlotFx(unlockSlotEl, 'fx-reject'); }
+  };
+  unlockSlotEl.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  unlockSlotEl.addEventListener('pointermove', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+  });
+  unlockSlotEl.addEventListener('pointercancel', (e) => {
+    if (tap && e.pointerId === tap.id) tap = null;
+  });
+  unlockSlotEl.addEventListener('pointerup', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    const s = tap; tap = null;
+    if (s.moved) return;
+    unlockSlotEl._tapAt = performance.now();
+    fire();
+  });
+  unlockSlotEl.addEventListener('click', () => {
+    if (unlockSlotEl._tapAt && performance.now() - unlockSlotEl._tapAt < 700) return;
+    fire();
+  });
+}
 slotsEl.appendChild(unlockSlotEl);
 
 const SHOP_UNLOCK_AT = 100;

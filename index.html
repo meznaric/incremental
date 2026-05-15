@@ -402,7 +402,7 @@
     .cl-group-list li.contacted { background: rgba(76, 208, 125, 0.04); }
     .cl-stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
       padding: 4px 0 12px;
     }
@@ -428,6 +428,16 @@
     }
     .cl-memory { color: #f5d34a; }
     .cl-mass { color: #4ea8ff; }
+    .cl-stat-hint {
+      font-size: 10px;
+      color: #8a8ac0;
+      line-height: 1.4;
+      margin: 6px 0 0;
+      letter-spacing: 0.01em;
+    }
+    .cl-stat.is-wide {
+      grid-column: 1 / -1;
+    }
     .cl-engravings {
       padding: 10px 0 12px;
       border-bottom: 1px solid rgba(120, 140, 255, 0.12);
@@ -437,7 +447,12 @@
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 0 0 6px;
+      padding: 8px 0 6px;
+      position: sticky;
+      top: 41px;
+      z-index: 1;
+      background: rgba(20, 20, 40, 0.95);
+      backdrop-filter: blur(6px);
     }
     .cl-eng-title {
       font-size: 11px;
@@ -677,6 +692,14 @@
       gap: 2px;
       margin-bottom: 14px;
       border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(20, 20, 40, 0.95);
+      backdrop-filter: blur(6px);
+      margin-left: -16px;
+      margin-right: -16px;
+      padding: 0 16px;
     }
     .cl-tab {
       background: transparent;
@@ -1778,6 +1801,9 @@
       transition: background 0.18s ease, backdrop-filter 0.18s ease;
       z-index: 100;
       cursor: pointer;
+      /* Skip iOS's 300ms tap-delay heuristics and tap-highlight flash. */
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     #interstitial.it-visible {
       background: rgba(6, 6, 14, 0.78);

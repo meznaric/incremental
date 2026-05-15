@@ -186,21 +186,21 @@ export function initContactLogUi(state, opts = {}) {
     const memoryTail = loop > 0
       ? ` · ${shards} shard${shards === 1 ? '' : 's'} + ${loop} loop${loop === 1 ? '' : 's'}`
       : (shards ? ` · ${shards} shard${shards === 1 ? '' : 's'}` : '');
-    // voice: Kalen. First-person ambient. The hints explain what each stat
-    // means in-world — that they survive every cycle close and how each one
-    // is earned. Kept terse so the tile still reads at a glance.
+    // voice: Kalen. First-person ambient. Hints spell out earn rule + spend
+    // rule so a new player knows where each currency comes from. Kept terse
+    // so the tile still reads at a glance.
     statsEl.innerHTML = `
       ${headStat}
       ${secondStat}
       <div class="cl-stat is-wide">
         <div class="cl-stat-label">Echo Memory</div>
         <div class="cl-stat-value cl-memory">+${memoryPct}%${memoryTail}</div>
-        <p class="cl-stat-hint">Every name I've ever logged keeps the carrier warmer. Each shard adds +10% to base Echoes. The names never leave the log.</p>
+        <p class="cl-stat-hint"><strong>One shard per name on the log</strong>, across every cycle. Each shard is +10% to my base Echoes/s — applied before every other multiplier. The names never leave the log; this number only ever climbs.</p>
       </div>
       <div class="cl-stat is-wide">
         <div class="cl-stat-label">Carrier Mass</div>
         <div class="cl-stat-value cl-mass">${mass} kg</div>
-        <p class="cl-stat-hint">Weight the rig pulls down from this cycle's peak. Banked when I close the cycle, spent on Engravings in the Rig tab.</p>
+        <p class="cl-stat-hint"><strong>Banked at cycle close</strong> from this cycle's peak Echo balance. Every 10× higher I push past 1k = +1 kg (100k → 3 kg, 1B → 7 kg, 1T → 10 kg). Spend it on <strong>Engravings</strong> in the Rig tab — those cuts survive every reset.</p>
       </div>
       ${patternRow}
     `;
@@ -241,15 +241,15 @@ export function initContactLogUi(state, opts = {}) {
         </li>
       `;
     }).join('');
-    // voice: Kalen. The hint explains where Mass comes from (each cycle's
-    // peak), what it buys (permanent cuts in the rig), and that they outlast
-    // resets — so the player knows the kg are worth banking, not hoarding.
+    // voice: Kalen. Hint spells out the earn rule (peak Echoes → kg at close)
+    // and the spend rule (kg → permanent rig cuts). Engravings outlast resets;
+    // shop Relays/Decodes don't. Stated plainly so the trade-off is legible.
     engravingsEl.innerHTML = `
       <div class="cl-eng-head-row">
         <div class="cl-eng-title">Carrier Engravings</div>
         <div class="cl-eng-balance">${mass} kg</div>
       </div>
-      <p class="cl-eng-hint">Mass accretes from each cycle's peak when I close it. I cut it into the rig as Engravings — they hold through every reset.</p>
+      <p class="cl-eng-hint">Mass is banked at cycle close: <strong>every 10× past 1k of peak balance = +1 kg</strong>. I spend it here to cut permanent boosts into the rig — Engravings <strong>survive every reset</strong>, unlike the shop's Relays and Decodes.</p>
       <ul class="cl-eng-list">${rows}</ul>
     `;
   }

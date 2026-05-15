@@ -1446,6 +1446,84 @@
       box-sizing: border-box;
     }
     #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open { display: flex; }
+    .diag-tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(20, 20, 40, 0.95);
+      backdrop-filter: blur(6px);
+      margin-left: -16px;
+      margin-right: -16px;
+      padding: 0 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .diag-tabs::-webkit-scrollbar { display: none; }
+    .diag-tab {
+      background: transparent;
+      border: 0;
+      color: #8a8ac0;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 9px 12px 10px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      white-space: nowrap;
+      transition: color 0.12s ease, border-color 0.12s ease;
+    }
+    .diag-tab:hover { color: #d49a55; }
+    .diag-tab.is-active { color: #d49a55; border-bottom-color: #d49a55; }
+    .diag-panel { display: none; }
+    .diag-panel.is-active { display: block; }
+    .faq-block {
+      padding: 11px 13px;
+      margin: 0 0 10px;
+      background: rgba(20, 20, 40, 0.6);
+      border: 1px solid rgba(120, 140, 255, 0.18);
+      border-left: 2px solid rgba(120, 140, 255, 0.45);
+      border-radius: 0 6px 6px 0;
+    }
+    .faq-block.kind-rate     { border-left-color: #ff8a3a; }
+    .faq-block.kind-luck     { border-left-color: #f5d34a; }
+    .faq-block.kind-cushion  { border-left-color: #6aa3d8; }
+    .faq-block.kind-compound { border-left-color: #9d6ee0; }
+    .faq-block.kind-mass     { border-left-color: #d49a55; }
+    .faq-block.kind-memory   { border-left-color: #4cd07d; }
+    .faq-block.kind-hail     { border-left-color: #ff5a6e; }
+    .faq-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e8e8f0;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    .faq-head .ri { font-size: 16px; color: #aab0d0; }
+    .faq-body {
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #c0c0d8;
+    }
+    .faq-body p { margin: 0 0 6px; }
+    .faq-body p:last-child { margin-bottom: 0; }
+    .faq-body strong { color: #e8e8f0; font-weight: 600; }
+    .faq-foot {
+      font-size: 11px;
+      color: #7a7a9a;
+      line-height: 1.5;
+      margin-top: 8px;
+      padding: 0 2px;
+    }
     .diag-intro, .diag-foot {
       font-size: 11px;
       color: #aab0d0;
@@ -1524,6 +1602,45 @@
       color: #c0c0d8;
       margin: 0 0 12px;
     }
+    .slot-modal-explain {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #8b91b5;
+      margin: 0 0 14px;
+      padding: 9px 11px;
+      border-left: 2px solid rgba(120, 140, 255, 0.35);
+      background: rgba(120, 140, 255, 0.05);
+      border-radius: 0 4px 4px 0;
+    }
+    .bm-intro {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #8b91b5;
+      margin: 0 0 14px;
+      padding: 9px 11px;
+      border-left: 2px solid rgba(120, 140, 255, 0.35);
+      background: rgba(120, 140, 255, 0.05);
+      border-radius: 0 4px 4px 0;
+    }
+    .bm-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 14px;
+      padding: 8px 12px;
+      background: rgba(120, 140, 255, 0.08);
+      border: 1px solid rgba(120, 140, 255, 0.25);
+      color: #8aa0ff;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    .bm-link:hover { background: rgba(120, 140, 255, 0.16); border-color: rgba(120, 140, 255, 0.4); color: #c0d0ff; }
+    .bm-link .ri { font-size: 14px; }
     .slot-modal-row {
       display: flex;
       justify-content: space-between;
@@ -2319,7 +2436,20 @@
         <span class="bm-title">Signal Diagnostic</span>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
-      <div class="bm-body diag-body"></div>
+      <div class="bm-body diag-body">
+        <div class="diag-tabs" role="tablist">
+          <button type="button" class="diag-tab is-active" data-tab="pulse" role="tab" aria-selected="true">Pulse</button>
+          <button type="button" class="diag-tab" data-tab="windows" role="tab" aria-selected="false">Windows</button>
+          <button type="button" class="diag-tab" data-tab="hail" role="tab" aria-selected="false">Hail</button>
+          <button type="button" class="diag-tab" data-tab="persist" role="tab" aria-selected="false">Names &amp; Mass</button>
+          <button type="button" class="diag-tab" data-tab="glossary" role="tab" aria-selected="false">Glossary</button>
+        </div>
+        <div class="diag-panel is-active" data-panel="pulse" role="tabpanel"></div>
+        <div class="diag-panel" data-panel="windows" role="tabpanel"></div>
+        <div class="diag-panel" data-panel="hail" role="tabpanel"></div>
+        <div class="diag-panel" data-panel="persist" role="tabpanel"></div>
+        <div class="diag-panel" data-panel="glossary" role="tabpanel"></div>
+      </div>
     </div>
   </div>
 
@@ -2330,21 +2460,22 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body">
+        <p class="bm-intro">All four kinds come from Window upgrades in the shop. Bought ones spawn on purchase; some also drop from Hail wins. They run their full duration in real time.</p>
         <section class="bm-section kind-rate">
           <div class="bm-section-head"><i class="ri ri-flashlight-fill"></i><span class="bm-section-name">Carrier</span></div>
-          <p class="bm-section-desc">Multiplies Echo production by the shown value while the window holds. Carriers stack multiplicatively — two ×3 windows give ×9.</p>
+          <p class="bm-section-desc">Multiplies Echo production by the shown value. Stacks multiplicatively — two ×3 Carriers give ×9. The big short bursts and the long quiet ones share this slot.</p>
         </section>
         <section class="bm-section kind-luck">
           <div class="bm-section-head"><i class="ri ri-sparkling-2-fill"></i><span class="bm-section-name">Carry</span></div>
-          <p class="bm-section-desc">Adds the shown percent to hail carry-chance. Stacks additively across active Carry windows. A 1% hail becomes 11% under a +10% Carry window.</p>
+          <p class="bm-section-desc">Adds the shown % to Hail win-chance. Stacks additively. A 1% Hail under a +10% Carry window pays at 11%. Pair with a Hail wager you've been hoarding for.</p>
         </section>
         <section class="bm-section kind-cushion">
           <div class="bm-section-head"><i class="ri ri-shield-fill"></i><span class="bm-section-name">Buffer</span></div>
-          <p class="bm-section-desc">Returns the shown percent of a failed wager. Stacks additively across active Buffers, capped at 100% (full return on miss).</p>
+          <p class="bm-section-desc">Returns the shown % of a failed Hail wager. Stacks additively, capped at 100% (full refund on a miss). Buy one before you fire a big Hail.</p>
         </section>
         <section class="bm-section kind-compound">
           <div class="bm-section-head"><i class="ri ri-stack-fill"></i><span class="bm-section-name">Resonance</span></div>
-          <p class="bm-section-desc">The carrier finds itself. Your multiplier compounds continuously from ×1 while the window holds — the shown value is the current state. Let it run.</p>
+          <p class="bm-section-desc">A multiplier that climbs from ×1 every second while it holds. The shown value is the current state. Let it run untouched — the late seconds are where the big numbers are.</p>
         </section>
       </div>
     </div>

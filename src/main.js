@@ -98,8 +98,32 @@ const slotModalTitleEl = document.getElementById('slotModalTitle');
 const slotModalBodyEl = document.getElementById('slotModalBody');
 const closeSlotModal = () => slotModalEl.classList.remove('open');
 slotModalEl.addEventListener('click', (e) => {
-  if (e.target === slotModalEl || e.target.closest('.bm-close')) closeSlotModal();
+  if (e.target === slotModalEl || e.target.closest('.bm-close')) { closeSlotModal(); return; }
+  // Cross-link: a buff-kind upgrade card surfaces a "What's a Window?" link
+  // that hands the player straight to the four-kind overview. The detail
+  // modal stays open behind so they can return.
+  if (e.target.closest('[data-act="open-buff-overview"]')) openBuffModal();
 });
+// Bridge between lore labels and mechanics. Surfaces inside the per-upgrade
+// modal under the description so a player meeting "Hail" for the first time
+// learns the wager / payout / cushion loop without leaving the card.
+const KIND_EXPLAIN = {
+  gamble:
+    'Hail = wager. Spend the listed % of your balance for a roll. Win → you get back Return × wager. Miss → wager lost (active Buffer windows refund part of it). Each Hail has its own cooldown after a roll.',
+  buff:
+    'Window = timed boost. Stacks while it holds. Multiple Carrier windows multiply (×3 × ×3 = ×9). Multiple Carry windows add. The duration runs in real time, even when the tab is hidden.',
+  convert:
+    'Seed Relay = permanent base-rate bribe. Burns the listed % of balance and folds it into your base Echoes/s for the rest of this cycle. Lost on cycle close.',
+  gift:
+    'Bleed = a one-shot Echo payout. Adds the listed Echoes to your balance. No ongoing effect.',
+};
+function permExplain(u) {
+  if (u.permType === 'mul') {
+    return 'Decode = permanent rate multiplier. Stacks multiplicatively with every other Decode. Lost on cycle close — buy Engravings (Rig tab) for cross-cycle multipliers.';
+  }
+  return 'Relay = permanent base-rate add. Stacks additively. Lost on cycle close — Echo Memory (Names tab) is the cross-cycle base bonus.';
+}
+
 function openSlotModal(idx) {
   const slot = state.shop.slots[idx];
   const u = slot ? resolveUpgrade(slot) : null;
@@ -138,10 +162,16 @@ function openSlotModal(idx) {
   } else if (u.kind === 'gift') {
     rows.push(`<div class="slot-modal-row"><span>Returns</span><span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`);
   }
+  const explain = u.kind === 'permanent' ? permExplain(u) : (KIND_EXPLAIN[u.kind] || '');
+  const crossLink = u.kind === 'buff'
+    ? `<button type="button" class="bm-link" data-act="open-buff-overview">View all four Window kinds <i class="ri ri-arrow-right-s-line"></i></button>`
+    : '';
   slotModalBodyEl.innerHTML = `
     <span class="slot-modal-tag rarity-${u.rarity}">${u.rarity} · ${kindLabel(u)}</span>
     <p class="slot-modal-desc">${u.desc}</p>
+    ${explain ? `<p class="slot-modal-explain">${explain}</p>` : ''}
     ${rows.join('')}
+    ${crossLink}
   `;
   slotModalEl.classList.add('open');
 }
@@ -737,14 +767,15 @@ const BUFF_ICONS = {
   compound: 'ri-stack-fill',
 };
 
-// Kind → category copy reused by the per-buff detail modal. Voice: Narrator —
-// observational, no second-person commentary. Mirrors the static blurbs in
-// #buffModal so the collapsed-tile tap surfaces the same answers.
+// Kind → category copy reused by the per-buff detail modal. Mirrors the
+// #buffModal blurbs but tightened for the single-effect view — the "How"
+// line bridges the lore label to the mechanic so a player meeting an
+// effect for the first time knows what to do with it.
 const BUFF_KIND_DESC = {
-  rate:     'A carrier window. Production multiplies for the duration.',
-  luck:     'A carry window. Hail chance lifts for the duration.',
-  cushion:  'A buffer window. A fraction of a failed wager returns.',
-  compound: 'A resonance window. The multiplier compounds while it holds.',
+  rate:     'A Carrier window. Production multiplies for the duration. Multiple Carriers stack multiplicatively (×3 × ×3 = ×9).',
+  luck:     'A Carry window. Adds % to Hail win-chance for the duration. Stacks additively with other Carries.',
+  cushion:  'A Buffer window. Returns % of a failed Hail wager. Stacks additively with other Buffers, capped at 100%.',
+  compound: 'A Resonance window. Your multiplier climbs from ×1 every second it holds. The shown value is the current state.',
 };
 
 // Named provenance for distinctive buffs minted outside the upgrade-purchase
@@ -772,7 +803,8 @@ const buffDetailTitleEl = document.getElementById('buffDetailTitle');
 const buffDetailBodyEl = document.getElementById('buffDetailBody');
 const closeBuffDetailModal = () => buffDetailModalEl.classList.remove('open');
 buffDetailModalEl.addEventListener('click', (e) => {
-  if (e.target === buffDetailModalEl || e.target.closest('.bm-close')) closeBuffDetailModal();
+  if (e.target === buffDetailModalEl || e.target.closest('.bm-close')) { closeBuffDetailModal(); return; }
+  if (e.target.closest('[data-act="open-buff-overview"]')) openBuffModal();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && buffDetailModalEl.classList.contains('open')) closeBuffDetailModal();
@@ -801,6 +833,7 @@ function openBuffDetail(idx) {
       <div class="slot-modal-row"><span>Duration</span><span>${fmtDuration(dur)}</span></div>
       <div class="buff-bar" style="margin-top:10px;"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
     </section>
+    <button type="button" class="bm-link" data-act="open-buff-overview">Compare all four Window kinds <i class="ri ri-arrow-right-s-line"></i></button>
   `;
   buffDetailModalEl.classList.add('open');
 }

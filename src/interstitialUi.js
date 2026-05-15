@@ -216,7 +216,39 @@ export function makeInterstitialUi(state, onShown) {
   }
 
   window.addEventListener('keydown', onKey);
-  root.addEventListener('click', handleInput);
+
+  // Pointer-based tap, same pattern as slot cards in main.js. Plain `click`
+  // misfires on iOS when the target re-renders between mousedown and mouseup —
+  // the typewriter rewrites `.it-text` ~45×/sec, so any tap that lands during
+  // typing risks losing target ancestry. Pointer events resolve on pointerdown.
+  let tap = null;
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  root.addEventListener('pointermove', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
+  });
+  root.addEventListener('pointercancel', (e) => {
+    if (tap && e.pointerId === tap.id) tap = null;
+  });
+  root.addEventListener('pointerup', (e) => {
+    if (!tap || e.pointerId !== tap.id) return;
+    const s = tap; tap = null;
+    if (s.moved) return;
+    // The 400ms input-guard window uses `pointer-events:none` so we shouldn't
+    // even receive this — defensive check in case CSS is overridden.
+    if (root.classList.contains('it-guard')) return;
+    root._tapAt = performance.now();
+    handleInput();
+  });
+  // Fallback click for environments without PointerEvent and for synthesized
+  // a11y/keyboard clicks. Deduped against the pointerup timestamp.
+  root.addEventListener('click', () => {
+    if (root._tapAt && performance.now() - root._tapAt < 700) return;
+    handleInput();
+  });
 
   return { tick, drain };
 }

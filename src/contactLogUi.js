@@ -157,7 +157,7 @@ export function initContactLogUi(state, opts = {}) {
     const mass = getMass(log);
     const pat = getPattern(log && log.pattern);
     const patternRow = pat ? `
-      <div class="cl-stat">
+      <div class="cl-stat is-wide">
         <div class="cl-stat-label">Pattern</div>
         <div class="cl-stat-value">${pat.name}</div>
       </div>
@@ -186,16 +186,21 @@ export function initContactLogUi(state, opts = {}) {
     const memoryTail = loop > 0
       ? ` · ${shards} shard${shards === 1 ? '' : 's'} + ${loop} loop${loop === 1 ? '' : 's'}`
       : (shards ? ` · ${shards} shard${shards === 1 ? '' : 's'}` : '');
+    // voice: Kalen. First-person ambient. The hints explain what each stat
+    // means in-world — that they survive every cycle close and how each one
+    // is earned. Kept terse so the tile still reads at a glance.
     statsEl.innerHTML = `
       ${headStat}
       ${secondStat}
-      <div class="cl-stat">
+      <div class="cl-stat is-wide">
         <div class="cl-stat-label">Echo Memory</div>
         <div class="cl-stat-value cl-memory">+${memoryPct}%${memoryTail}</div>
+        <p class="cl-stat-hint">Every name I've ever logged keeps the carrier warmer. Each shard adds +10% to base Echoes. The names never leave the log.</p>
       </div>
-      <div class="cl-stat">
+      <div class="cl-stat is-wide">
         <div class="cl-stat-label">Carrier Mass</div>
         <div class="cl-stat-value cl-mass">${mass} kg</div>
+        <p class="cl-stat-hint">Weight the rig pulls down from this cycle's peak. Banked when I close the cycle, spent on Engravings in the Rig tab.</p>
       </div>
       ${patternRow}
     `;
@@ -236,12 +241,15 @@ export function initContactLogUi(state, opts = {}) {
         </li>
       `;
     }).join('');
+    // voice: Kalen. The hint explains where Mass comes from (each cycle's
+    // peak), what it buys (permanent cuts in the rig), and that they outlast
+    // resets — so the player knows the kg are worth banking, not hoarding.
     engravingsEl.innerHTML = `
       <div class="cl-eng-head-row">
         <div class="cl-eng-title">Carrier Engravings</div>
         <div class="cl-eng-balance">${mass} kg</div>
       </div>
-      <p class="cl-eng-hint">Cuts in the rig that survive every reset. Bought with Carrier Mass.</p>
+      <p class="cl-eng-hint">Mass accretes from each cycle's peak when I close it. I cut it into the rig as Engravings — they hold through every reset.</p>
       <ul class="cl-eng-list">${rows}</ul>
     `;
   }

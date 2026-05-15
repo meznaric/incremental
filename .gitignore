@@ -7,4 +7,7 @@ dist/
 .env
 .env.local
 .playwright-mcp/
-/initial-load.png
+/*.png
+docs/lore/scripts/__pycache__/
+.claude/scheduled_tasks.lock
+.claude/worktrees/

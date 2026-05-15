@@ -7,7 +7,7 @@ import {
   makeShopState, effectiveRate, integrateRate, tryBuy, validateSlate,
   tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
-  marginalRateForPurchase,
+  marginalRateForPurchase, effectiveGambleChance,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
 } from './shop.js';
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
@@ -28,6 +28,7 @@ import { initBreakdownUi } from './breakdownUi.js';
 import { hasPendingPatternChoice } from './cyclePatterns.js';
 import { showPatternSelect } from './patternUi.js';
 import { installTap } from './tap.js';
+import { fireGambleResult } from './gambleFx.js';
 
 const state = {
   amount: 0,
@@ -132,8 +133,9 @@ function openSlotModal(idx) {
   const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${ECHO_ICON}${formatAbbrev(slot.cost)}</span>`;
   const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${costCell}</span></div>`];
   if (u.kind === 'gamble') {
+    const effChance = effectiveGambleChance(state, u, nowSeconds());
     rows.push(
-      `<div class="slot-modal-row"><span>Carry chance</span><span>${fmtPct(u.chance)}</span></div>`,
+      `<div class="slot-modal-row"><span>Carry chance</span><span>${fmtPct(effChance)}</span></div>`,
       `<div class="slot-modal-row"><span>Return</span><span>${u.payout}× wager</span></div>`,
       `<div class="slot-modal-row"><span>Cooldown</span><span>${u.cooldown}s</span></div>`,
     );
@@ -534,14 +536,7 @@ function ensureSlotEls() {
         <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
       </div>
     `;
-    // Use pointerdown/pointerup with a movement threshold instead of `click`.
-    // Why: on iOS, `renderShop` rewrites `.outcomes` innerHTML every 100ms,
-    // and if a tap lands on that child between mousedown/mouseup the
-    // synthesized click is silently dropped (target ancestry changed).
-    // Pointer events resolve at pointerdown's target, immune to DOM churn,
-    // and also sidestep iOS's sticky-:hover delay.
-    let tap = null;
-    const fireTap = (target) => {
+    installTap(el, (_e, target) => {
       const idx = slotEls.indexOf(el);
       if (target.closest('.pin')) {
         const r = tryTogglePin(state, idx);
@@ -551,35 +546,34 @@ function ensureSlotEls() {
       if (target.closest('.slot-info')) { openSlotModal(idx); return; }
       const res = tryBuy(state, idx, nowSeconds());
       if (res.ok) {
-        playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); flyOutAndReplace(el);
-        if (res.result && res.result.won) fireWinBurst(el);
+        // Gambles get the dramatic centred reveal flow — gravity pull, hold,
+        // then a WIN/LOSS banner with a green burst or a quiet fall. The
+        // ordinary fly-up/fly-in card swap is replaced by an onMid callback
+        // that triggers renderShop midway through the burst so the new card
+        // appears while the banner is the focal point. Non-gamble purchases
+        // keep the existing per-card fly-up animation.
+        if (res.result) {
+          // Skip the local fx-buy scale-pulse and echo-glyph float — both
+          // would scribble over the inline transforms the gravity pull
+          // applies to this card. The centred banner is the feedback.
+          const won = !!res.result.won;
+          const deltaText = formatAbbrev(Math.abs(res.result.delta || 0));
+          fireGambleResult({
+            slotsEl,
+            tappedEl: el,
+            won,
+            deltaText,
+            onMid: () => { renderShop(); markContentFresh(el); },
+          });
+          // Keep the card-anchored ring burst as a secondary flourish on
+          // wins — it blooms around the tapped card while the central
+          // banner pops, composing rather than competing.
+          if (won) fireWinBurst(el);
+        } else {
+          playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); flyOutAndReplace(el);
+        }
         scheduleFreeRerollCheck();
       } else { playSlotFx(el, 'fx-reject'); }
-    };
-    el.addEventListener('pointerdown', (e) => {
-      if (e.button !== undefined && e.button !== 0) return;
-      tap = { id: e.pointerId, target: e.target, x: e.clientX, y: e.clientY, moved: false };
-    });
-    el.addEventListener('pointermove', (e) => {
-      if (!tap || e.pointerId !== tap.id) return;
-      if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-    });
-    el.addEventListener('pointercancel', (e) => {
-      if (tap && e.pointerId === tap.id) tap = null;
-    });
-    el.addEventListener('pointerup', (e) => {
-      if (!tap || e.pointerId !== tap.id) return;
-      const s = tap; tap = null;
-      if (s.moved) return;
-      // Suppress the synthetic click that follows on touch — we already acted.
-      el._tapAt = performance.now();
-      fireTap(s.target);
-    });
-    // Fallback click for environments without PointerEvent (and to keep
-    // keyboard / a11y simulated clicks working). Deduped against pointerup.
-    el.addEventListener('click', (e) => {
-      if (el._tapAt && performance.now() - el._tapAt < 700) return;
-      fireTap(e.target);
     });
     if (unlockSlotEl && unlockSlotEl.parentNode === slotsEl) {
       slotsEl.insertBefore(el, unlockSlotEl);
@@ -622,39 +616,11 @@ unlockSlotEl.innerHTML = `
   <div class="meta"></div>
   <div class="foot"></div>
 `;
-// Same pointer-based tap as the regular slots — see ensureSlotEls for the
-// reasoning. Plain click() loses the first tap on iOS when renderShop's
-// 100ms tick rewrites the cost between mousedown and mouseup.
-{
-  let tap = null;
-  const fire = () => {
-    const res = tryUnlockSlot(state, nowSeconds());
-    if (res.ok) { playSlotFx(unlockSlotEl, 'fx-buy'); renderShop(); }
-    else { playSlotFx(unlockSlotEl, 'fx-reject'); }
-  };
-  unlockSlotEl.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-  });
-  unlockSlotEl.addEventListener('pointermove', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  });
-  unlockSlotEl.addEventListener('pointercancel', (e) => {
-    if (tap && e.pointerId === tap.id) tap = null;
-  });
-  unlockSlotEl.addEventListener('pointerup', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    const s = tap; tap = null;
-    if (s.moved) return;
-    unlockSlotEl._tapAt = performance.now();
-    fire();
-  });
-  unlockSlotEl.addEventListener('click', () => {
-    if (unlockSlotEl._tapAt && performance.now() - unlockSlotEl._tapAt < 700) return;
-    fire();
-  });
-}
+installTap(unlockSlotEl, () => {
+  const res = tryUnlockSlot(state, nowSeconds());
+  if (res.ok) { playSlotFx(unlockSlotEl, 'fx-buy'); renderShop(); }
+  else { playSlotFx(unlockSlotEl, 'fx-reject'); }
+});
 slotsEl.appendChild(unlockSlotEl);
 
 const SHOP_UNLOCK_AT = 100;
@@ -787,8 +753,11 @@ function renderShop() {
     let outcomes = '';
     if (u.kind === 'gamble') {
       const winNet = cost * (u.payout - 1);
-      const winPct = fmtPct(u.chance);
-      const losePct = fmtPct(1 - u.chance);
+      // Effective chance: base + active Carry windows + pattern luck bonus, clamped at CAP.
+      // This is the same number tryBuy rolls against, so what the player reads is reality.
+      const effChance = effectiveGambleChance(state, u, now);
+      const winPct = fmtPct(effChance);
+      const losePct = fmtPct(1 - effChance);
       outcomes =
         `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
         `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;

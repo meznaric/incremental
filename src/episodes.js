@@ -8,8 +8,10 @@
 // season). The voice for each beat is named in the comment above the steps.
 //
 // Step shape — same as the static INTERSTITIALS table in interstitial.js:
-//   { text, autoMs?, italic? }
-// autoMs auto-advances after typewriter + delay; absence waits for input.
+//   { text, italic? }
+// Non-final steps auto-advance after typewriter + a text-length-derived dwell
+// (see DWELL_* in interstitialUi.js). Final step always waits for user input.
+// Legacy `autoMs` fields are kept for historical reference but ignored.
 
 export const EP_INTERSTITIALS = {
   // ──────────────────────────────────────────────────────────────────────

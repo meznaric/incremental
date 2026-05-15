@@ -7,6 +7,7 @@
 //
 // voice: Sera. Procedural, second person. Periods always.
 import { formatAbbrev } from './bignum.js';
+import { installTap } from './tap.js';
 
 // Below this and we don't bother — anything shorter reads as a page refresh,
 // not a return.
@@ -155,11 +156,6 @@ export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }
     setTimeout(() => {
       root.style.display = 'none';
       numberEl.classList.remove('wb-number-settled');
-      collectBtn.removeEventListener('pointerdown', onBtnPointerDown);
-      collectBtn.removeEventListener('pointermove', onBtnPointerMove);
-      collectBtn.removeEventListener('pointercancel', onBtnPointerCancel);
-      collectBtn.removeEventListener('pointerup', onBtnPointerUp);
-      collectBtn.removeEventListener('click', onBtnClick);
       root.removeEventListener('click', onBackdrop);
       window.removeEventListener('keydown', onKey);
       onDismiss && onDismiss();
@@ -177,41 +173,13 @@ export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }
     }
   }
 
-  // pointerup resolves before iOS Chrome's synthesized click, which can drop
-  // taps on a button whose ancestor is re-rendering (the .wb-number animates
-  // every frame). Track pointerdown→pointerup with a small move tolerance so a
-  // scroll-drag doesn't fire dismiss. Click stays as a fallback for keyboard /
-  // a11y synthesis and is deduped against the pointerup timestamp.
-  let lastPointerAt = 0;
-  let tap = null;
-  function onBtnPointerDown(e) {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  // Bind installTap once; route taps through a per-invocation closure ref so
+  // re-shows of the modal hit their own dismiss().
+  collectBtn._wbDismiss = dismiss;
+  if (!collectBtn._wbTapBound) {
+    collectBtn._wbTapBound = true;
+    installTap(collectBtn, () => { collectBtn._wbDismiss && collectBtn._wbDismiss(); });
   }
-  function onBtnPointerMove(e) {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  }
-  function onBtnPointerCancel(e) {
-    if (tap && e.pointerId === tap.id) tap = null;
-  }
-  function onBtnPointerUp(e) {
-    if (!tap || e.pointerId !== tap.id) return;
-    const t = tap; tap = null;
-    if (t.moved) return;
-    lastPointerAt = performance.now();
-    dismiss();
-  }
-  function onBtnClick() {
-    if (lastPointerAt && performance.now() - lastPointerAt < 700) return;
-    dismiss();
-  }
-
-  collectBtn.addEventListener('pointerdown', onBtnPointerDown);
-  collectBtn.addEventListener('pointermove', onBtnPointerMove);
-  collectBtn.addEventListener('pointercancel', onBtnPointerCancel);
-  collectBtn.addEventListener('pointerup', onBtnPointerUp);
-  collectBtn.addEventListener('click', onBtnClick);
   root.addEventListener('click', onBackdrop);
   window.addEventListener('keydown', onKey);
 

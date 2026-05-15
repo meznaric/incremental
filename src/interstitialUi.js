@@ -1,13 +1,22 @@
 import { INTERSTITIALS, FIRST_CONTACT_ID } from './interstitial.js';
 import { worldFor } from './contactLog.js';
+import { installTap } from './tap.js';
 
 const TYPE_MS_PER_CHAR = 22;
-// Contact-bearing interstitials (first_contact + milestones) auto-progress
-// slower than narrative beats — a new world arriving is something the player
-// should have time to absorb, not blink past. Multiplier on top of the
-// per-step `autoMs`, with a floor so very short waits still get a beat.
-const CONTACT_AUTOMS_MULTIPLIER = 1.9;
-const CONTACT_AUTOMS_FLOOR = 4200;
+// Text-driven dwell: auto-advance time for a non-final step is computed from
+// the visible word count, so a 1-word line doesn't get the same reserve as a
+// 12-word monologue. Formula: 1.4s base + ~0.48s/word, floored at 2.2s. This
+// runs AFTER the typewriter completes (typewriter time is not folded in), so
+// total time-on-screen for a step is roughly typewriter + dwell.
+const DWELL_PER_WORD_MS = 480;
+const DWELL_BASE_MS = 1400;
+const DWELL_FLOOR_MS = 2200;
+function dwellForText(text) {
+  const t = (text || '').trim();
+  if (!t) return DWELL_FLOOR_MS;
+  const words = t.split(/\s+/).length;
+  return Math.max(DWELL_FLOOR_MS, words * DWELL_PER_WORD_MS + DWELL_BASE_MS);
+}
 
 export function makeInterstitialUi(state, onShown) {
   const root = document.getElementById('interstitial');
@@ -22,7 +31,6 @@ export function makeInterstitialUi(state, onShown) {
   const contactTagEl = root.querySelector('.it-contact-tag');
   const prevBtn = root.querySelector('.it-prev');
   const nextBtn = root.querySelector('.it-next');
-  const closeBtn = root.querySelector('.it-close');
 
   let active = null;       // { id, def, stepIdx, isContact }
   let typing = null;       // { i, full, raf, doneAt }
@@ -183,12 +191,29 @@ export function makeInterstitialUi(state, onShown) {
     ).join('');
   }
 
+  // User-initiated advance: tap / space / enter on a finished step. From the
+  // last step, this is the *only* way (other than Escape) to dismiss.
   function advance() {
     if (!active) return;
     if (active.stepIdx >= active.def.steps.length - 1) {
-      // Last step: dismiss only on explicit input (tap / space / enter / close
-      // button). Never auto-dismiss.
+      // Last step: dismiss only on explicit input (tap / space / enter /
+      // Escape). Never auto-dismiss.
       close();
+      return;
+    }
+    active.stepIdx++;
+    showStep();
+  }
+
+  // Timer-initiated advance: the dwell expired on a non-final step. Cannot
+  // close — if we somehow got here on the last step (defensive; finishStepDwell
+  // never sets autoTimer there) we simply wait for input.
+  function autoAdvance() {
+    if (!active) return;
+    if (active.stepIdx >= active.def.steps.length - 1) {
+      waitingInput = true;
+      hintEl.style.opacity = '0.7';
+      autoTimer = 0;
       return;
     }
     active.stepIdx++;
@@ -204,9 +229,9 @@ export function makeInterstitialUi(state, onShown) {
 
   function goNext() {
     if (!active) return;
-    // Don't let the side button close the card — only the tap-to-continue /
-    // close button can do that. This way the player who hits next on the
-    // final step still has a chance to re-read before committing to dismiss.
+    // Don't let the side button close the card — only tap-to-continue or
+    // Escape can do that. This way the player who hits next on the final
+    // step still has a chance to re-read before committing to dismiss.
     if (active.stepIdx >= active.def.steps.length - 1) return;
     active.stepIdx++;
     showStep();
@@ -221,25 +246,13 @@ export function makeInterstitialUi(state, onShown) {
       if (len >= typing.full.length) {
         typing = null;
         textEl.classList.remove('it-typing');
-        const step = active.def.steps[active.stepIdx];
-        const isLast = active.stepIdx >= active.def.steps.length - 1;
-        // The final step never auto-dismisses; it always waits for input.
-        // Earlier steps may auto-advance per their `autoMs`. Contact-bearing
-        // beats get a generous multiplier + floor so new-world reveals breathe.
-        if (!isLast && typeof step.autoMs === 'number') {
-          let ms = step.autoMs;
-          if (active.isContact) ms = Math.max(CONTACT_AUTOMS_FLOOR, ms * CONTACT_AUTOMS_MULTIPLIER);
-          autoTimer = ms;
-        } else {
-          waitingInput = true;
-          hintEl.style.opacity = '0.7';
-        }
+        finishStepDwell();
       }
       return;
     }
     if (autoTimer > 0) {
       autoTimer -= dtMs;
-      if (autoTimer <= 0) advance();
+      if (autoTimer <= 0) autoAdvance();
     }
   }
 
@@ -261,19 +274,29 @@ export function makeInterstitialUi(state, onShown) {
       textEl.textContent = typing.full;
       typing = null;
       textEl.classList.remove('it-typing');
-      const step = active.def.steps[active.stepIdx];
-      const isLast = active.stepIdx >= active.def.steps.length - 1;
-      if (!isLast && typeof step.autoMs === 'number') {
-        let ms = step.autoMs;
-        if (active.isContact) ms = Math.max(CONTACT_AUTOMS_FLOOR, ms * CONTACT_AUTOMS_MULTIPLIER);
-        autoTimer = ms;
-      } else {
-        waitingInput = true;
-        hintEl.style.opacity = '0.7';
-      }
+      finishStepDwell();
       return;
     }
     advance();
+  }
+
+  // Called when the typewriter for the current step finishes (either naturally
+  // or because the user skipped it). The final step ALWAYS waits for input —
+  // it never receives an autoTimer. Earlier steps get a text-length-based
+  // dwell. This is the *only* place autoTimer is set, which keeps the "no
+  // timer can call close()" contract trivial to verify.
+  function finishStepDwell() {
+    if (!active) return;
+    const step = active.def.steps[active.stepIdx];
+    const isLast = active.stepIdx >= active.def.steps.length - 1;
+    if (isLast) {
+      waitingInput = true;
+      hintEl.style.opacity = '0.7';
+      autoTimer = 0;
+      return;
+    }
+    const full = typeof step.text === 'function' ? step.text(state) : step.text;
+    autoTimer = dwellForText(full);
   }
 
   function drain() {
@@ -284,14 +307,9 @@ export function makeInterstitialUi(state, onShown) {
 
   window.addEventListener('keydown', onKey);
 
-  // Pointer-based tap, same pattern as slot cards in main.js. Plain `click`
-  // misfires on iOS when the target re-renders between mousedown and mouseup —
-  // the typewriter rewrites `.it-text` ~45×/sec, so any tap that lands during
-  // typing risks losing target ancestry. Pointer events resolve on pointerdown.
-  // The nav buttons (prev/next/close) record their action on pointerdown via
-  // the `data-it-action` attribute and resolve on pointerup; this matches
-  // the existing pattern and stays reliable on iOS Chrome.
-  let tap = null;
+  // Delegated taps via installTap — pointerdown's target is what routes the
+  // action so DOM rewrites during the typewriter (.it-text mutates ~45×/s)
+  // don't lose the tap.
   function actionForTarget(target) {
     let n = target;
     while (n && n !== root) {
@@ -300,50 +318,11 @@ export function makeInterstitialUi(state, onShown) {
     }
     return null;
   }
-  root.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    tap = {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      moved: false,
-      action: actionForTarget(e.target),
-    };
-  });
-  root.addEventListener('pointermove', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 10) tap.moved = true;
-  });
-  root.addEventListener('pointercancel', (e) => {
-    if (tap && e.pointerId === tap.id) tap = null;
-  });
-  root.addEventListener('pointerup', (e) => {
-    if (!tap || e.pointerId !== tap.id) return;
-    const s = tap; tap = null;
-    if (s.moved) return;
-    // The 400ms input-guard window uses `pointer-events:none` so we shouldn't
-    // even receive this — defensive check in case CSS is overridden.
+  installTap(root, (_e, downTarget) => {
     if (root.classList.contains('it-guard')) return;
-    // Pointerup landed on the same action target as pointerdown? Honour it.
-    const upAction = actionForTarget(e.target);
-    if (s.action && s.action === upAction) {
-      root._tapAt = performance.now();
-      if (s.action === 'prev') goPrev();
-      else if (s.action === 'next') goNext();
-      else if (s.action === 'close') close();
-      return;
-    }
-    root._tapAt = performance.now();
-    handleInput();
-  });
-  // Fallback click for environments without PointerEvent and for synthesized
-  // a11y/keyboard clicks. Deduped against the pointerup timestamp.
-  root.addEventListener('click', (e) => {
-    if (root._tapAt && performance.now() - root._tapAt < 700) return;
-    const action = actionForTarget(e.target);
+    const action = actionForTarget(downTarget);
     if (action === 'prev') { goPrev(); return; }
     if (action === 'next') { goNext(); return; }
-    if (action === 'close') { close(); return; }
     handleInput();
   });
 

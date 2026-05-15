@@ -16,6 +16,19 @@ export const MAX_SLOTS = 10;
 // few percent stay on the other side.
 export const GAMBLE_CHANCE_CAP = 0.85;
 
+// Single source of truth for the win-chance a Hail card actually rolls against.
+// Both the renderer (so the % the player reads matches reality) and tryBuy
+// (the actual roll) walk through this. Callers pass the current `now` so an
+// expiring Carry stops counting the moment it's gone — the displayed % drops
+// to the next % the rig would actually roll against.
+export function effectiveGambleChance(state, upgrade, now) {
+  if (!upgrade || typeof upgrade.chance !== 'number') return 0;
+  const luckBuffs = (state && state.buffs && state.buffs.gambleLuck) || [];
+  const luck = luckBuffs.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
+  const pat = patternGambleLuckBonus(state);
+  return Math.min(GAMBLE_CHANCE_CAP, upgrade.chance + luck + pat);
+}
+
 // Cost to unlock the Nth slot (the slot whose index === N). Slots 0 and 1 are free.
 // 10× growth starting at 1k for slot index 2.
 export const SLOT_UNLOCK_COSTS = (() => {
@@ -276,8 +289,7 @@ export function tryBuy(state, slotIdx, now) {
     if (now < (state.gambleCd[slot.id] || 0)) return { ok: false, reason: 'cooldown' };
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
-    const luck = state.buffs.gambleLuck.reduce((s, b) => s + (now < b.expiresAt ? b.value : 0), 0);
-    const won = Math.random() < Math.min(GAMBLE_CHANCE_CAP, u.chance + luck + patternGambleLuckBonus(state));
+    const won = Math.random() < effectiveGambleChance(state, u, now);
     let result;
     if (won) {
       const payout = cost * u.payout;

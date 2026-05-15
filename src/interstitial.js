@@ -14,9 +14,15 @@ export const FIRST_CONTACT_ID = 'first_contact';
 // docs/lore/voice-and-tone.md for the rules.
 //
 // Step shape:
-//   { text: '…'              }  // wait for click / space / tap
-//   { text: '…', autoMs: 1400 } // auto-advance after typewriter + this many ms
+//   { text: '…'              }  // any step. Non-final steps auto-advance after
+//                                // the typewriter + a text-length-derived dwell
+//                                // (see DWELL_* in interstitialUi.js). The
+//                                // *final* step never auto-advances; the player
+//                                // dismisses it with tap / space / enter / Esc.
 //   { text: '…', italic: true } // render in italic — reserved for voice: A
+//
+// Note: legacy `autoMs` fields on existing entries are now ignored — pacing is
+// computed from word count so short lines stay snappy and long lines breathe.
 //
 // `repeat: true` lets a message fire more than once.
 //

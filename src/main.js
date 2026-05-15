@@ -429,9 +429,14 @@ function ensureSlotEls() {
     el.className = 'slot';
     el.innerHTML = `
       <button class="pin" type="button" aria-label="Pin"><i class="ri ri-pushpin-2-fill"></i></button>
-      <i class="kind-icon"></i>
-      <div class="rarity"></div>
+      <div class="head">
+        <i class="kind-icon"></i>
+        <div class="rarity"></div>
+      </div>
+      <div class="name"></div>
+      <div class="desc"></div>
       <div class="cost"></div>
+      <div class="outcomes"></div>
       <div class="meta"></div>
       <div class="foot">
         <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
@@ -490,7 +495,41 @@ function ensureSlotEls() {
     const el = slotEls.pop();
     el.remove();
   }
+  if (unlockSlotEl) slotsEl.appendChild(unlockSlotEl); // keep last
 }
+
+// Preview of what kind of upgrade slot N will roll. Mirrors SLOT_FILTERS in
+// upgrades.js. Slots past the pinned set ("any") show a neutral wildcard.
+const SLOT_PREVIEW = [
+  { icon: KIND_THEME.permanent.icon, color: KIND_THEME.permanent.color, label: KIND_THEME.permanent.label },
+  { icon: KIND_THEME.permanent.icon, color: KIND_THEME.permanent.color, label: KIND_THEME.permanent.permLabel },
+  { icon: KIND_THEME.buff.icon,      color: KIND_THEME.buff.color,      label: KIND_THEME.buff.label },
+  { icon: KIND_THEME.gamble.icon,    color: KIND_THEME.gamble.color,    label: KIND_THEME.gamble.label },
+  { icon: KIND_THEME.buff.icon,      color: KIND_THEME.buff.color,      label: 'Surge' },
+];
+const SLOT_PREVIEW_ANY = { icon: 'ri-shuffle-line', color: '#8aa0ff', label: 'Any' };
+function slotPreview(idx) { return SLOT_PREVIEW[idx] || SLOT_PREVIEW_ANY; }
+
+const unlockSlotEl = document.createElement('div');
+unlockSlotEl.className = 'slot slot-unlock';
+unlockSlotEl.innerHTML = `
+  <div class="head">
+    <i class="kind-icon"></i>
+    <div class="rarity">Locked</div>
+  </div>
+  <div class="name"></div>
+  <div class="desc">Open a new band. The next card lands here.</div>
+  <div class="cost"></div>
+  <div class="outcomes"></div>
+  <div class="meta"></div>
+  <div class="foot"></div>
+`;
+unlockSlotEl.addEventListener('click', () => {
+  const res = tryUnlockSlot(state, nowSeconds());
+  if (res.ok) { playSlotFx(unlockSlotEl, 'fx-buy'); renderShop(); }
+  else { playSlotFx(unlockSlotEl, 'fx-reject'); }
+});
+slotsEl.appendChild(unlockSlotEl);
 
 const SHOP_UNLOCK_AT = 100;
 let shopUnlocked = state.amount > SHOP_UNLOCK_AT;
@@ -507,7 +546,6 @@ function makeTbBtn(act, icon) {
   return b;
 }
 const tbButtons = {
-  'unlock-slot':   makeTbBtn('unlock-slot',   'ri-add-line'),
   'free-reroll':   makeTbBtn('free-reroll',   'ri-refresh-line'),
   'reroll':        makeTbBtn('reroll',        'ri-refresh-line'),
   'unlock-reroll': makeTbBtn('unlock-reroll', 'ri-refresh-line'),
@@ -523,11 +561,6 @@ function setTbBtn(act, visible, locked, label) {
 }
 
 function renderToolbar() {
-  const slotCost = nextSlotUnlockCost(state);
-  const slotVisible = slotCost != null;
-  setTbBtn('unlock-slot', slotVisible, slotVisible && state.amount < slotCost,
-    slotVisible ? `Slot ${state.shop.slotsUnlocked + 1} · <span class="cc">${ECHO_ICON}${formatAbbrev(slotCost)}</span>` : '');
-
   const rerollUnlockVisible = !state.shop.rerollUnlocked && state.amount >= REROLL_UNLOCK_AT;
   const rerollVisible = state.shop.rerollUnlocked;
   setTbBtn('unlock-reroll', rerollUnlockVisible,
@@ -552,7 +585,7 @@ function renderToolbar() {
   setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
     `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
 
-  const anyVisible = slotVisible || rerollUnlockVisible || rerollVisible || pinVisible || freeVisible;
+  const anyVisible = rerollUnlockVisible || rerollVisible || pinVisible || freeVisible;
   toolbarEl.style.display = anyVisible ? '' : 'none';
 }
 
@@ -570,8 +603,7 @@ toolbarEl.addEventListener('click', (e) => {
   if (!btn) return;
   const act = btn.dataset.act;
   let res;
-  if (act === 'unlock-slot') res = tryUnlockSlot(state, nowSeconds());
-  else if (act === 'unlock-reroll') res = tryUnlockReroll(state);
+  if (act === 'unlock-reroll') res = tryUnlockReroll(state);
   else if (act === 'unlock-pin') res = tryUnlockPin(state);
   else if (act === 'reroll' || act === 'free-reroll') {
     res = tryReroll(state, nowSeconds());
@@ -602,13 +634,14 @@ function renderShop() {
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
     const theme = KIND_THEME[u.kind] || {};
     el.dataset.kind = u.kind;
-    // Type-preview card: kind icon + rarity tag + price. Detail (name/desc/
-    // outcomes) lives behind the info button — slot index already signals type.
-    el.style.setProperty('--kind-color', theme.color || '#8aa0ff');
     el.querySelector('.kind-icon').className = `kind-icon ri ${theme.icon || ''}`;
-    el.querySelector('.rarity').textContent = u.rarity;
+    el.querySelector('.rarity').textContent = `${u.rarity} · ${kindLabel(u)}`;
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
+    el.querySelector('.name').textContent = u.name;
+    el.querySelector('.desc').textContent = u.desc;
     // Pattern free-purchase coverage applies to any non-hail, non-bleed slot.
+    // Surface it as "FREE" on the cost cell so the player sees the charge being
+    // used before they tap.
     const patternFree = (state.patternFreeLeft || 0) > 0 && u.kind !== 'gamble' && u.kind !== 'gift';
     const costHtml = u.kind === 'gift'
       ? 'FREE'
@@ -616,6 +649,22 @@ function renderShop() {
         ? `<span class="cc">FREE</span> <span class="cc-strike">${ECHO_ICON}${formatAbbrev(cost)}</span>`
         : `${ECHO_ICON}${formatAbbrev(cost)}`;
     setHtmlIfChanged(el.querySelector('.cost'), costHtml);
+
+    let outcomes = '';
+    if (u.kind === 'gamble') {
+      const winNet = cost * (u.payout - 1);
+      const winPct = fmtPct(u.chance);
+      const losePct = fmtPct(1 - u.chance);
+      outcomes =
+        `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
+        `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
+    } else if (u.kind === 'convert' || (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul'))) {
+      const eff = marginalRateForPurchase(state, slot, now);
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
+    } else if (u.kind === 'gift') {
+      outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
+    }
+    setHtmlIfChanged(el.querySelector('.outcomes'), outcomes);
 
     let meta = '';
     if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
@@ -627,7 +676,27 @@ function renderShop() {
     const canAfford = state.amount >= cost;
     el.classList.toggle('locked', !canAfford || cdLeft > 0);
   }
+  renderUnlockSlot();
   updateSlotsNav();
+}
+
+function renderUnlockSlot() {
+  const cost = nextSlotUnlockCost(state);
+  if (cost == null) { unlockSlotEl.style.display = 'none'; return; }
+  unlockSlotEl.style.display = '';
+  const idx = state.shop.slotsUnlocked;
+  const p = slotPreview(idx);
+  unlockSlotEl.style.setProperty('--kind-color', p.color);
+  unlockSlotEl.style.setProperty('--kind-border', p.color);
+  unlockSlotEl.style.setProperty('--kind-glow', p.color);
+  unlockSlotEl.querySelector('.kind-icon').className = `kind-icon ri ${p.icon}`;
+  const rarityEl = unlockSlotEl.querySelector('.rarity');
+  rarityEl.textContent = `Slot ${idx + 1} · ${p.label}`;
+  rarityEl.className = 'rarity';
+  unlockSlotEl.querySelector('.name').textContent = 'Unlock';
+  setHtmlIfChanged(unlockSlotEl.querySelector('.cost'),
+    `${ECHO_ICON}${formatAbbrev(cost)}`);
+  unlockSlotEl.classList.toggle('locked', state.amount < cost);
 }
 
 const BUFF_ICONS = {

@@ -1061,29 +1061,24 @@
     .slot.pinned .pin { color: #f5d34a; }
     .slot.pinned .pin::before { border-color: #f5d34a; background: rgba(245, 211, 74, 0.18); transform: rotate(0deg); }
     .slot.pinned .pin > i { transform: rotate(0deg); }
-    .slot { align-items: center; text-align: center; padding-top: 18px; padding-bottom: 8px; }
-    .slot .kind-icon {
-      font-size: 44px;
-      line-height: 1;
-      color: var(--kind-color, #8aa0ff);
-      margin: 6px 0 8px;
-      filter: drop-shadow(0 0 8px var(--kind-glow, rgba(120, 140, 255, 0.3)));
-    }
+    .slot .head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; padding-right: 28px; }
+    .slot .kind-icon { font-size: 16px; line-height: 1; color: var(--kind-color, #8aa0ff); }
     .slot .rarity {
       font-size: 9px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      order: -1;
-      align-self: center;
+      flex: 1;
     }
-    .slot .name, .slot .desc, .slot .outcomes { display: none; }
+    .slot .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; color: #e8e8f0; }
+    .slot .desc { font-size: 11px; color: #aab0d0; line-height: 1.35; min-height: 30px; }
+    .slot .cost { font-size: 13px; font-weight: 600; color: #d49a55; margin-top: 6px; }
+    .slot .outcomes { margin-top: 4px; min-height: 14px; line-height: 1.45; font-size: 11px; }
     .slot .outcome { display: flex; align-items: center; gap: 4px; }
     .slot .outcome.win  { color: #4cd07d; }
     .slot .outcome.lose { color: #ff7a8c; }
     .slot .outcome .cc  { color: #d49a55; }
-    .slot .cost { font-size: 16px; font-weight: 700; color: #d49a55; margin-top: 4px; }
-    .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 4px; }
-    .slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; align-self: stretch; }
+    .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
+    .slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; }
     .slot .slot-info {
       display: inline-flex;
       align-items: center;
@@ -1100,6 +1095,24 @@
       line-height: 1;
     }
     .slot .slot-info:hover { color: #c0d0ff; }
+
+    /* Unlock-slot card — sits at the end of the slot row. Reads as a locked
+       upgrade card whose kind icon/color previews the next slot index. The
+       card itself is the click target. */
+    .slot.slot-unlock {
+      border-style: dashed;
+      border-color: color-mix(in srgb, var(--kind-color, #8aa0ff) 55%, transparent);
+      background: rgba(20, 20, 40, 0.55);
+    }
+    .slot.slot-unlock .kind-icon { color: var(--kind-color, #8aa0ff); }
+    .slot.slot-unlock .name { color: var(--kind-color, #8aa0ff); }
+    .slot.slot-unlock .desc { font-style: italic; }
+    .slot.slot-unlock.locked { opacity: 0.85; }
+    .slot.slot-unlock.locked > * { opacity: 1; }
+    .slot.slot-unlock.locked .cost { opacity: 0.55; }
+    @media (hover: hover) and (pointer: fine) {
+      .slot.slot-unlock:hover { border-color: var(--kind-color, #8aa0ff); background: rgba(40, 40, 80, 0.7); }
+    }
 
     .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); --kind-glow: rgba(76, 208, 125, 0.55); border-color: var(--kind-border); }
     .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); --kind-glow: rgba(157, 110, 224, 0.6); border-color: var(--kind-border); }
@@ -2003,9 +2016,11 @@
         padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
         scroll-padding-inline: 8px;
       }
-      .slot { width: 110px; padding: 12px 8px 8px; }
-      .slot .kind-icon { font-size: 38px; margin: 4px 0 6px; }
-      .slot .cost { font-size: 14px; margin-top: 4px; }
+      .slot { width: 150px; padding: 8px; }
+      .slot .name { font-size: 12px; }
+      .slot .desc { font-size: 10px; min-height: 28px; }
+      .slot .cost { font-size: 12px; margin-top: 4px; }
+      .slot .outcomes { font-size: 10px; }
       .slot .rarity { font-size: 8px; }
       #result { bottom: auto; top: 12px; right: 12px; left: auto; transform: none; font-size: 14px; padding: 6px 12px; }
       #buffs {

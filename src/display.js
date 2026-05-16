@@ -701,8 +701,9 @@ class Column {
           px = ax + p._gfxOutX * e;
           py = ay + p._gfxOutY * e;
           pz = az + p._gfxOutZ * e;
-          // Fade as we leave.
-          opacity = p.opacity * (1 - easeOutCubic(u) * 0.9);
+          // Fade fully to 0 over phase 3, weighted so most of the fade lands
+          // in the second half — the particles travel visibly before dissolving.
+          opacity = p.opacity * Math.max(0, 1 - Math.pow(u, 1.6));
         }
         if (this._gfx.won) {
           // Green tint that grows as we approach centre, then explodes.

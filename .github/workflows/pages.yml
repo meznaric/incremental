@@ -38,6 +38,9 @@ jobs:
       - run: |
           mkdir -p _site/docs/lore
           cp -r index.html src vendor _site/
+          cp manifest.webmanifest sw.js favicon.svg \
+             apple-touch-icon.png icon-192.png icon-512.png icon-512-maskable.png \
+             og-image.png _site/
           cp -r docs/lore/images _site/docs/lore/
       - uses: actions/upload-pages-artifact@v3
         with:

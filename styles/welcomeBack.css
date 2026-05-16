@@ -1,0 +1,228 @@
+/* --- Signal Lock (welcome-back) --- */
+#welcomeBack {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 14, 0);
+  backdrop-filter: blur(0px);
+  transition: background 0.22s ease, backdrop-filter 0.22s ease;
+  z-index: 220;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  cursor: pointer;
+  /* Skip iOS's 300ms tap-delay heuristics and tap-highlight flash. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+#welcomeBack.wb-visible {
+  background: rgba(6, 6, 14, 0.82);
+  backdrop-filter: blur(6px);
+}
+.wb-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(212, 154, 85, 0.10), transparent 60%),
+    rgba(20, 20, 40, 0.96);
+  border: 1px solid rgba(212, 154, 85, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(212, 154, 85, 0.12) inset,
+    0 0 40px -4px rgba(212, 154, 85, 0.35);
+  transform: translateY(10px);
+  opacity: 0;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+  cursor: auto;
+  /* 100dvh tracks the actually-visible viewport on iOS Chrome so the
+     Collect button stays in reach even when the breakdown is long. */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Scroll lives on the inner column, not on .wb-card. The Collect button
+   sits in .wb-foot below this — outside the scroll region — so iOS does
+   not arbitrate its taps against scroll-gestures, which was dropping
+   stationary taps as pointercancel. */
+.wb-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 20px 24px 12px;
+}
+.wb-foot {
+  flex: 0 0 auto;
+  padding: 16px 24px 20px;
+  border-top: 1px solid rgba(212, 154, 85, 0.22);
+  background: rgba(20, 20, 40, 0.96);
+}
+#welcomeBack.wb-visible .wb-card { transform: translateY(0); opacity: 1; }
+/* Scanline overlay — a faint detector trace running across the card, kept
+   low-opacity so the lore frame does not tip into casino. */
+.wb-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(212, 154, 85, 0.04) 0px,
+    rgba(212, 154, 85, 0.04) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+.wb-title {
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #d49a55;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.wb-lines {
+  text-align: center;
+  color: #c0c0d8;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+.wb-line + .wb-line { margin-top: 2px; }
+.wb-number-wrap {
+  position: relative;
+  text-align: center;
+  margin: 0 auto 22px;
+  padding: 18px 12px 16px;
+  border-top: 1px solid rgba(212, 154, 85, 0.18);
+  border-bottom: 1px solid rgba(212, 154, 85, 0.18);
+}
+.wb-number-label {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+  margin-bottom: 6px;
+}
+.wb-number {
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #d49a55;
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 12px rgba(212, 154, 85, 0.55),
+    0 0 28px rgba(212, 154, 85, 0.25);
+  animation: wb-glow 2.4s ease-in-out infinite;
+}
+.wb-number-settled {
+  animation: wb-glow 3.2s ease-in-out infinite, wb-pop 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes wb-glow {
+  0%, 100% { text-shadow: 0 0 10px rgba(212, 154, 85, 0.45), 0 0 24px rgba(212, 154, 85, 0.18); }
+  50%      { text-shadow: 0 0 16px rgba(212, 154, 85, 0.70), 0 0 36px rgba(212, 154, 85, 0.35); }
+}
+@keyframes wb-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.wb-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.wb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(120, 140, 255, 0.10);
+  font-size: 12px;
+}
+.wb-row:first-child { border-top: none; }
+.wb-row-label {
+  color: #8a8ac0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.wb-row-value {
+  color: #e8e8f0;
+  text-align: right;
+}
+.wb-collect {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px;
+  background: rgba(212, 154, 85, 0.18);
+  border: 1px solid rgba(212, 154, 85, 0.6);
+  color: #d49a55;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+}
+.wb-collect:hover {
+  background: rgba(212, 154, 85, 0.28);
+  border-color: #d49a55;
+  color: #f0c080;
+  box-shadow: 0 0 18px -2px rgba(212, 154, 85, 0.55);
+}
+.wb-collect:active { transform: translateY(1px); }
+@media (max-width: 520px) {
+  #welcomeBack { padding: 0; align-items: stretch; }
+  .wb-card {
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .wb-scroll {
+    padding:
+      max(18px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      12px
+      max(16px, env(safe-area-inset-left));
+  }
+  .wb-foot {
+    padding:
+      14px
+      max(16px, env(safe-area-inset-right))
+      max(18px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+  .wb-number { font-size: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wb-number,
+  .wb-number-settled { animation: none; }
+  .wb-card::before { display: none; }
+}

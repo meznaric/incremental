@@ -2,7 +2,7 @@ import {
   worldFor, recordContact, saveContactLog, getRun,
   activeEp, allEpsComplete,
 } from './contactLog.js';
-import { WORLDS_BY_EP } from './worlds.js';
+import { WORLDS_BY_EP } from './worlds-data.js';
 import { EP_INTERSTITIALS } from './episodes.js';
 
 // Staging id for the one-shot First Contact beat. Queued *before* the very

@@ -1,0 +1,490 @@
+/* Seed Relay network modal */
+.net-card { width: 100%; max-width: 1040px; }
+.net-body { padding: 0; }
+.net-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 14px 18px 18px;
+}
+.net-map {
+  flex: 1 1 520px;
+  min-width: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(45, 212, 255, 0.16);
+  background:
+    radial-gradient(ellipse at center, rgba(20, 25, 48, 0.6) 0%, rgba(8, 10, 22, 0.95) 100%),
+    linear-gradient(rgba(45, 212, 255, 0.045) 1px, transparent 1px) 0 0,
+    linear-gradient(90deg, rgba(45, 212, 255, 0.045) 1px, transparent 1px) 0 0;
+  background-size: auto, 24px 24px, 24px 24px;
+  box-shadow: inset 0 0 36px rgba(45, 212, 255, 0.07);
+  padding: 10px;
+}
+/* Slow vertical scanline — synth feel without being distracting. */
+.net-map::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 110px;
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    rgba(45, 212, 255, 0.05) 35%,
+    rgba(45, 212, 255, 0.10) 50%,
+    rgba(45, 212, 255, 0.05) 65%,
+    transparent 100%);
+  pointer-events: none;
+  animation: net-scan 7s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes net-scan {
+  0%   { transform: translateY(-140px); }
+  100% { transform: translateY(120%); }
+}
+/* Respect reduced-motion preference — kill the scanline. */
+@media (prefers-reduced-motion: reduce) {
+  .net-map::before { animation: none; opacity: 0; }
+}
+.net-side {
+  flex: 0 1 320px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.netmap-svg { width: 100%; height: auto; display: block; }
+.relay-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #f3f4ff;
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(8, 8, 18, 0.85);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+.relay-label.ripen-label { fill: #d8d2ff; font-size: 10px; }
+@media (max-width: 520px) {
+  .relay-label { font-size: 9px; }
+  .relay-label.ripen-label { font-size: 8.5px; }
+}
+/* Cyberpunk hex cell — low-alpha sector fill, glowing sector stroke.
+   The polygon's sector identity rides on the --sec-color CSS variable
+   set inline by the renderer. */
+.hex-cell polygon {
+  fill: color-mix(in srgb, var(--sec-color) 16%, transparent);
+  stroke: color-mix(in srgb, var(--sec-color) 70%, transparent);
+  stroke-width: 1.2;
+  transition: fill 140ms ease, stroke 140ms ease, filter 140ms ease;
+  cursor: pointer;
+}
+.hex-cell.empty:hover polygon {
+  fill: color-mix(in srgb, var(--sec-color) 32%, transparent);
+  stroke: var(--sec-color);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--sec-color) 60%, transparent));
+}
+.hex-cell.has-relay polygon {
+  fill: color-mix(in srgb, var(--sec-color) 24%, transparent);
+  stroke: var(--sec-color);
+}
+.hex-cell.selected polygon {
+  stroke: #ffe082;
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
+}
+
+/* Cluster edges — glowing cyan trace, mechanic A's visual cue. */
+.cluster-edge {
+  stroke: rgba(45, 212, 255, 0.7);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(45, 212, 255, 0.55));
+  animation: cluster-pulse 2.4s ease-in-out infinite;
+}
+@keyframes cluster-pulse {
+  0%, 100% { stroke-opacity: 0.55; }
+  50%      { stroke-opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cluster-edge { animation: none; }
+}
+
+/* Relay markers — read as scanner reticles, not painted dots. The
+   backplate frame uses screen-dark fill so the core dot pops; the four
+   L-bracket corners add the "this thing is being tracked" feel. */
+.relay-mark { pointer-events: all; cursor: pointer; }
+.relay-mark .r-frame {
+  fill: rgba(8, 10, 22, 0.85);
+  stroke: rgba(45, 212, 255, 0.7);
+  stroke-width: 1.1;
+}
+.relay-mark .r-core { stroke: none; }
+.relay-mark .r-bracket {
+  fill: none;
+  stroke: rgba(45, 212, 255, 0.85);
+  stroke-width: 1.4;
+  stroke-linecap: square;
+}
+.relay-mark.clustered .r-core {
+  fill: #ffd86b;
+  filter: drop-shadow(0 0 3px rgba(255, 216, 107, 0.95));
+}
+.relay-mark.clustered .r-frame  { stroke: rgba(255, 216, 107, 0.85); }
+.relay-mark.clustered .r-bracket { stroke: rgba(255, 216, 107, 0.9); }
+.relay-mark.isolated .r-core {
+  fill: #2dd4ff;
+  filter: drop-shadow(0 0 4px rgba(45, 212, 255, 0.95));
+}
+.relay-mark.isolated .r-frame   { stroke: rgba(45, 212, 255, 0.85); }
+.relay-mark.isolated .r-bracket { stroke: rgba(45, 212, 255, 0.9); }
+/* Ripening — dim purple base, brighter progress arc, brackets hidden. */
+.relay-mark.ripening .r-frame {
+  stroke: rgba(192, 132, 252, 0.55);
+  fill: rgba(8, 10, 22, 0.75);
+}
+.relay-mark.ripening .ripe-base {
+  fill: none;
+  stroke: rgba(192, 132, 252, 0.2);
+  stroke-width: 2;
+}
+.relay-mark.ripening .ripe-fill {
+  fill: none;
+  stroke: #c084fc;
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 3px rgba(192, 132, 252, 0.75));
+}
+.relay-mark.ripening .r-core { fill: rgba(192, 132, 252, 0.6); }
+.relay-mark.ripening .r-bracket { display: none; }
+.relay-mark.selected .r-frame {
+  stroke: #ffe082;
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
+}
+.relay-mark.selected .r-bracket { stroke: #ffe082; }
+/* Ghost reticle — preview of a relay before the player confirms placement.
+   Dashed frame + low-alpha core, pulses to read as "not committed". */
+.relay-mark.pending { pointer-events: none; }
+.relay-mark.pending .r-frame {
+  fill: rgba(255, 224, 130, 0.10);
+  stroke: #ffe082;
+  stroke-width: 1.6;
+  stroke-dasharray: 3 3;
+  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.55));
+  animation: net-pending-pulse 1.4s ease-in-out infinite;
+}
+.relay-mark.pending .r-bracket {
+  fill: none;
+  stroke: rgba(255, 224, 130, 0.9);
+  stroke-width: 1.4;
+  stroke-linecap: square;
+}
+.relay-mark.pending .r-core {
+  fill: rgba(255, 224, 130, 0.6);
+  filter: drop-shadow(0 0 4px rgba(255, 224, 130, 0.7));
+}
+@keyframes net-pending-pulse {
+  0%, 100% { opacity: 0.95; }
+  50%      { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .relay-mark.pending .r-frame { animation: none; }
+}
+/* Staged hex (the one the player just chose) gets a warm outline so the
+   choice reads even with the bar covering part of the SVG. */
+.hex-cell.staged polygon {
+  fill: color-mix(in srgb, #ffe082 22%, transparent);
+  stroke: #ffe082;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.6));
+}
+
+.net-status {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.net-stat { display: flex; flex-direction: column; align-items: center; }
+.net-stat-num { font-size: 18px; font-weight: 600; color: #e8e8f0; font-variant-numeric: tabular-nums; }
+.net-stat-lab { font-size: 10px; letter-spacing: 0.08em; color: #8a8ac0; text-transform: uppercase; }
+.net-stat.dim .net-stat-num { color: #d97a92; }
+
+.net-summary {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.net-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #c4c4d8;
+  padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+/* Sector swatches under Coverage — covered ones glow with sector color. */
+.net-cov-chips {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.net-cov-chip {
+  width: 22px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--sec-color);
+  opacity: 0.25;
+  transition: opacity 200ms ease, box-shadow 200ms ease;
+}
+.net-cov-chip.on {
+  opacity: 1;
+  box-shadow: 0 0 6px var(--sec-color);
+}
+
+.net-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+  margin-bottom: 6px;
+}
+.net-help-link {
+  background: none;
+  border: none;
+  color: #8aa0ff;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  cursor: pointer;
+  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.net-help-link:hover { color: #c4cfff; }
+.net-help-link .ri { font-size: 12px; }
+/* Diagnostic-tab tables + bullets — reused by the Network tab. */
+.diag-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.diag-table th, .diag-table td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.diag-table th {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+  font-weight: 500;
+}
+.diag-table td { color: #c4c4d8; }
+.diag-table td strong { color: #e8e8f0; font-weight: 500; }
+.diag-table .net-legend-sw {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.diag-bullets {
+  margin: 6px 0;
+  padding-left: 18px;
+  color: #c4c4d8;
+  font-size: 13px;
+}
+.diag-bullets li { margin: 4px 0; }
+.diag-formula {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid #6fa5e8;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: #c4cfff;
+  border-radius: 0 4px 4px 0;
+}
+.net-queue, .net-detail, .net-legend {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.net-queue-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #c4c4d8;
+  font-variant-numeric: tabular-nums;
+}
+.net-queue-row + .net-queue-row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.net-token-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #8aa0ff;
+}
+.net-token-dot.rar-common    { background: #8aa0ff; }
+.net-token-dot.rar-uncommon  { background: #6fb88c; }
+.net-token-dot.rar-rare      { background: #c89c5c; }
+.net-token-dot.rar-legendary { background: #d8649c; }
+.net-token-dot.rar-mythic    { background: #ffd86b; }
+.net-token-tier { color: #e8e8f0; }
+.net-token-pos { color: #8a8ac0; font-size: 10px; text-align: right; }
+.net-empty { font-size: 12px; color: #8a8ac0; padding: 4px 0; }
+.net-hint { font-size: 11px; color: #8a8ac0; margin-top: 8px; font-style: italic; }
+
+.net-detail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.net-detail-name { font-size: 13px; color: #e8e8f0; font-weight: 500; }
+.net-detail-sec  { font-size: 10px; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.06em; text-transform: uppercase; }
+.net-detail-row {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: #c4c4d8; padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sec-tag-core     { background: rgba(45, 212, 255, 0.18); color: #7be4ff; }
+.sec-tag-frontier { background: rgba(74, 222, 128, 0.18); color: #86eaa3; }
+.sec-tag-edge     { background: rgba(251, 191, 36, 0.18); color: #fbd569; }
+.sec-tag-silent   { background: rgba(192, 132, 252, 0.18); color: #d6aaff; }
+.sec-tag-watch    { background: rgba(244, 63, 94, 0.22); color: #ff8aa4; }
+.sec-tag-dark     { background: rgba(129, 140, 248, 0.20); color: #aeb6ff; }
+
+.net-legend-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #c4c4d8;
+  background: transparent;
+  border-radius: 0;
+}
+.net-legend-sw { width: 10px; height: 10px; border-radius: 2px; }
+.net-legend-name { color: #e8e8f0; }
+.net-legend-mults { color: #8a8ac0; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+/* Placement confirmation bar — overlay docked to the bottom of the map. */
+.net-place-bar {
+  position: absolute;
+  left: 12px; right: 12px; bottom: 12px;
+  background: rgba(8, 10, 22, 0.94);
+  border: 1px solid rgba(255, 224, 130, 0.45);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 224, 130, 0.18);
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.net-place-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.net-place-tier { font-size: 13px; color: #e8e8f0; font-weight: 500; }
+.net-place-tier.rar-common    { color: #c0c8ff; }
+.net-place-tier.rar-uncommon  { color: #9fe0b6; }
+.net-place-tier.rar-rare      { color: #ffd8a0; }
+.net-place-tier.rar-legendary { color: #ffadcc; }
+.net-place-tier.rar-mythic    { color: #ffe98a; }
+.net-place-stats {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: #c4c4d8;
+  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+}
+.net-place-sep { color: #5a5a78; }
+.net-place-hint { font-size: 11px; color: #8a8ac0; font-style: italic; }
+.net-place-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.net-place-btn {
+  flex: 1 1 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-weight: 500;
+}
+.net-place-btn.cancel {
+  background: rgba(255, 255, 255, 0.05);
+  color: #c4c4d8;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.net-place-btn.cancel:hover { background: rgba(255, 255, 255, 0.09); }
+.net-place-btn.confirm {
+  background: linear-gradient(180deg, rgba(255, 224, 130, 0.25), rgba(255, 224, 130, 0.12));
+  color: #ffe082;
+  border-color: rgba(255, 224, 130, 0.65);
+  box-shadow: 0 0 10px rgba(255, 224, 130, 0.22);
+}
+.net-place-btn.confirm:hover {
+  background: linear-gradient(180deg, rgba(255, 224, 130, 0.35), rgba(255, 224, 130, 0.18));
+}
+
+@media (max-width: 640px) {
+  .net-layout { flex-direction: column; }
+  .net-side   { flex: 1 1 auto; }
+  /* Cover-fit + pan on the map. The SVG is visually scaled up via CSS
+     transform (driven by --map-scale) and the .net-map clips the overflow.
+     JS drives --map-tx / --map-ty in response to touch drags. */
+  .net-map {
+    flex: 0 0 auto;
+    height: 58vh;
+    padding: 0;
+    touch-action: none;
+    --map-scale: 1.7;
+    cursor: grab;
+  }
+  .net-map:active { cursor: grabbing; }
+  .netmap-svg {
+    width: 100%;
+    height: auto;
+    transform-origin: top left;
+    transform: translate(var(--map-tx, 0px), var(--map-ty, 0px)) scale(var(--map-scale, 1));
+    will-change: transform;
+  }
+  .net-place-bar {
+    left: 10px; right: 10px; bottom: 10px;
+  }
+}
+

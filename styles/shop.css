@@ -1,0 +1,848 @@
+/* --- Shop feedback animations (max 0.5s each) --- */
+.slot { will-change: transform; }
+.slot.fx-buy { animation: slot-buy 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.slot.fx-drop { animation: slot-drop 0.34s ease-out; }
+.slot.fx-reject { animation: slot-reject 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+@keyframes slot-buy {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 var(--kind-glow, rgba(120, 140, 255, 0.5)); }
+  30%  { transform: scale(1.06); box-shadow: 0 0 22px 6px var(--kind-glow, rgba(120, 140, 255, 0.5)); background: rgba(212, 154, 85, 0.18); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes slot-drop {
+  0%   { transform: translateY(0); filter: saturate(1); }
+  35%  { transform: translateY(3px) translateX(-2px); filter: saturate(0.3) brightness(0.8); }
+  60%  { transform: translateY(2px) translateX(2px); filter: saturate(0.5) brightness(0.85); }
+  100% { transform: translateY(0); filter: saturate(1); }
+}
+@keyframes slot-reject {
+  0%, 100% { transform: translateX(0); border-color: var(--kind-border, rgba(120, 140, 255, 0.35)); }
+  15% { transform: translateX(-5px); border-color: #ff5a6e; box-shadow: 0 0 14px 2px rgba(255, 90, 110, 0.45); }
+  35% { transform: translateX(5px); border-color: #ff5a6e; box-shadow: 0 0 14px 2px rgba(255, 90, 110, 0.45); }
+  55% { transform: translateX(-3px); border-color: #ff5a6e; }
+  75% { transform: translateX(3px); border-color: #ff5a6e; }
+}
+
+/* Fresh-content reveal: applied to inner elements when a new upgrade lands. Flies in from below. */
+.slot.fx-content > .head,
+.slot.fx-content > .name,
+.slot.fx-content > .desc,
+.slot.fx-content > .cost,
+.slot.fx-content > .outcomes,
+.slot.fx-content > .meta {
+  animation: slot-content-in 0.18s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes slot-content-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Exit on click: contents fly up and fade before the new card lands. */
+.slot.fx-fly-up > .head,
+.slot.fx-fly-up > .name,
+.slot.fx-fly-up > .desc,
+.slot.fx-fly-up > .cost,
+.slot.fx-fly-up > .outcomes,
+.slot.fx-fly-up > .meta {
+  animation: slot-content-out 0.16s cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+@keyframes slot-content-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-22px); }
+}
+
+/* Echo glyph floating up from cost line on purchase */
+.slot .echo-burn {
+  position: absolute;
+  left: 50%;
+  bottom: 38px;
+  transform: translateX(-50%);
+  color: #d49a55;
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(212, 154, 85, 0.8);
+  animation: echo-burn 0.5s ease-out forwards;
+}
+@keyframes echo-burn {
+  0%   { opacity: 0; transform: translate(-50%, 0) scale(0.7); }
+  20%  { opacity: 1; transform: translate(-50%, -8px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot.fx-buy,
+  .slot.fx-drop,
+  .slot.fx-reject {
+    animation: slot-flash 0.1s ease-out;
+  }
+  .slot.fx-content > .head,
+  .slot.fx-content > .name,
+  .slot.fx-content > .desc,
+  .slot.fx-content > .cost,
+  .slot.fx-content > .outcomes,
+  .slot.fx-content > .meta,
+  .slot.fx-fly-up > .head,
+  .slot.fx-fly-up > .name,
+  .slot.fx-fly-up > .desc,
+  .slot.fx-fly-up > .cost,
+  .slot.fx-fly-up > .outcomes,
+  .slot.fx-fly-up > .meta {
+    animation: none;
+  }
+  .slot .echo-burn { display: none; }
+  @keyframes slot-flash {
+    0%, 100% { background: rgba(28, 28, 56, 0.78); }
+    50%      { background: rgba(80, 80, 140, 0.85); }
+  }
+}
+
+.rarity-common    { color: #8a8ac0; }
+.rarity-uncommon  { color: #4cd07d; }
+.rarity-rare      { color: #4ea8ff; }
+.rarity-legendary { color: #ff8a3a; }
+.rarity-mythic    { color: #ff3df0; text-shadow: 0 0 6px rgba(255, 61, 240, 0.5); }
+
+#buffs {
+  position: fixed;
+  top: 160px;
+  left: 16px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 190px;
+  pointer-events: none;
+}
+.buff-card {
+  background: rgba(20, 20, 40, 0.78);
+  border: 1px solid rgba(120, 140, 255, 0.3);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  padding: 8px 10px 7px;
+  font-variant-numeric: tabular-nums;
+}
+.buff-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.buff-name {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.buff-name .ri-fw { font-size: 13px; line-height: 1; }
+.buff-info {
+  pointer-events: auto;
+  background: transparent;
+  border: none;
+  color: #6a6a90;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.buff-info:hover { color: #c0d0ff; }
+.buff-val { font-size: 14px; font-weight: 600; color: #e8e8f0; }
+.buff-time { font-size: 10px; color: #4cd07d; margin-top: 2px; }
+.buff-bar {
+  height: 3px;
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.buff-bar-fill {
+  height: 100%;
+  transition: width 0.1s linear;
+}
+/* Active effects inherit the colour of the upgrade that spawned them.
+   rate / compound are the rate-multiplier family (purple shades); luck /
+   cushion are the gamble family (red shades). The shop card border, the
+   icon, the time-bar fill, and the value text all share one swatch so
+   a buff reads the same from purchase to expiry. */
+.buff-card.kind-rate          { border-color: rgba(157, 110, 224, 0.4); }
+.buff-card.kind-luck          { border-color: rgba(255, 90, 110, 0.4); }
+.buff-card.kind-cushion       { border-color: rgba(255, 138, 138, 0.4); }
+.buff-card.kind-compound      { border-color: rgba(124, 90, 212, 0.4); }
+.kind-rate     .buff-bar-fill { background: #9d6ee0; }
+.kind-rate     .buff-val      { color: #9d6ee0; }
+.kind-luck     .buff-bar-fill { background: #ff5a6e; }
+.kind-luck     .buff-val      { color: #ff5a6e; }
+.kind-cushion  .buff-bar-fill { background: #ff8a8a; }
+.kind-cushion  .buff-val      { color: #ff8a8a; }
+.kind-compound .buff-bar-fill { background: #7c5ad4; }
+.kind-compound .buff-val      { color: #7c5ad4; }
+
+/* Collapsed mobile-only tile. The progress bar fills the tile background
+   left-to-right; glyph + multiplier overlay it. Visible only below 640px —
+   the desktop card markup above stays the source of truth on wider HUDs. */
+.buff-tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(20, 20, 40, 0.78);
+  border: 1px solid rgba(120, 140, 255, 0.3);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  padding: 0;
+  font-family: inherit;
+  color: #e8e8f0;
+  display: none;
+}
+.buff-tile .buff-tile-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  transform-origin: left center;
+  opacity: 0.32;
+  transition: transform 0.1s linear;
+}
+.buff-tile .buff-tile-fg {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.buff-tile .buff-tile-glyph {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.buff-tile .buff-tile-val {
+  font-size: 14px;
+  font-weight: 600;
+}
+.buff-tile.kind-rate     { border-color: rgba(157, 110, 224, 0.4); }
+.buff-tile.kind-rate     .buff-tile-bar { background: #9d6ee0; }
+.buff-tile.kind-rate     .buff-tile-glyph, .buff-tile.kind-rate     .buff-tile-val { color: #9d6ee0; }
+.buff-tile.kind-luck     { border-color: rgba(255, 90, 110, 0.4); }
+.buff-tile.kind-luck     .buff-tile-bar { background: #ff5a6e; }
+.buff-tile.kind-luck     .buff-tile-glyph, .buff-tile.kind-luck     .buff-tile-val { color: #ff5a6e; }
+.buff-tile.kind-cushion  { border-color: rgba(255, 138, 138, 0.4); }
+.buff-tile.kind-cushion  .buff-tile-bar { background: #ff8a8a; }
+.buff-tile.kind-cushion  .buff-tile-glyph, .buff-tile.kind-cushion  .buff-tile-val { color: #ff8a8a; }
+.buff-tile.kind-compound { border-color: rgba(124, 90, 212, 0.4); }
+.buff-tile.kind-compound .buff-tile-bar { background: #7c5ad4; }
+.buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #7c5ad4; }
+.buff-tile:active { transform: scale(0.97); }
+
+/* Meta-buff minibar — smaller, dimmer pills than .buff-tile. Sits just
+   above the buff list (which itself sits in a different fixed position on
+   desktop vs mobile), so we share the same coordinate system as #buffs.
+   Hidden when no metas are active. */
+#metaBuffs {
+  position: fixed;
+  top: 130px;
+  left: 16px;
+  width: 190px;
+  z-index: 5;
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  pointer-events: auto;
+}
+/* Meta-pill mirrors .buff-tile (same corners, same bar opacity, same chrome)
+   but at a shorter height — meta-buffs are smaller cousins of regular buffs.
+   Same shape so the two rows read as one visual family. */
+.meta-pill {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(20, 20, 40, 0.78);
+  border: 1px solid rgba(120, 140, 255, 0.3);
+  color: #e8e8f0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+.meta-pill .meta-bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 100%;
+  transform-origin: left center;
+  opacity: 0.32;
+  transition: transform 0.1s linear;
+}
+.meta-pill .meta-fg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+}
+.meta-pill .ri { font-size: 13px; line-height: 1; }
+.meta-pill .meta-val { font-weight: 600; font-size: 12px; }
+.meta-pill .meta-time { color: #cfc0e8; font-size: 10px; opacity: 0.75; }
+/* All meta-buffs spawn from Window upgrades, so the family colour is purple.
+   Three sub-shades let the kinds be glanced apart; icons confirm. */
+.meta-pill.kind-strength .meta-bar { background: #c084ff; }
+.meta-pill.kind-strength { border-color: rgba(192, 132, 255, 0.4); }
+.meta-pill.kind-strength .ri, .meta-pill.kind-strength .meta-val { color: #c084ff; }
+.meta-pill.kind-duration .meta-bar { background: #9d6ee0; }
+.meta-pill.kind-duration { border-color: rgba(157, 110, 224, 0.4); }
+.meta-pill.kind-duration .ri, .meta-pill.kind-duration .meta-val { color: #9d6ee0; }
+.meta-pill.kind-luck     .meta-bar { background: #d8a5f0; }
+.meta-pill.kind-luck     { border-color: rgba(216, 165, 240, 0.4); }
+.meta-pill.kind-luck     .ri, .meta-pill.kind-luck .meta-val { color: #d8a5f0; }
+
+/* Hail win burst — anchored fixed at the tapped card's centre. Pointer
+   events off so it cannot eat input. All sub-elements share a single root
+   that is removed on a ~1.3s timer. */
+#winFxRoot {
+  position: fixed; inset: 0; pointer-events: none; z-index: 90;
+  overflow: hidden;
+}
+.win-burst {
+  position: absolute; width: 0; height: 0;
+  pointer-events: none;
+}
+.win-burst .wb-flash {
+  position: absolute;
+  left: -260px; top: -260px; width: 520px; height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(220, 255, 232, 0.65), rgba(76, 208, 125, 0.30) 35%, rgba(76, 208, 125, 0) 70%);
+  filter: blur(2px);
+  animation: wb-flash 0.65s ease-out forwards;
+}
+@keyframes wb-flash {
+  0%   { transform: scale(0.2); opacity: 0; }
+  35%  { transform: scale(1.0); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.win-burst .wb-glyph {
+  position: absolute;
+  left: 0; top: 0;
+  font-size: 96px;
+  color: #d8ffe5;
+  text-shadow: 0 0 22px rgba(76, 208, 125, 0.95), 0 0 44px rgba(76, 208, 125, 0.55);
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: wb-glyph 0.95s cubic-bezier(0.2, 0.9, 0.25, 1.1) forwards;
+}
+@keyframes wb-glyph {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  18%  { transform: translate(-50%, -50%) scale(1.55); opacity: 1; }
+  55%  { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+  100% { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
+}
+.win-burst .wb-ring {
+  position: absolute;
+  left: 0; top: 0;
+  width: 36px; height: 36px;
+  margin-left: -18px; margin-top: -18px;
+  border-radius: 50%;
+  border: 2px solid rgba(76, 208, 125, 0.9);
+  box-shadow: 0 0 18px rgba(76, 208, 125, 0.55);
+  transform: scale(0.1); opacity: 0;
+  animation: wb-ring 1.0s ease-out forwards;
+}
+.win-burst .wb-ring-2 { animation-delay: 120ms; border-color: rgba(126, 230, 167, 0.75); }
+.win-burst .wb-ring-3 { animation-delay: 240ms; border-color: rgba(76, 208, 125, 0.55); }
+@keyframes wb-ring {
+  0%   { transform: scale(0.1); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: scale(14); opacity: 0; }
+}
+.win-burst .wb-mote {
+  position: absolute;
+  left: 0; top: 0; width: 6px; height: 6px;
+  margin-left: -3px; margin-top: -3px;
+  border-radius: 50%;
+  background: #d8ffe5;
+  box-shadow: 0 0 10px rgba(76, 208, 125, 0.95);
+  transform: rotate(var(--a)) translateY(0);
+  animation: wb-mote 1.1s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+  animation-delay: var(--d);
+}
+@keyframes wb-mote {
+  0%   { transform: rotate(var(--a)) translateY(0) scale(0.5); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(240px) scale(0.2); opacity: 0; }
+}
+.slot.fx-win-glow {
+  box-shadow:
+    0 0 0 1px rgba(76, 208, 125, 0.85),
+    0 0 28px rgba(76, 208, 125, 0.55),
+    0 0 64px rgba(76, 208, 125, 0.30);
+  animation: slot-win-glow 0.9s ease-out;
+}
+@keyframes slot-win-glow {
+  0%   { filter: brightness(2.0) saturate(1.4); }
+  40%  { filter: brightness(1.35) saturate(1.2); }
+  100% { filter: brightness(1) saturate(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win-burst { display: none; }
+  .slot.fx-win-glow { animation: none; }
+}
+
+/* Hail result drama — full-screen overlay carrying the centred WIN/LOSS
+   banner plus radiating motes. Sits above the shelf but below modals.
+   pointer-events stays off so taps fall through to whatever is below
+   (nothing interactive should be there mid-burst, but safety first). */
+#gambleFxOverlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 120;
+  overflow: hidden;
+}
+.gx-banner {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0.6) rotate(-3deg);
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.16em;
+  text-align: center;
+  will-change: transform, opacity;
+}
+.gx-banner .gx-label {
+  font-size: clamp(38px, 9vw, 96px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.22em;
+}
+.gx-banner .gx-delta {
+  font-size: clamp(20px, 4.5vw, 44px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.gx-banner .gx-sign { font-size: 0.9em; opacity: 0.85; }
+.gx-banner.gx-win {
+  color: #d8ffe5;
+  text-shadow:
+    0 0 14px rgba(76, 208, 125, 0.95),
+    0 0 36px rgba(76, 208, 125, 0.7),
+    0 0 72px rgba(76, 208, 125, 0.35);
+}
+.gx-banner.gx-win .gx-delta { color: #7ee6a7; text-shadow: 0 0 18px rgba(76, 208, 125, 0.85); }
+.gx-banner.gx-loss {
+  color: #d6a4a8;
+  text-shadow:
+    0 0 14px rgba(170, 60, 70, 0.7),
+    0 0 36px rgba(120, 30, 40, 0.5);
+}
+.gx-banner.gx-loss .gx-delta { color: #b97078; }
+.gx-banner.gx-in.gx-win  { animation: gx-banner-in-win  0.7s cubic-bezier(0.2, 0.9, 0.25, 1.15) forwards; }
+.gx-banner.gx-in.gx-loss { animation: gx-banner-in-loss 0.7s cubic-bezier(0.2, 0.7, 0.3, 1)    forwards; }
+/* gx-out variants need 3-class selectors so they override the gx-in rules
+   above; otherwise the higher-specificity gx-in animation keeps applying
+   and the banner just pops out of existence when the JS removes it. */
+.gx-banner.gx-out.gx-win  { animation: gx-banner-out-win  0.9s cubic-bezier(0.33, 0, 0.4, 1) forwards; }
+.gx-banner.gx-out.gx-loss { animation: gx-banner-out-loss 1.0s cubic-bezier(0.33, 0, 0.4, 1) forwards; }
+@keyframes gx-banner-in-win {
+  0%   { transform: translate(-50%, -50%) scale(0.55) rotate(-6deg); opacity: 0; }
+  40%  { transform: translate(-50%, -50%) scale(1.28) rotate(2deg);  opacity: 1; }
+  70%  { transform: translate(-50%, -50%) scale(0.96) rotate(-1deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg);  opacity: 1; }
+}
+@keyframes gx-banner-in-loss {
+  0%   { transform: translate(-50%, -50%) scale(0.65) rotate(2deg); opacity: 0; }
+  40%  { transform: translate(-50%, -50%) scale(1.18) rotate(-1deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg);  opacity: 1; }
+}
+@keyframes gx-banner-out-win {
+  0%   { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg); opacity: 1; }
+  35%  { transform: translate(-50%, -52%) scale(1.03) rotate(0deg); opacity: 0.7; }
+  100% { transform: translate(-50%, -56%) scale(1.10) rotate(0deg); opacity: 0; }
+}
+@keyframes gx-banner-out-loss {
+  0%   { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg); opacity: 1; }
+  35%  { transform: translate(-50%, -46%) scale(0.98) rotate(0deg); opacity: 0.7; }
+  100% { transform: translate(-50%, -38%) scale(0.92) rotate(0deg); opacity: 0; }
+}
+/* Green motes radiating from centre on a win. Each rotates by --a and
+   travels out --d pixels along that axis. */
+.gx-mote-win {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 8px; height: 8px;
+  margin-left: -4px; margin-top: -4px;
+  border-radius: 50%;
+  background: #d8ffe5;
+  box-shadow: 0 0 12px rgba(76, 208, 125, 0.95);
+  transform: rotate(var(--a)) translateY(0) scale(0.4);
+  opacity: 0;
+  animation: gx-mote-win 0.95s cubic-bezier(0.18, 0.7, 0.28, 1) forwards;
+}
+@keyframes gx-mote-win {
+  0%   { transform: rotate(var(--a)) translateY(0) scale(0.4); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(var(--d)) scale(0.1); opacity: 0; }
+}
+/* Ash-grey motes drifting down on a loss. Quieter, fewer, slower. */
+.gx-mote-loss {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 5px; height: 5px;
+  margin-left: -2.5px; margin-top: -2.5px;
+  border-radius: 50%;
+  background: #6e6a78;
+  box-shadow: 0 0 6px rgba(150, 145, 165, 0.45);
+  transform: translate(var(--x), 0) scale(0.6);
+  opacity: 0;
+  animation: gx-mote-loss 1.3s ease-in forwards;
+}
+@keyframes gx-mote-loss {
+  0%   { transform: translate(var(--x), -8px) scale(0.6); opacity: 0; }
+  20%  { opacity: 0.85; }
+  100% { transform: translate(var(--x), 220px) scale(0.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gx-banner { animation: none !important; opacity: 1 !important; transform: translate(-50%, -50%) !important; }
+  .gx-mote-win, .gx-mote-loss { display: none; }
+}
+
+#buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 14, 0.78);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+#buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open, #networkModal.open { display: flex; }
+/* Cover every interactive surface inside a modal: skips iOS's 300ms tap
+   delay and the tap-highlight flash that occasionally swallows first taps
+   on iOS Chrome. Mirrors what the slot cards already do. */
+.bm-card button,
+.cl-tab, .diag-tab,
+.cl-entry, .cl-eng-btn, .cl-close-btn, .cl-cancel-btn,
+.bm-close, .bm-link {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* On phones the modal overlay's 20px padding eats real estate. Drop it to
+   8px so the body has room and the close button stays in the viewport. */
+@media (max-width: 520px) {
+  #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal {
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+  .bm-card {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+}
+.diag-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(20, 20, 40, 0.95);
+  backdrop-filter: blur(6px);
+  margin-left: -16px;
+  margin-right: -16px;
+  padding: 0 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.diag-tabs::-webkit-scrollbar { display: none; }
+.diag-tab {
+  background: transparent;
+  border: 0;
+  color: #8a8ac0;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 9px 12px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.diag-tab:hover { color: #d49a55; }
+.diag-tab.is-active { color: #d49a55; border-bottom-color: #d49a55; }
+.diag-panel { display: none; }
+.diag-panel.is-active { display: block; }
+.faq-block {
+  padding: 11px 13px;
+  margin: 0 0 10px;
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  border-left: 2px solid rgba(120, 140, 255, 0.45);
+  border-radius: 0 6px 6px 0;
+}
+.faq-block.kind-rate     { border-left-color: #9d6ee0; }
+.faq-block.kind-luck     { border-left-color: #ff5a6e; }
+.faq-block.kind-cushion  { border-left-color: #ff8a8a; }
+.faq-block.kind-compound { border-left-color: #7c5ad4; }
+.faq-block.kind-mass     { border-left-color: #d49a55; }
+.faq-block.kind-memory   { border-left-color: #4cd07d; }
+.faq-block.kind-hail     { border-left-color: #ff5a6e; }
+.faq-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e8f0;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.faq-head .ri { font-size: 16px; color: #aab0d0; }
+.faq-body {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #c0c0d8;
+}
+.faq-body p { margin: 0 0 6px; }
+.faq-body p:last-child { margin-bottom: 0; }
+.faq-body strong { color: #e8e8f0; font-weight: 600; }
+.faq-foot {
+  font-size: 11px;
+  color: #7a7a9a;
+  line-height: 1.5;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+.diag-intro, .diag-foot {
+  font-size: 11px;
+  color: #aab0d0;
+  line-height: 1.45;
+  margin: 0;
+}
+.diag-intro { padding: 4px 0 12px; }
+.diag-foot {
+  padding: 12px 0 4px;
+  color: #6a6a90;
+  border-top: 1px solid rgba(120, 140, 255, 0.12);
+  margin-top: 8px;
+}
+.diag-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.diag-row {
+  background: rgba(20, 20, 40, 0.55);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.diag-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.diag-row-label {
+  font-size: 13px;
+  color: #e8e8f0;
+  letter-spacing: 0.02em;
+}
+.diag-row-factor {
+  font-size: 14px;
+  color: #c0c0d8;
+  font-weight: 600;
+}
+.diag-row-note {
+  font-size: 10px;
+  color: #6a6a90;
+  letter-spacing: 0.06em;
+  margin-top: 3px;
+}
+.diag-row.diag-base { border-color: rgba(76, 208, 125, 0.4); }
+.diag-row.diag-base .diag-row-factor { color: #4cd07d; }
+.diag-row.diag-mul .diag-row-factor { color: #8aa0ff; }
+.diag-row.diag-exp { border-color: rgba(245, 211, 74, 0.4); }
+.diag-row.diag-exp .diag-row-factor { color: #f5d34a; }
+.diag-row.diag-total {
+  border-color: rgba(212, 154, 85, 0.55);
+  background: rgba(212, 154, 85, 0.08);
+  margin-top: 4px;
+}
+.diag-row.diag-total .diag-row-label { color: #d49a55; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; }
+.diag-row.diag-total .diag-row-factor { color: #d49a55; font-size: 16px; }
+.slot-modal-tag {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(120, 140, 255, 0.12);
+  margin-bottom: 12px;
+}
+.slot-modal-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c0c0d8;
+  margin: 0 0 12px;
+}
+.slot-modal-explain {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #8b91b5;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-left: 2px solid rgba(120, 140, 255, 0.35);
+  background: rgba(120, 140, 255, 0.05);
+  border-radius: 0 4px 4px 0;
+}
+.bm-intro {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #8b91b5;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-left: 2px solid rgba(120, 140, 255, 0.35);
+  background: rgba(120, 140, 255, 0.05);
+  border-radius: 0 4px 4px 0;
+}
+.bm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: rgba(120, 140, 255, 0.08);
+  border: 1px solid rgba(120, 140, 255, 0.25);
+  color: #8aa0ff;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.bm-link:hover { background: rgba(120, 140, 255, 0.16); border-color: rgba(120, 140, 255, 0.4); color: #c0d0ff; }
+.bm-link .ri { font-size: 14px; }
+.slot-modal-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(120, 140, 255, 0.12);
+  color: #aab0d0;
+}
+.slot-modal-row span:last-child { color: #e8e8f0; font-variant-numeric: tabular-nums; }
+.slot-modal-row span.cc { color: #d49a55; }
+.bm-card {
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(120, 140, 255, 0.35);
+  border-radius: 12px;
+  max-width: 460px;
+  width: 100%;
+  /* 100dvh tracks the actually-visible viewport on iOS Chrome,
+     where 100vh otherwise leaks behind the URL bar and pushes the
+     close button above the fold. 100vh kept as a fallback. */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.bm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+}
+.bm-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #e8e8f0;
+}
+.bm-close {
+  background: transparent;
+  border: none;
+  color: #8aa0ff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+.bm-close:hover { color: #c0d0ff; }
+.bm-body {
+  padding: 8px 16px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.bm-section { padding: 12px 0; border-bottom: 1px solid rgba(120, 140, 255, 0.1); }
+.bm-section:last-child { border-bottom: none; }
+.bm-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.bm-section-head .ri { font-size: 18px; line-height: 1; }
+.bm-section-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.bm-section-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c0c0d8;
+  margin: 0;
+}
+.bm-section.kind-rate     .ri, .bm-section.kind-rate     .bm-section-name { color: #9d6ee0; }
+.bm-section.kind-luck     .ri, .bm-section.kind-luck     .bm-section-name { color: #ff5a6e; }
+.bm-section.kind-cushion  .ri, .bm-section.kind-cushion  .bm-section-name { color: #ff8a8a; }
+.bm-section.kind-compound .ri, .bm-section.kind-compound .bm-section-name { color: #7c5ad4; }
+

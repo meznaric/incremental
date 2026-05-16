@@ -1,0 +1,430 @@
+
+#interstitial {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 14, 0);
+  backdrop-filter: blur(0px);
+  transition: background 0.18s ease, backdrop-filter 0.18s ease;
+  z-index: 100;
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  cursor: pointer;
+  /* Skip iOS's 300ms tap-delay heuristics and tap-highlight flash. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+#interstitial.it-visible {
+  background: rgba(6, 6, 14, 0.78);
+  backdrop-filter: blur(6px);
+}
+/* Briefly transparent to input right after opening so rapid taps from the
+   purchase that triggered the interstitial reach the card behind instead
+   of being eaten as advance/dismiss. */
+#interstitial.it-guard { pointer-events: none; }
+.it-card {
+  width: 100%;
+  max-width: min(960px, calc(100vw - 64px));
+  /* Cap at the overlay's available height so a tall card never pushes
+     the footer (Prev / Next) off-screen on small phones. The overlay
+     padding already includes safe-area, so 100% of its content box is
+     what we have to work with. */
+  max-height: 100%;
+  padding: 28px 32px 18px;
+  text-align: center;
+  transform: translateY(8px);
+  opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+#interstitial.it-visible .it-card { transform: translateY(0); opacity: 1; }
+/* Head: holds the contact frame + speaker badge. flex 0 so the body
+   region absorbs vertical slack. */
+.it-head { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.it-head:empty { display: none; }
+/* Body: text region with a stable reserved height. Allowed to scroll
+   internally for the rare long step rather than push the footer off.
+   No flex-centering inside — as the typewriter streams characters, a
+   centered text would drift; top-aligned + min-height keeps the visual
+   anchor put. */
+.it-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  width: 100%;
+}
+/* Foot: dots + button row. flex 0 keeps it pinned regardless of body. */
+.it-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 14px; }
+/* Season finale card. The bg layer holds a full-bleed image; the card
+   widens, the type lifts, and the fade is slower so the cinematic beat
+   lands. Used by the `season_complete` interstitial; future season
+   openers reuse the same class via the interstitial def's cssClass. */
+.it-card.it-season-finale {
+  max-width: min(1100px, calc(100vw - 64px));
+  min-height: 360px;
+  padding: 48px 48px 24px;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+  border-color: rgba(212, 154, 85, 0.55);
+  background:
+    linear-gradient(180deg, rgba(10, 8, 22, 0.55) 0%, rgba(10, 8, 22, 0.85) 80%),
+    rgba(10, 8, 22, 0.6);
+  overflow: hidden;
+}
+.it-card.it-season-finale .it-text {
+  font-size: 22px;
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+}
+.it-card.it-season-finale .it-text.it-italic {
+  color: #d49a55;
+  font-size: 23px;
+}
+.it-bg-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.45;
+  z-index: -1;
+  filter: saturate(0.9) brightness(0.85);
+  animation: it-bg-fade-in 1.2s ease forwards;
+}
+@keyframes it-bg-fade-in {
+  from { opacity: 0; transform: scale(1.04); }
+  to   { opacity: 0.45; transform: scale(1); }
+}
+.it-card.it-season-finale .it-dots .it-dot { background: rgba(212, 154, 85, 0.55); }
+.it-card.it-season-finale .it-dots .it-dot.on { background: #d49a55; }
+.it-contact {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+  width: 100%;
+}
+.it-card.it-has-contact .it-contact { display: flex; }
+.it-card.it-first-contact .it-contact { gap: 18px; padding-bottom: 22px; }
+.it-portrait {
+  position: relative;
+  width: min(420px, 78vw);
+  aspect-ratio: 11 / 6;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(212, 154, 85, 0.45);
+  background:
+    radial-gradient(60% 60% at 50% 40%, rgba(212, 154, 85, 0.18), transparent 65%),
+    linear-gradient(180deg, #14142a 0%, #060614 100%);
+  box-shadow: 0 0 28px -6px rgba(212, 154, 85, 0.35);
+}
+.it-card.it-first-contact .it-portrait {
+  width: min(520px, 86vw);
+  box-shadow: 0 0 44px -4px rgba(212, 154, 85, 0.55);
+  animation: it-portrait-glow 3.2s ease-in-out infinite;
+}
+@keyframes it-portrait-glow {
+  0%, 100% { box-shadow: 0 0 32px -6px rgba(212, 154, 85, 0.45); }
+  50%      { box-shadow: 0 0 56px -2px rgba(212, 154, 85, 0.7); }
+}
+.it-portrait-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.32s ease;
+}
+.it-portrait-img.loaded { opacity: 1; }
+.it-portrait-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(40% 40% at 50% 50%, rgba(212, 154, 85, 0.22), transparent 70%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(212, 154, 85, 0.18) 0, rgba(212, 154, 85, 0.18) 1px, transparent 1px, transparent 16px);
+}
+.it-portrait-fallback::before {
+  content: '';
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 154, 85, 0.6);
+  box-shadow: 0 0 18px rgba(212, 154, 85, 0.45) inset, 0 0 22px rgba(212, 154, 85, 0.35);
+}
+.it-card.it-portrait-has-image .it-portrait-fallback { display: none; }
+.it-contact-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.it-contact-tag {
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #d49a55;
+}
+.it-card.it-first-contact .it-contact-tag {
+  color: #f0c080;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+}
+.it-contact-name {
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  color: #e8e8f0;
+  margin-top: 4px;
+}
+.it-card.it-first-contact .it-contact-name { font-size: 22px; letter-spacing: 0.16em; }
+.it-contact-status {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-top: 2px;
+  font-weight: 600;
+}
+.it-contact-status.s-triggered { color: #ff8a3a; }
+.it-contact-status.s-collapsed { color: #ff5a6e; }
+.it-contact-status.s-shifted   { color: #9d6ee0; }
+.it-contact-status.s-missing   { color: #4ea8ff; }
+.it-contact-flavor {
+  font-size: 12px;
+  color: #aab0d0;
+  margin-top: 8px;
+  max-width: 460px;
+  line-height: 1.5;
+  font-style: italic;
+}
+@media (prefers-reduced-motion: reduce) {
+  .it-card.it-first-contact .it-portrait { animation: none; }
+}
+/* Speaker badge — portrait + name above each text step. Only shown for
+   Kalen / Sera voices; Narrator and Anonymous hide it (italic carries A).
+   The card toggles .it-has-speaker per step. */
+.it-speaker {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.it-card.it-has-speaker .it-speaker { display: flex; opacity: 1; }
+.it-speaker-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(138, 160, 255, 0.45);
+  background: #0a0a18;
+  box-shadow: 0 0 14px -4px rgba(138, 160, 255, 0.5);
+}
+.it-card.voice-sera .it-speaker-img {
+  border-color: rgba(212, 154, 85, 0.55);
+  box-shadow: 0 0 14px -4px rgba(212, 154, 85, 0.55);
+}
+.it-speaker-name {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(232, 232, 240, 0.7);
+}
+.it-card.voice-kalen .it-speaker-name { color: #b9c1ff; }
+.it-card.voice-sera   .it-speaker-name { color: #d49a55; }
+.it-text {
+  font-size: 22px;
+  line-height: 1.45;
+  color: #e8e8f0;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  /* Reserve ~5 lines so prev/next (anchored to card center) don't shift
+     as step text length changes. Long steps grow past this; one-liners
+     keep the card a stable size. */
+  min-height: 7.25em;
+}
+.it-text.it-italic {
+  font-style: italic;
+  color: #b9c1ff;
+  letter-spacing: 0.02em;
+}
+.it-text.it-typing::after {
+  content: '▍';
+  display: inline-block;
+  margin-left: 2px;
+  color: #8aa0ff;
+  animation: it-blink 0.8s steps(2) infinite;
+}
+@keyframes it-blink { 50% { opacity: 0; } }
+.it-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  min-height: 6px;
+}
+.it-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(120, 140, 255, 0.25);
+  transition: background 0.15s;
+}
+.it-dot.on { background: #8aa0ff; }
+/* Footer button row. Two equal buttons (Previous / Next; Next swaps to
+   Close on the last step). Pinned to the bottom of the card by .it-foot
+   so they're always in reach — no chevrons floating off small screens. */
+.it-btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.it-btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 10px 16px;
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid rgba(120, 140, 255, 0.32);
+  color: #b9c1ff;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, opacity 0.14s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.it-btn:hover { background: rgba(40, 40, 80, 0.85); border-color: rgba(138, 160, 255, 0.6); color: #e8e8f0; }
+.it-btn:disabled { opacity: 0.28; cursor: default; }
+/* Close = primary affordance on the last step. Warm tungsten matches the
+   Collect button in welcome-back so the "this dismisses" reading is
+   consistent across modals. */
+.it-btn.is-close {
+  background: rgba(212, 154, 85, 0.18);
+  border-color: rgba(212, 154, 85, 0.6);
+  color: #d49a55;
+}
+.it-btn.is-close:hover {
+  background: rgba(212, 154, 85, 0.28);
+  border-color: #d49a55;
+  color: #f0c080;
+}
+/* Single-step interstitials hide Previous — only a Close-style Next remains. */
+.it-card.it-single .it-btn-prev { display: none; }
+/* Season-finale tone — match the warm palette across both buttons. */
+.it-card.it-season-finale .it-btn {
+  border-color: rgba(212, 154, 85, 0.42);
+  color: #d49a55;
+}
+.it-card.it-season-finale .it-btn:hover {
+  border-color: rgba(212, 154, 85, 0.9);
+  color: #f0c080;
+}
+@media (max-width: 520px) {
+  .it-card { padding: 18px 16px 14px; gap: 12px; }
+  .it-text { min-height: 6.5em; font-size: 17px; line-height: 1.45; }
+  .it-card.it-season-finale { padding: 28px 20px 16px; }
+  .it-card.it-season-finale .it-text { font-size: 18px; line-height: 1.5; }
+  .it-portrait { width: min(360px, 76vw); }
+  .it-card.it-first-contact .it-portrait { width: min(420px, 84vw); }
+  .it-btn { font-size: 12px; letter-spacing: 0.12em; padding: 10px 12px; }
+}
+
+@media (max-width: 820px) {
+  #shop {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: auto;
+    max-width: none;
+    /* max() instead of safe-area + 8px so notched phones don't get a
+       doubled-up gap below the shop (home-indicator inset is enough). */
+    padding: 6px 0 max(8px, env(safe-area-inset-bottom));
+    gap: 6px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+  }
+  #shopToolbar { padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)); }
+  #slots {
+    gap: 8px;
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    scroll-padding-inline: 8px;
+  }
+  .slot { width: 150px; padding: 8px; min-height: 204px; }
+  .slot .name { font-size: 12px; }
+  .slot .desc { font-size: 10px; min-height: 28px; }
+  .slot .cost { font-size: 12px; margin-top: 4px; }
+  .slot .outcomes { font-size: 10px; }
+  .slot .rarity { font-size: 8px; }
+  #buffs {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    bottom: calc(var(--shop-h, 200px) + 8px);
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 8px 0;
+    gap: 8px;
+    pointer-events: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  #buffs::-webkit-scrollbar { display: none; }
+  #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
+  /* On mobile #buffs is a horizontal strip at the bottom. Place metaBuffs
+     just above it — buff-tile height is 44px + gap, plus a small breath.
+     Match the scrolling behaviour of #buffs so long meta-stacks feel native. */
+  #metaBuffs {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    bottom: calc(var(--shop-h, 200px) + 60px);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 8px;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  #metaBuffs::-webkit-scrollbar { display: none; }
+  #metaBuffs .meta-pill { scroll-snap-align: start; }
+  #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
+  #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+  #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
+  #networkChip   { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 96px); padding: 0 10px; font-size: 12px; }
+}
+
+/* Phone-width: collapse buff cards into tappable tiles. The expanded
+   cards still render but are hidden — the same DOM tree powers both
+   layouts and the tile carries the data-idx the modal looks up. */
+@media (max-width: 640px) {
+  #buffs .buff-card { display: none; }
+  #buffs .buff-tile { display: inline-flex; scroll-snap-align: start; }
+}
+

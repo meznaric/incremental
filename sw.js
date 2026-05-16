@@ -27,7 +27,15 @@ const PRECACHE = [
   './vendor/remixicon/remixicon.css',
   './vendor/remixicon/remixicon.woff2',
 
+  './styles/base.css',
+  './styles/shop.css',
+  './styles/welcomeBack.css',
+  './styles/interstitial.css',
+  './styles/cyclePattern.css',
+  './styles/network.css',
+
   './src/main.js',
+  './src/mainUi.js',
   './src/bignum.js',
   './src/breakdown.js',
   './src/breakdownUi.js',
@@ -47,9 +55,10 @@ const PRECACHE = [
   './src/save.js',
   './src/shop.js',
   './src/tap.js',
+  './src/upgrades-data.js',
   './src/upgrades.js',
   './src/welcomeBack.js',
-  './src/worlds.js',
+  './src/worlds-data.js',
 ];
 
 self.addEventListener('install', (event) => {

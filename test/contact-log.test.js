@@ -11,7 +11,7 @@ import {
   ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
   echoLoopLevel, isLoopMode, activeEp, allEpsComplete, isEpComplete,
 } from '../src/contactLog.js';
-import { WORLDS_BY_EP } from '../src/worlds.js';
+import { WORLDS_BY_EP } from '../src/worlds-data.js';
 
 // Helper: log a synthetic player who has completed every world in EPs 1..n.
 function logWithEpsCompleted(n) {

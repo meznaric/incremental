@@ -25,7 +25,7 @@
 //     bestPeak: number,          // Highest peakAmount of any past cycle (for stats).
 //   }
 
-import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds.js';
+import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds-data.js';
 
 export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
@@ -71,7 +71,7 @@ export function worldFor(log, milestoneId) {
 }
 
 // Per-world lore detail — surfaces only when the player taps a contact in the
-// log. Defined per world id in worlds.js so the same lookup serves every EP.
+// log. Defined per world id in worlds-data.js so the same lookup serves every EP.
 export function worldDetail(id) {
   return WORLD_DETAIL[id] || null;
 }

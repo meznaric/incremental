@@ -1,47 +1,63 @@
 # Incremental — *Echoes Beyond the Stars* companion game
 
-3D incremental/idle game. Three.js, zero-build, deploys as static files. Companion to the dark sci-fi drama *Echoes Beyond the Stars*. **The player is Kalen Vale.** The number going up is signal — *Echoes* — returning from the dark.
+3D incremental/idle. Three.js. Zero-build. Static deploy. Companion to dark sci-fi drama *Echoes Beyond the Stars*. **Player = Kalen Vale.** Number go up = signal — *Echoes* — return from dark.
 
 > *The dark was never silent.*
 
-## Run it
+## Run
 
 ```
 python3 -m http.server 8765
 ```
 
-Open `http://localhost:8765/`. No npm, no bundler, no build step. Ever.
+Open `http://localhost:8765/`. No npm. No bundler. No build. Ever.
 
 ## Layout
 
 ```
-index.html          # entry: HUD markup, import map, styles
-src/main.js         # game loop, scene, state, save/load
+index.html          # entry: HUD markup, importmap, <link>s to styles/*.css. ~400 lines.
+styles/             # per-feature CSS: base, shop, welcomeBack, interstitial, cyclePattern, network
+src/main.js         # bootstrap: state + scene + game loop. ~340 lines.
+src/mainUi.js       # all HUD/shop/buff/toolbar/modal rendering. initMainUi(state, deps)
+src/<name>.js       # pure logic — testable, no DOM, no three.js
+src/<name>Ui.js     # DOM/HTML half — renders, wires taps, consumes the pure module
+src/<name>-data.js  # static catalogues (worlds-data, upgrades-data, periods-data). Pure const exports.
+src/tap.js          # installTap() — use for every in-game tap. Header explains the iOS pain.
+src/save.js         # SAVE_KEY (currently `v14`), saveState / loadState
 vendor/             # three.module.min.js + three.core.min.js (pinned r171)
+test/               # node --test files, one per pure module
+docs/lore/          # in-world content — start at docs/lore/README.md
 ```
 
-Add new modules under `src/` and import them from `main.js`. Keep `vendor/` for third-party only.
+New modules → `src/`, import from `main.js`. `vendor/` = third-party only. CSS → add a rule to the matching `styles/*.css` (or create a new file + `<link>` in `index.html` + entry in `sw.js` PRECACHE for new features). Static catalogues that >500 lines → split into `name-data.js` so logic edits don't drown in tables.
 
 ## Architecture
 
-- **State**: single `state` object in `src/main.js`. Mutated directly. Persisted to `localStorage` under `incremental.save.v1` — bump the key suffix on breaking schema changes.
-- **Loop**: one `requestAnimationFrame` driver. All time-based logic uses `dt` seconds, never frame count.
-- **Rendering**: one `THREE.Scene`, one `WebGLRenderer`. Resize handler keeps it full-viewport.
-- **Input**: raycaster against meshes. Don't add DOM buttons over the canvas unless the HUD layer needs them.
+- **State**: one `state` object in `src/main.js`. Mutate direct. Persist to `localStorage` key `incremental.save.v14` — bump suffix on breaking schema change.
+- **Loop**: one `requestAnimationFrame`. Time logic = `dt` seconds, never frame count.
+- **Render**: one `THREE.Scene`, one `WebGLRenderer`. Resize handler = full viewport.
+- **Input**: raycaster vs meshes for the 3D scene. All HUD/modal taps go through `installTap()`. Plain `addEventListener('click', …)` drops taps on iOS — don't use it.
+
+## Patterns
+
+- **Logic / UI split.** `foo.js` is pure (`tryBuy`, `placeRelay`, `integrateRate`-style math) — no DOM, no three.js, importable from Node. `fooUi.js` renders HTML, wires taps, mutates the modal. Tests cover the pure half only. When adding behaviour, ask: is this state math (→ `foo.js`) or pixels (→ `fooUi.js`)?
+- **Taps**: `installTap(el, handler)` from `src/tap.js` is the only sanctioned way. iOS drops synthesized `click`s when ancestor HTML rewrites mid-gesture, and Android scroll-pans fire stale taps. The header in `src/tap.js` documents every failure mode that's been fixed — read it before "improving" the helper.
+- **Two persistence keys, not one.** `SAVE_KEY` (`incremental.save.v14`) holds the gameplay run — wiped by Cycle close. `contactLog` lives under its own key in `src/contactLog.js` — survives Cycle close so prestige (Echo Memory, Carrier Mass, Engravings) carries across runs. Don't merge them.
+- **Tuning lives next to code.** Cooldown ms, hex radius, drop rates, sector multipliers — all inline as `const` at the top of the module that uses them. No config files.
 
 ## Constraints (non-negotiable)
 
-- No build tooling. No `node_modules`. The only `package.json` is a 1-line `{ "type": "module" }` so Node treats `src/*.js` as ESM for tests — no deps, no scripts.
-- No CDN imports at runtime. All deps vendored under `vendor/`.
-- Three.js stays pinned. To upgrade: download both `three.module.min.js` and `three.core.min.js` from the same version, commit together.
-- ES modules only. No globals on `window`.
-- Plain JS. No TypeScript, no JSX.
+- No build tools. No `node_modules`. Only `package.json` = 1-line `{ "type": "module" }` so Node treats `src/*.js` as ESM for tests. No deps. No scripts.
+- No CDN imports at runtime. Vendor all under `vendor/`.
+- Three.js pinned. Upgrade: download `three.module.min.js` + `three.core.min.js` same version, commit together.
+- ES modules only. No `window` globals.
+- Plain JS. No TypeScript. No JSX.
 
 ## Style
 
-- Terse. No comments unless the *why* is non-obvious.
-- No premature abstractions. Inline until something is used 3+ times.
-- Numbers and tuning constants live next to the code that uses them, not in a config file.
+- Terse. No comments unless *why* non-obvious.
+- No premature abstractions. Inline until 3+ uses.
+- Tuning constants live next to code, not config file.
 
 ## Testing
 
@@ -49,41 +65,64 @@ Add new modules under `src/` and import them from `main.js`. Keep `vendor/` for 
 node --test test/
 ```
 
-Uses Node's built-in test runner (no deps). Covers the pure logic that's likely to break: `integrateRate` math, `save`/`load` round-trips, `tryBuy` flows, `bignum` format/parse. Anything that touches three.js / DOM / `window` is out of scope here.
+Node built-in runner. No deps. Covers pure logic likely to break: `integrateRate` math, `save`/`load` round-trips, `tryBuy` flows, `bignum` format/parse. three.js / DOM / `window` = out of scope.
 
-For visual / rendering regressions: Playwright via MCP — start the server, navigate to the page, check `browser_console_messages`, screenshot to verify. Only run this when the user asks.
+Visual/render regressions: Playwright via MCP — start server, navigate, check `browser_console_messages`, screenshot. Only on user ask.
+
+## Workflow
+
+- **Commit messages**: single-line imperative, sentence case, no trailing period, ≤~72 chars. Body (optional, blank line above) explains *why* — past commits like `ab49b4c`, `619e648`, `fe3543a` are the template. Don't summarise the diff; describe the failure mode the change fixes or the behaviour it adds.
+- **`queue.txt`** (untracked, root): personal feature queue consumed by the `/queue-tasks` skill. Don't `git add` it. `Merge Task N: …` commits in the log are queue-tasks output.
+- **iOS / mobile is a first-class target.** Every tappable element gets tested on a touch viewport. The commit log is littered with iOS tap fixes — assume any new interactive UI will need the same scrutiny.
 
 ## Save compatibility
 
-When `state` shape changes:
+`state` shape change:
 1. Bump `SAVE_KEY` suffix (`v1` → `v2`).
-2. Old saves are dropped on next load. That is acceptable during development.
-3. Once we ship, write a migration in `load()` instead.
+2. Old saves drop on next load. Fine during dev.
+3. Post-ship: write migration in `load()`.
 
 ## Deploy caching
 
-GitHub Pages serves through `sw.js`, a service worker that **cache-firsts every static asset** (incl. `src/*.js`, `vendor/*`). Stale `src/main.js` is the failure mode — fresh HTML still imports the same URL, which the SW intercepts and serves from cache.
+GitHub Pages serves via `sw.js`, service worker. **Cache-firsts every static asset** (incl. `src/*.js`, `vendor/*`). Stale `src/main.js` = failure mode — fresh HTML imports same URL, SW intercepts, serves cache.
 
-The cache key is `CACHE_VERSION` in `sw.js`. **Bumping it per deploy invalidates every cached asset for existing players.** The Pages workflow (`.github/workflows/pages.yml`) does this automatically: a `sed` rewrites `CACHE_VERSION` to the commit SHA inside `_site/sw.js` before upload, and a `grep -q` immediately afterwards fails the build if the substitution didn't land. **Don't break the `CACHE_VERSION = '…'` line shape** in `sw.js` — if you ever rename it or change the quoting, update the sed and grep in `pages.yml` to match. Local dev keeps the static value baked into `sw.js`, which is fine because dev cache state is scoped to `localhost`.
+Cache key = `CACHE_VERSION` in `sw.js`. **Bump per deploy = invalidate all cached assets for existing players.** Pages workflow (`.github/workflows/pages.yml`) does this auto: `sed` rewrites `CACHE_VERSION` to commit SHA inside `_site/sw.js` pre-upload, `grep -q` after fails build if sub didn't land. **Don't break `CACHE_VERSION = '…'` line shape** in `sw.js` — rename or requote = update sed + grep in `pages.yml` to match. Local dev keeps static value baked in `sw.js`. Fine because dev cache scoped to `localhost`.
 
-The rest of the chain is robust: SW install uses `{cache: 'reload'}` so it bypasses HTTP cache; `skipWaiting()` + `clients.claim()` activate the new SW immediately; a `controllerchange` listener in `index.html` auto-reloads the page on update, so players get the fresh build mid-session without an explicit prompt.
+Rest of chain robust: SW install uses `{cache: 'reload'}` → bypass HTTP cache. `skipWaiting()` + `clients.claim()` → activate new SW immediately. `controllerchange` listener in `index.html` → auto-reload page on update. Players get fresh build mid-session, no prompt.
 
 ## Lore — read before adding content
 
-All story, world, character, naming, voice, and image references live under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). The mapping from existing mechanics to in-world names is in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — that is the canonical naming source for any new upgrade / buff / gamble / convert.
+All story, world, character, naming, voice, image refs under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). Mapping from mechanics to in-world names in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — canonical naming source for new upgrade / buff / gamble / convert.
 
-The lore rename has rolled out for **display strings**: currency reads as Echoes, and the gamble / buff / permanent-mul / convert tables in `src/upgrades.js` carry their lore names (Stim Patch, Adaptive Filter, Carrier Bleed, etc.). What's intentionally still casino-flavoured: **ids** (`coin_flip`, `mult_starter`, `red_black`) and the **save key** (`incremental.save.v1`). That's by design — ids are stable across the rename, and the save-key migration is the last item in [`game-mapping.md`](./docs/lore/game-mapping.md#conversion-order-ifwhen-we-do-the-rename). When you write copy, use the lore names; when you reference upgrades in code, use the ids.
+Lore rename rolled out for **display strings**: currency = Echoes. Gamble / buff / permanent-mul / convert tables in `src/upgrades-data.js` carry lore names (Stim Patch, Adaptive Filter, Carrier Bleed, etc.). Intentionally still casino-flavoured: **ids** (`coin_flip`, `mult_starter`, `red_black`) + **save key** prefix (`incremental.save.v14`). By design — ids stable across rename. Save-key migration = last item in [`game-mapping.md`](./docs/lore/game-mapping.md#conversion-order-ifwhen-we-do-the-rename). Write copy → lore names. Reference upgrades in code → ids.
 
-### Non-negotiable when writing in-world copy
+### Non-negotiable for in-world copy
 
-- **The player is Kalen.** Never "you, the user." The game speaks *to Kalen* or *as Kalen*. Voices are: **Kalen** (first person, ambient), **Sera** (second person, procedural), **Narrator** (third person, rare), **Anonymous** (italic, one sentence, ~once per season). Details in [`docs/lore/voice-and-tone.md`](./docs/lore/voice-and-tone.md).
-- **Currency is *Echoes*.** Plural. The icon is the triple-arc Echo glyph (see [`docs/lore/images/echo-glyph.png`](./docs/lore/images/echo-glyph.png)). The code field `state.amount` stays as-is — only display labels change.
-- **No real-world references.** No emoji, no internet vernacular, no fourth-wall breaks. No swearing.
-- **No Trek terms.** Banned list in [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md#names-you-should-not-use-ip--trek-overlap). If you find one in a draft, rewrite.
-- **Every new term goes into [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md).** If it's worth using, it's worth being canonical.
-- **Every new interstitial declares a voice** via a `// voice: …` comment above its `INTERSTITIALS[key]` block. See [`docs/lore/interstitials.md`](./docs/lore/interstitials.md).
-- **Story commitments live in [`docs/lore/episodes.md`](./docs/lore/episodes.md).** Don't answer S2/S3 mysteries in S1 content. The reveal order matters.
+- **Player = Kalen.** Never "you, the user." Game speaks *to Kalen* or *as Kalen*. Voices: **Kalen** (first person, ambient), **Sera** (second person, procedural), **Narrator** (third person, rare), **Anonymous** (italic, one sentence, ~once per season). See [`docs/lore/voice-and-tone.md`](./docs/lore/voice-and-tone.md).
+- **Currency = *Echoes*.** Plural. Icon = triple-arc Echo glyph (see [`docs/lore/images/echo-glyph.png`](./docs/lore/images/echo-glyph.png)). Code field `state.amount` stays. Only display labels change.
+- **No real-world refs.** No emoji. No internet vernacular. No fourth-wall breaks. No swearing.
+- **No Trek terms.** Banned list in [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md#names-you-should-not-use-ip--trek-overlap). Find one in draft → rewrite.
+- **Every new term → [`docs/lore/naming-conventions.md`](./docs/lore/naming-conventions.md).** Worth using = worth being canonical.
+- **Every new interstitial declares voice** via `// voice: …` comment above `INTERSTITIALS[key]` block. See [`docs/lore/interstitials.md`](./docs/lore/interstitials.md).
+- **Story commitments → [`docs/lore/episodes.md`](./docs/lore/episodes.md).** Don't answer S2/S3 mysteries in S1 content. Reveal order matters.
 
-### When generating images
+### Generating images
 
-Use [`docs/lore/scripts/gen-images.py`](./docs/lore/scripts/gen-images.py). The script bakes in the canonical visual-DNA prompt prefix; do not call the Imagen endpoint with ad-hoc prompts. If the visual DNA changes, edit `CANONICAL_PREFIX` in that script and rerun the full set so everything stays consistent. Style rules + banned terms in [`docs/lore/image-style-guide.md`](./docs/lore/image-style-guide.md).
+Use [`docs/lore/scripts/gen-images.py`](./docs/lore/scripts/gen-images.py). Script bakes canonical visual-DNA prompt prefix. Do not call Imagen endpoint with ad-hoc prompts. Visual DNA changes → edit `CANONICAL_PREFIX` in script, rerun full set so all stays consistent. Style rules + banned terms in [`docs/lore/image-style-guide.md`](./docs/lore/image-style-guide.md).
+
+## Keeping this doc current
+
+This file is the briefing a fresh Claude reads before touching the repo. Goal: enough that exploration is rare, terse enough that it's still scannable. Update it when:
+
+- **A new convention emerges that a stranger wouldn't guess** — a load-bearing helper (`installTap`), a naming pattern (`foo.js` ↔ `fooUi.js`), an invariant (`contactLog` survives Cycle close).
+- **A constraint changes** — build tooling, vendored versions, deploy chain, where CSS lives, where the entry-point's render code lives.
+- **A pointer goes stale** — `SAVE_KEY` version, line numbers, file paths cited above.
+- **A foot-gun gets fixed** — if you spent >15 min rediscovering something the codebase had quietly learned (iOS taps, SW cache invalidation), record the lesson here so the next Claude doesn't pay the same tax.
+
+Skip the update for:
+
+- One-off bug fixes, balance tuning, copy changes, refactors.
+- Anything a `git log -p` or `ls src/` reveals in under a minute.
+- Specific feature details — those belong in code, commit messages, or `docs/lore/`.
+
+Style: lead with the rule, then *why* only if non-obvious. Prefer `file.js:line` over prose. If a section grew past ~8 bullets, it's drifting into reference docs — push the detail into the source file's header comment and link to it.

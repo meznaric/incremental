@@ -959,7 +959,8 @@ class Column {
         // even while the boost (and hence ripple frequency) is lerping.
         const waveK = 1.3;
         const amp = 0.07 + boost * 0.45;
-        const wave = Math.sin((this._wavePhase || 0) - d * waveK);
+        const phaseAt = (this._wavePhase || 0) - d * waveK;
+        const wave = Math.sin(phaseAt);
         // Brightness pulse at the wavefront crests — particles at the peak
         // glow brighter, so the ring is visible as it moves outward.
         const crest = Math.max(0, wave);
@@ -969,9 +970,15 @@ class Column {
           const ux = dx / d;
           const uy = dy / d;
           const r = wave * amp;
-          // World offset converted back to local (matrix is in column-local).
-          px += (ux * r) / sx;
-          py += (uy * r) / sx;
+          // Tangential component (90° phase shift, perpendicular to radial)
+          // gives orbital water-ripple motion. Without this, particles
+          // directly below the ripple centre (i.e. the centre column) get
+          // purely-vertical displacement — invisible against their downward
+          // fall in streaming mode. The tangential adds a sideways
+          // oscillation that reads as the wavefront sweeping past them.
+          const tr = Math.cos(phaseAt) * amp * 0.75;
+          px += (ux * r + (-uy) * tr) / sx;
+          py += (uy * r + ux * tr) / sx;
         }
       }
       _pos.set(px, py, pz);

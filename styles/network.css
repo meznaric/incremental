@@ -56,7 +56,16 @@
   flex-direction: column;
   gap: 12px;
 }
-.netmap-svg { width: 100%; height: auto; display: block; }
+.netmap-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* JS owns --map-scale / --map-tx / --map-ty for pinch-zoom + pan on mobile.
+     Desktop leaves the defaults below (1, 0, 0) and the transform is a no-op. */
+  transform-origin: top left;
+  transform: translate(var(--map-tx, 0px), var(--map-ty, 0px)) scale(var(--map-scale, 1));
+  will-change: transform;
+}
 .relay-label {
   font-size: 11px;
   font-weight: 600;
@@ -529,25 +538,17 @@
 @media (max-width: 640px) {
   .net-layout { flex-direction: column; }
   .net-side   { flex: 1 1 auto; }
-  /* Cover-fit + pan on the map. The SVG is visually scaled up via CSS
-     transform (driven by --map-scale) and the .net-map clips the overflow.
-     JS drives --map-tx / --map-ty in response to touch drags. */
+  /* Cover-fit on the map. The SVG is visually scaled and translated via CSS
+     vars set in JS (see attachInteractions in networkUi.js) — one-finger drag
+     pans, two-finger pinch zooms, both clamped to the map content. */
   .net-map {
     flex: 0 0 auto;
     height: 58vh;
     padding: 0;
     touch-action: none;
-    --map-scale: 1.7;
     cursor: grab;
   }
   .net-map:active { cursor: grabbing; }
-  .netmap-svg {
-    width: 100%;
-    height: auto;
-    transform-origin: top left;
-    transform: translate(var(--map-tx, 0px), var(--map-ty, 0px)) scale(var(--map-scale, 1));
-    will-change: transform;
-  }
   .net-place-bar {
     left: 10px; right: 10px; bottom: 10px;
   }

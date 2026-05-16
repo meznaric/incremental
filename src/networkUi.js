@@ -100,26 +100,31 @@ export function makeNetworkUi(state, opts) {
   // hex appears to blink. Storing the hovered hex by q,r key + re-applying a
   // .hovered class after each render keeps the visual stable.
   let hoveredHexKey = null;
-  // Mobile-only pan offset on the SVG (in CSS pixels). The map element is kept
-  // stable across renders so the drag-in-progress and these listeners survive.
-  const pan = { tx: 0, ty: 0, centered: false };
-  let dragState = null;
+  // Mobile-only view transform applied to the SVG (in CSS pixels for tx/ty,
+  // unitless for scale). The map element is kept stable across renders so the
+  // drag-in-progress, pinch state and these listeners survive.
+  const view = { scale: 1, tx: 0, ty: 0, initialized: false };
+  // Pinches release the second finger before the first; the trailing single
+  // pointer would otherwise register as a tap on the underlying hex. Stamp a
+  // short suppression window after every pinch (or zoom keystroke) so the
+  // body-level installTap handler skips that ghost tap.
+  let suppressTapUntil = 0;
 
   const open = () => {
     ensureNetwork(state);
     modalEl.classList.add('open');
-    pan.centered = false;
+    view.initialized = false;
     render();
   };
   const close = () => {
     modalEl.classList.remove('open');
     pendingPlacement = null;
   };
-  // On viewport resize the cover-fit dimensions change, so the existing pan
-  // offset no longer centers correctly. Recenter on the next render.
+  // On viewport resize the container dimensions change, so the existing pan
+  // offset may now be out of bounds. clampView (in render) snaps it back into
+  // range — the user's zoom level is preserved.
   window.addEventListener('resize', () => {
     if (!modalEl.classList.contains('open')) return;
-    pan.centered = false;
     render();
   });
 
@@ -134,6 +139,9 @@ export function makeNetworkUi(state, opts) {
   // Delegated tap handler on the modal body. Listens for hex / relay / queue
   // taps via data-act attributes that render() stamps onto the SVG nodes.
   installTap(bodyEl, (_e, target) => {
+    // Ghost tap left over from a pinch or pan release — ignore so we don't
+    // stage a placement on the hex the user happened to lift over.
+    if (performance.now() < suppressTapUntil) return;
     if (target.closest('[data-act="open-diag"]')) {
       if (openDiagnostic) openDiagnostic('network');
       return;
@@ -431,75 +439,152 @@ export function makeNetworkUi(state, opts) {
     `;
   }
 
-  // --- Mobile pan support -------------------------------------------------
-  // The SVG is visually enlarged via a CSS transform inside the mobile media
-  // query. We drive --map-tx / --map-ty on the (stable) .net-map element and
-  // clamp to keep at least a fraction of the SVG inside the viewport.
-  function visualSize(mapEl) {
-    const svgEl = mapEl.querySelector('.netmap-svg');
-    if (!svgEl) return null;
-    // SVG elements don't implement offsetWidth/Height in every engine. The
-    // bounding rect already reflects the active transform (scale + translate),
-    // so it's exactly the visual size we want.
-    const rect = svgEl.getBoundingClientRect();
-    if (!(rect.width > 0) || !(rect.height > 0)) return null;
-    return { w: rect.width, h: rect.height };
+  // --- Mobile pan + pinch-zoom -------------------------------------------
+  // The SVG is rendered at viewBox size and visually transformed by the CSS
+  // vars --map-scale / --map-tx / --map-ty on the (stable) .net-map element.
+  // Pan from single-finger drag, zoom from two-finger pinch. Both clamp so
+  // the map can't be dragged into empty space.
+  const MIN_SCALE = 0.6;
+  const MAX_SCALE = 3;
+  const MOBILE_INITIAL_SCALE = 1.7;
+  const MOBILE_BREAKPOINT = 640; // matches the media query in network.css
+  function isMobileView() {
+    return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
   }
-  function clampPan(mapEl) {
-    const vs = visualSize(mapEl);
-    if (!vs) return;
-    const rect = mapEl.getBoundingClientRect();
-    const minTx = Math.min(0, rect.width - vs.w);
-    const minTy = Math.min(0, rect.height - vs.h);
-    const maxTx = Math.max(0, rect.width - vs.w);
-    const maxTy = Math.max(0, rect.height - vs.h);
-    pan.tx = Math.max(minTx, Math.min(maxTx, pan.tx));
-    pan.ty = Math.max(minTy, Math.min(maxTy, pan.ty));
+  // SVG fills the map's content width (width: 100%, height: auto). With a
+  // preserveAspectRatio="xMidYMid meet" viewBox the rendered height follows
+  // the viewBox aspect ratio — compute it directly so we don't have to depend
+  // on a freshly-applied transform to read getBoundingClientRect.
+  function naturalLayoutSize(mapEl) {
+    const cw = mapEl.clientWidth;
+    if (!(cw > 0)) return null;
+    const aspect = bounds.height / bounds.width;
+    return { w: cw, h: cw * aspect };
   }
-  function centerPan(mapEl) {
-    const vs = visualSize(mapEl);
-    if (!vs) return { tx: 0, ty: 0 };
-    const rect = mapEl.getBoundingClientRect();
-    return { tx: (rect.width - vs.w) / 2, ty: (rect.height - vs.h) / 2 };
+  function clampView(mapEl) {
+    const nat = naturalLayoutSize(mapEl);
+    if (!nat) return;
+    const cw = mapEl.clientWidth;
+    const ch = mapEl.clientHeight;
+    const vw = nat.w * view.scale;
+    const vh = nat.h * view.scale;
+    if (vw <= cw) view.tx = (cw - vw) / 2;
+    else view.tx = Math.max(cw - vw, Math.min(0, view.tx));
+    if (vh <= ch) view.ty = (ch - vh) / 2;
+    else view.ty = Math.max(ch - vh, Math.min(0, view.ty));
   }
-  function applyPan(mapEl) {
-    mapEl.style.setProperty('--map-tx', `${pan.tx.toFixed(1)}px`);
-    mapEl.style.setProperty('--map-ty', `${pan.ty.toFixed(1)}px`);
+  function centerView(mapEl) {
+    const nat = naturalLayoutSize(mapEl);
+    if (!nat) return;
+    const cw = mapEl.clientWidth;
+    const ch = mapEl.clientHeight;
+    view.tx = (cw - nat.w * view.scale) / 2;
+    view.ty = (ch - nat.h * view.scale) / 2;
   }
-  function attachPan(mapEl) {
+  function applyView(mapEl) {
+    mapEl.style.setProperty('--map-scale', view.scale.toFixed(3));
+    mapEl.style.setProperty('--map-tx', `${view.tx.toFixed(1)}px`);
+    mapEl.style.setProperty('--map-ty', `${view.ty.toFixed(1)}px`);
+  }
+  function attachInteractions(mapEl) {
+    const pointers = new Map(); // pointerId -> {x, y}
+    let dragState = null;
+    let pinchState = null;
     mapEl.addEventListener('pointerdown', (e) => {
-      // Only enable pan for touch input. Desktop mouse keeps the existing
-      // tap-only behaviour (the SVG fits the container on wide viewports).
+      // Only handle touch — desktop mouse keeps the no-pan / no-zoom layout
+      // because the SVG already fits its container on wide viewports.
       if (e.pointerType !== 'touch') return;
-      // Pan only when the SVG actually overflows its container (i.e. mobile
-      // cover-fit is in effect). Otherwise there's nothing to scroll.
-      const vs = visualSize(mapEl);
-      const rect = mapEl.getBoundingClientRect();
-      if (!vs || (vs.w <= rect.width + 1 && vs.h <= rect.height + 1)) return;
-      dragState = {
-        pointerId: e.pointerId,
-        startX: e.clientX, startY: e.clientY,
-        baseTx: pan.tx, baseTy: pan.ty,
-        active: false,
-      };
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(b.x - a.x, b.y - a.y);
+        if (dist < 1) return;
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        const rect = mapEl.getBoundingClientRect();
+        // Anchor the pinch midpoint in svg-natural coordinates so the same
+        // map location stays pinned under the fingers while they spread.
+        pinchState = {
+          startDist: dist,
+          baseScale: view.scale,
+          rectLeft: rect.left,
+          rectTop: rect.top,
+          anchorX: (midX - rect.left - view.tx) / view.scale,
+          anchorY: (midY - rect.top - view.ty) / view.scale,
+        };
+        dragState = null;
+      } else {
+        dragState = {
+          pointerId: e.pointerId,
+          startX: e.clientX, startY: e.clientY,
+          baseTx: view.tx, baseTy: view.ty,
+          active: false,
+        };
+      }
     });
     mapEl.addEventListener('pointermove', (e) => {
-      if (!dragState || e.pointerId !== dragState.pointerId) return;
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      // Defer commit until the gesture is clearly a pan — keeps tiny finger
-      // jitters during a tap from sliding the map. 15px matches the tap
-      // tolerance, so taps and pans don't both fire.
-      if (!dragState.active && Math.hypot(dx, dy) < 15) return;
-      dragState.active = true;
-      pan.tx = dragState.baseTx + dx;
-      pan.ty = dragState.baseTy + dy;
-      clampPan(mapEl);
-      applyPan(mapEl);
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinchState && pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(b.x - a.x, b.y - a.y);
+        if (dist < 1) return;
+        const ratio = dist / pinchState.startDist;
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchState.baseScale * ratio));
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        view.scale = newScale;
+        view.tx = midX - pinchState.rectLeft - pinchState.anchorX * newScale;
+        view.ty = midY - pinchState.rectTop - pinchState.anchorY * newScale;
+        clampView(mapEl);
+        applyView(mapEl);
+        return;
+      }
+      if (dragState && e.pointerId === dragState.pointerId) {
+        // Need the map to actually overflow before drag does anything; if it
+        // doesn't, the clamp will snap us back to center.
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        // Defer commit until the gesture is clearly a pan — keeps tiny finger
+        // jitters during a tap from sliding the map. 15px matches the tap
+        // tolerance, so taps and pans don't both fire.
+        if (!dragState.active && Math.hypot(dx, dy) < 15) return;
+        dragState.active = true;
+        view.tx = dragState.baseTx + dx;
+        view.ty = dragState.baseTy + dy;
+        clampView(mapEl);
+        applyView(mapEl);
+      }
     });
     const end = (e) => {
-      if (!dragState || e.pointerId !== dragState.pointerId) return;
-      dragState = null;
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
+      if (pinchState) {
+        // Suppress the trailing single-pointer tap that fires when the second
+        // finger lifts first — without this, releasing a pinch over a hex
+        // would stage a placement.
+        suppressTapUntil = performance.now() + 350;
+        if (pointers.size < 2) {
+          pinchState = null;
+          // Re-seat drag from whichever finger is still down so the user can
+          // pan smoothly without releasing first.
+          if (pointers.size === 1) {
+            const [id] = [...pointers.keys()];
+            const p = pointers.get(id);
+            dragState = {
+              pointerId: id,
+              startX: p.x, startY: p.y,
+              baseTx: view.tx, baseTy: view.ty,
+              active: false,
+            };
+          }
+        }
+        return;
+      }
+      if (dragState && e.pointerId === dragState.pointerId) {
+        if (dragState.active) suppressTapUntil = performance.now() + 100;
+        dragState = null;
+      }
     };
     mapEl.addEventListener('pointerup', end);
     mapEl.addEventListener('pointercancel', end);
@@ -549,7 +634,7 @@ export function makeNetworkUi(state, opts) {
     `;
     const mapEl = bodyEl.querySelector('.net-map');
     if (mapEl) {
-      attachPan(mapEl);
+      attachInteractions(mapEl);
       attachHover(mapEl);
     }
   }
@@ -654,15 +739,16 @@ export function makeNetworkUi(state, opts) {
     if (infoEl) mapEl.appendChild(infoEl);
     sideEl.innerHTML = renderSidePanel(now);
     applyHover(mapEl);
-    if (!pan.centered) {
+    if (!view.initialized) {
       requestAnimationFrame(() => {
-        const c = centerPan(mapEl);
-        pan.tx = c.tx; pan.ty = c.ty;
-        pan.centered = true;
-        applyPan(mapEl);
+        view.scale = isMobileView() ? MOBILE_INITIAL_SCALE : 1;
+        centerView(mapEl);
+        view.initialized = true;
+        applyView(mapEl);
       });
     } else {
-      applyPan(mapEl);
+      clampView(mapEl);
+      applyView(mapEl);
     }
   }
 

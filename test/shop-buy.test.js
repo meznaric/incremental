@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   makeShopState, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll,
-  tryUnlockPin, tryTogglePin, SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST,
-  PIN_UNLOCK_COST, REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
+  tryUnlockPinTier, tryTogglePin, isSlotPinned, nextPinTierCost,
+  SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST, PIN_TIER_COSTS, MAX_PIN_SLOTS,
+  REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
 } from '../src/shop.js';
 import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS } from '../src/upgrades.js';
 
@@ -235,10 +236,10 @@ test('tryReroll: deducts cost (max of pct and 15s of rate) and replaces slots', 
 test('tryReroll: pinned slot is preserved and not charged', () => {
   const s = freshState({ amount: 100000, basePerSecond: 0 });
   s.shop.rerollUnlocked = true;
-  s.shop.pinUnlocked = true;
+  s.shop.pinSlots = 1;
   installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
-  s.shop.pinnedSlot = 0;
+  s.shop.pinnedSlots = [0];
   const before = s.shop.slots[0];
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
@@ -298,19 +299,69 @@ test('tryUnlockReroll: refused when broke; succeeds and flips flag', () => {
   assert.equal(s.amount, 500);
 });
 
-test('tryTogglePin: toggles only when pin is unlocked', () => {
+test('tryTogglePin: toggles only when at least one pin tier is unlocked', () => {
   const s = freshState({ amount: 0 });
   installSlot(s, 0, 'mult5', 50);
   assert.equal(tryTogglePin(s, 0).ok, false);
 
-  s.amount = PIN_UNLOCK_COST;
-  tryUnlockPin(s);
-  assert.equal(s.shop.pinUnlocked, true);
+  s.amount = PIN_TIER_COSTS[0];
+  tryUnlockPinTier(s);
+  assert.equal(s.shop.pinSlots, 1);
 
   tryTogglePin(s, 0);
-  assert.equal(s.shop.pinnedSlot, 0);
+  assert.deepEqual(s.shop.pinnedSlots, [0]);
+  assert.equal(isSlotPinned(s, 0), true);
   tryTogglePin(s, 0);
-  assert.equal(s.shop.pinnedSlot, null);
+  assert.deepEqual(s.shop.pinnedSlots, []);
+  assert.equal(isSlotPinned(s, 0), false);
+});
+
+test('tryUnlockPinTier: walks the cost ladder and respects the cap', () => {
+  // Enough Echoes to buy every tier.
+  const total = PIN_TIER_COSTS.reduce((a, b) => a + b, 0);
+  const s = freshState({ amount: total });
+  for (let i = 0; i < MAX_PIN_SLOTS; i++) {
+    assert.equal(nextPinTierCost(s), PIN_TIER_COSTS[i], `tier ${i + 1} cost matches the ladder`);
+    const res = tryUnlockPinTier(s);
+    assert.ok(res.ok, `tier ${i + 1} buy succeeds`);
+    assert.equal(s.shop.pinSlots, i + 1);
+  }
+  // Past the cap → maxed, no spend.
+  assert.equal(s.amount, 0);
+  assert.equal(nextPinTierCost(s), null);
+  const res = tryUnlockPinTier(s);
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'maxed');
+});
+
+test('tryTogglePin: respects pinSlots capacity (FIFO when full)', () => {
+  const s = freshState({ amount: 0 });
+  s.shop.pinSlots = 2;
+  for (let i = 0; i < 3; i++) installSlot(s, i, `mult5`, 50);
+  tryTogglePin(s, 0);
+  tryTogglePin(s, 1);
+  assert.deepEqual(s.shop.pinnedSlots, [0, 1]);
+  // Pinning slot 2 pushes slot 0 out — capacity is 2.
+  tryTogglePin(s, 2);
+  assert.deepEqual(s.shop.pinnedSlots, [1, 2]);
+});
+
+test('tryReroll: multiple pinned slots all stay; cost charges only non-pinned', () => {
+  const s = freshState({ amount: 100000, basePerSecond: 0 });
+  s.shop.rerollUnlocked = true;
+  s.shop.pinSlots = 2;
+  installSlot(s, 0, 'mult5', 50);
+  installSlot(s, 1, 'coin_flip', 100);
+  installSlot(s, 2, 'mult5', 50);
+  s.shop.pinnedSlots = [0, 2];
+  const a = s.shop.slots[0], c = s.shop.slots[2];
+  const res = tryReroll(s, 0);
+  assert.ok(res.ok);
+  // Only slot 1 is rerollable — cost = 1 × 1.5% × 100000 = 1500.
+  assert.equal(res.rerolled, 1);
+  assert.equal(s.amount, 100000 - 1500);
+  assert.equal(s.shop.slots[0], a);
+  assert.equal(s.shop.slots[2], c);
 });
 
 // Reference the imported constant so unused-import lint stays quiet.

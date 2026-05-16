@@ -14,10 +14,10 @@
 import { formatAbbrev, parseAmount } from './bignum.js';
 import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade } from './upgrades.js';
 import {
-  effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPin, tryTogglePin,
+  effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
-  marginalRateForPurchase, effectiveGambleChance,
-  REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_COST, PIN_UNLOCK_AT,
+  marginalRateForPurchase, effectiveGambleChance, nextPinTierCost, isSlotPinned,
+  REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_AT, MAX_PIN_SLOTS,
 } from './shop.js';
 import { nowSeconds } from './save.js';
 import { installTap } from './tap.js';
@@ -505,9 +505,18 @@ export function initMainUi(state, deps) {
     setTbBtn('free-reroll', freeVisible, freeVisible && freeN === 0,
       `<i class="ri ri-gift-fill"></i> Free Reroll (${freeCount})`);
 
-    const pinVisible = state.shop.rerollUnlocked && !state.shop.pinUnlocked && state.amount >= PIN_UNLOCK_AT;
-    setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < PIN_UNLOCK_COST,
-      `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(PIN_UNLOCK_COST)}</span>`);
+    // Band Lock — pin upgrades. The button cycles through five tiers; each
+    // buy increments state.shop.pinSlots and reveals the next tier's price.
+    // Once tier 5 lands the button retreats. Label uses Roman numerals so
+    // the progression reads at a glance (Unlock Pin · I/II/III/IV/V).
+    const pinCost = nextPinTierCost(state);
+    const pinOwned = state.shop.pinSlots || 0;
+    const pinVisible = state.shop.rerollUnlocked && pinCost != null && state.amount >= PIN_UNLOCK_AT;
+    const tierRoman = ['I', 'II', 'III', 'IV', 'V'][pinOwned] || '';
+    const pinLabel = pinOwned === 0
+      ? `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(pinCost || 0)}</span>`
+      : `Band Lock ${tierRoman} · <span class="cc">${ECHO_ICON}${formatAbbrev(pinCost || 0)}</span>`;
+    setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < (pinCost || 0), pinLabel);
 
     const anyVisible = rerollUnlockVisible || rerollVisible || pinVisible || freeVisible;
     toolbarEl.style.display = anyVisible ? '' : 'none';
@@ -516,7 +525,7 @@ export function initMainUi(state, deps) {
   function countRerollableForUi() {
     let n = 0;
     for (let i = 0; i < state.shop.slots.length; i++) {
-      if (state.shop.pinnedSlot === i) continue;
+      if (isSlotPinned(state, i)) continue;
       if (state.shop.slots[i]) n++;
     }
     return n;
@@ -532,12 +541,12 @@ export function initMainUi(state, deps) {
     const act = btn.dataset.act;
     let res;
     if (act === 'unlock-reroll') res = tryUnlockReroll(state);
-    else if (act === 'unlock-pin') res = tryUnlockPin(state);
+    else if (act === 'unlock-pin') res = tryUnlockPinTier(state);
     else if (act === 'reroll' || act === 'free-reroll') {
       res = tryReroll(state, nowSeconds());
       if (res.ok) {
         for (let i = 0; i < slotEls.length; i++) {
-          if (state.shop.pinnedSlot === i) continue;
+          if (isSlotPinned(state, i)) continue;
           markContentFresh(slotEls[i]);
         }
       }
@@ -640,8 +649,8 @@ export function initMainUi(state, deps) {
       else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
       el.querySelector('.meta').textContent = meta;
       const pinEl = el.querySelector('.pin');
-      pinEl.style.display = state.shop.pinUnlocked ? '' : 'none';
-      el.classList.toggle('pinned', state.shop.pinnedSlot === i);
+      pinEl.style.display = (state.shop.pinSlots || 0) > 0 ? '' : 'none';
+      el.classList.toggle('pinned', isSlotPinned(state, i));
       const canAfford = state.amount >= cost;
       el.classList.toggle('locked', !canAfford || cdLeft > 0);
     }

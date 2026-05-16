@@ -151,6 +151,69 @@ test('clearSave removes the save', () => {
   assert.equal(localStorage.getItem(SAVE_KEY), null);
 });
 
+test('loadState migrates legacy pin shape { pinUnlocked, pinnedSlot } → { pinSlots, pinnedSlots }', () => {
+  beforeEach();
+  const snap = {
+    amount: 0, basePerSecond: 0, flatBonus: 0, permMul: 1, owned: {},
+    buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
+    gambleCd: {}, savedAt: nowSeconds(),
+    shop: {
+      slotsUnlocked: 5,
+      slots: [],
+      pinUnlocked: true,
+      pinnedSlot: 2,
+    },
+    messages: { shown: {}, queue: [], stats: {} },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+
+  const s = freshState();
+  loadState(s);
+  assert.equal(s.shop.pinSlots, 1);
+  assert.deepEqual(s.shop.pinnedSlots, [2]);
+});
+
+test('loadState defaults pin state to 0/[] when fields are absent', () => {
+  beforeEach();
+  const snap = {
+    amount: 0, basePerSecond: 0, flatBonus: 0, permMul: 1, owned: {},
+    buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
+    gambleCd: {}, savedAt: nowSeconds(),
+    shop: { slotsUnlocked: 2, slots: [] },
+    messages: { shown: {}, queue: [], stats: {} },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+  const s = freshState();
+  loadState(s);
+  assert.equal(s.shop.pinSlots, 0);
+  assert.deepEqual(s.shop.pinnedSlots, []);
+});
+
+test('loadState round-trips the new pin shape { pinSlots, pinnedSlots }', () => {
+  beforeEach();
+  // Don't use saveState here — clearSave in an earlier test toggles a module-
+  // level `suppressed` flag that turns saveState into a no-op for the rest of
+  // the suite. Write the snapshot directly to localStorage.
+  const snap = {
+    amount: 0, basePerSecond: 0, flatBonus: 0, permMul: 1, owned: {},
+    buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [] },
+    gambleCd: {}, savedAt: nowSeconds(),
+    shop: {
+      slotsUnlocked: 4,
+      slots: [],
+      pinSlots: 3,
+      pinnedSlots: [0, 2],
+    },
+    messages: { shown: {}, queue: [], stats: {} },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+
+  const b = freshState();
+  loadState(b);
+  assert.equal(b.shop.pinSlots, 3);
+  assert.deepEqual(b.shop.pinnedSlots, [0, 2]);
+});
+
 test('loadState ignores malformed shop.slots entries', () => {
   beforeEach();
   const snap = {

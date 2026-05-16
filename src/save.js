@@ -27,8 +27,8 @@ export function saveState(state) {
       slots: state.shop.slots,
       slotsUnlocked: state.shop.slotsUnlocked,
       rerollUnlocked: state.shop.rerollUnlocked,
-      pinUnlocked: state.shop.pinUnlocked,
-      pinnedSlot: state.shop.pinnedSlot,
+      pinSlots: state.shop.pinSlots || 0,
+      pinnedSlots: Array.isArray(state.shop.pinnedSlots) ? state.shop.pinnedSlots.slice() : [],
       offeredRate: state.shop.offeredRate,
     },
     network: state.network ? {
@@ -82,13 +82,32 @@ export function loadState(state) {
       ? Math.max(DEFAULT_SLOTS, Math.min(MAX_SLOTS, unlocked))
       : DEFAULT_SLOTS;
     state.shop.rerollUnlocked = !!s.shop.rerollUnlocked;
-    state.shop.pinUnlocked = !!s.shop.pinUnlocked;
     const offered = Number(s.shop.offeredRate);
     state.shop.offeredRate = Number.isFinite(offered) ? offered : 0;
-    const pinRaw = s.shop.pinnedSlot;
-    state.shop.pinnedSlot = Number.isInteger(pinRaw) && pinRaw >= 0 && pinRaw < state.shop.slotsUnlocked
-      ? pinRaw
-      : null;
+    // Pin migration — two legacy shapes feed the new (pinSlots, pinnedSlots)
+    // pair:
+    //   1. { pinUnlocked: bool, pinnedSlot: number|null }   — pre-tiered pin
+    //   2. { pinSlots: number,  pinnedSlots: number[] }     — current shape
+    // Old `pinUnlocked: true` becomes pinSlots = 1; old `pinnedSlot: n`
+    // becomes pinnedSlots = [n] (if n still fits the slate). New schema is
+    // taken verbatim, capped at MAX_PIN_SLOTS for safety.
+    const rawSlots = Number(s.shop.pinSlots);
+    if (Number.isInteger(rawSlots) && rawSlots > 0) {
+      state.shop.pinSlots = Math.min(rawSlots, 5);
+    } else {
+      state.shop.pinSlots = s.shop.pinUnlocked ? 1 : 0;
+    }
+    if (Array.isArray(s.shop.pinnedSlots)) {
+      state.shop.pinnedSlots = s.shop.pinnedSlots
+        .filter((i) => Number.isInteger(i) && i >= 0 && i < state.shop.slotsUnlocked)
+        .slice(0, state.shop.pinSlots);
+    } else if (Number.isInteger(s.shop.pinnedSlot)
+        && s.shop.pinnedSlot >= 0
+        && s.shop.pinnedSlot < state.shop.slotsUnlocked) {
+      state.shop.pinnedSlots = [s.shop.pinnedSlot];
+    } else {
+      state.shop.pinnedSlots = [];
+    }
     if (Array.isArray(s.shop.slots)) {
       state.shop.slots = s.shop.slots.slice(0, state.shop.slotsUnlocked).map((slot) => {
         if (!slot || typeof slot !== 'object') return null;

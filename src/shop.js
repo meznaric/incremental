@@ -41,8 +41,19 @@ export const SLOT_UNLOCK_COSTS = (() => {
 
 export const REROLL_UNLOCK_COST = 1000;
 export const REROLL_UNLOCK_AT = 1000;
-export const PIN_UNLOCK_COST = 5000;
-export const PIN_UNLOCK_AT = 5000;
+// Band Lock — five tiers. Each tier unlocks one additional pin slot so the
+// player can hold more bands steady through a re-tune (every pinned slot is
+// excluded from the reroll, dropping its cost and price-floor share).
+// Cost grows ~3× per tier: 5k, 15k, 45k, 135k, 405k. Pin tier N requires
+// tier N-1 already owned (enforced by tryUnlockPinTier).
+export const PIN_TIER_COSTS = [5000, 15000, 45000, 135000, 405000];
+export const MAX_PIN_SLOTS = PIN_TIER_COSTS.length;
+// First pin shows up in the toolbar at this balance; the tier-cost is the
+// hard gate. Visibility-only — mirrors the old PIN_UNLOCK_AT behaviour.
+export const PIN_UNLOCK_AT = PIN_TIER_COSTS[0];
+// Back-compat re-export: a few call sites (and tests) still import the old
+// single-cost constant. Map it to tier-1 so nothing breaks during the rename.
+export const PIN_UNLOCK_COST = PIN_TIER_COSTS[0];
 export const REROLL_PCT_PER_SLOT = 0.015;
 export const REROLL_FLOOR_SECONDS = 15;
 
@@ -82,8 +93,14 @@ export function makeShopState() {
       slots: Array(DEFAULT_SLOTS).fill(null),
       slotsUnlocked: DEFAULT_SLOTS,
       rerollUnlocked: false,
-      pinUnlocked: false,
-      pinnedSlot: null,
+      // How many band-lock pins the player has unlocked (0..MAX_PIN_SLOTS).
+      // Each tier of the Band Lock upgrade increments this. The number is the
+      // soft cap on how many slot indices can live in pinnedSlots at once.
+      pinSlots: 0,
+      // Array of slot indices that are currently pinned. Length ≤ pinSlots.
+      // Replaces the old scalar `pinnedSlot` field; save migration handles
+      // legacy { pinUnlocked, pinnedSlot } shapes.
+      pinnedSlots: [],
       offeredRate: 0,
     },
     messages: {
@@ -462,8 +479,10 @@ export function validateSlate(state, now) {
       rerolled = true;
     }
   }
-  if (state.shop.pinnedSlot != null && state.shop.pinnedSlot >= state.shop.slots.length) {
-    state.shop.pinnedSlot = null;
+  // Drop any pin pointing past the live slot count. Slot-removing scenarios
+  // (engraving downgrades, schema changes) should never leave dangling pins.
+  if (Array.isArray(state.shop.pinnedSlots)) {
+    state.shop.pinnedSlots = state.shop.pinnedSlots.filter((i) => i >= 0 && i < state.shop.slots.length);
   }
   if (rerolled || state.shop.offeredRate == null) state.shop.offeredRate = ctx.rate;
 }
@@ -475,7 +494,7 @@ export function rerollCost(state, now) {
 function countRerollable(state) {
   let n = 0;
   for (let i = 0; i < state.shop.slots.length; i++) {
-    if (state.shop.pinnedSlot === i) continue;
+    if (isSlotPinned(state, i)) continue;
     if (state.shop.slots[i]) n++;
   }
   return n;
@@ -497,7 +516,7 @@ export function tryReroll(state, now) {
   }
   const ctx = rollContext(state, now);
   for (let i = 0; i < state.shop.slots.length; i++) {
-    if (state.shop.pinnedSlot === i) continue;
+    if (isSlotPinned(state, i)) continue;
     state.shop.slots[i] = rerollSlot(state.shop.slots, i, ctx);
   }
   state.shop.offeredRate = ctx.rate;
@@ -589,17 +608,54 @@ export function tryUnlockReroll(state) {
   return { ok: true };
 }
 
-export function tryUnlockPin(state) {
-  if (state.shop.pinUnlocked) return { ok: false, reason: 'owned' };
-  if (state.amount < PIN_UNLOCK_COST) return { ok: false, reason: 'broke' };
-  state.amount -= PIN_UNLOCK_COST;
-  state.shop.pinUnlocked = true;
+// Cost of the next Band Lock tier the player can buy, or null if maxed.
+export function nextPinTierCost(state) {
+  const owned = state.shop.pinSlots || 0;
+  if (owned >= MAX_PIN_SLOTS) return null;
+  return PIN_TIER_COSTS[owned];
+}
+
+// Whether a given slot index is currently pinned. Single source of truth for
+// renderers and the reroll-skip logic — neither should poke pinnedSlots
+// directly. Falsy / malformed arrays read as "nothing pinned".
+export function isSlotPinned(state, slotIdx) {
+  const arr = state.shop.pinnedSlots;
+  if (!Array.isArray(arr) || arr.length === 0) return false;
+  return arr.includes(slotIdx);
+}
+
+// Buy the next Band Lock tier. Each tier costs the next entry in
+// PIN_TIER_COSTS and is gated by the previous tier (enforced implicitly by
+// using the current count as the index into the cost ladder). Replaces the
+// single-shot tryUnlockPin from the days when there was only one pin.
+export function tryUnlockPinTier(state) {
+  const cost = nextPinTierCost(state);
+  if (cost == null) return { ok: false, reason: 'maxed' };
+  if (state.amount < cost) return { ok: false, reason: 'broke' };
+  state.amount -= cost;
+  state.shop.pinSlots = (state.shop.pinSlots || 0) + 1;
   return { ok: true };
 }
 
+// Back-compat shim: legacy name still imported from mainUi and tests. Same
+// behaviour as tryUnlockPinTier — buy the next available tier.
+export const tryUnlockPin = tryUnlockPinTier;
+
 export function tryTogglePin(state, slotIdx) {
-  if (!state.shop.pinUnlocked) return { ok: false, reason: 'locked' };
+  const cap = state.shop.pinSlots || 0;
+  if (cap <= 0) return { ok: false, reason: 'locked' };
   if (slotIdx < 0 || slotIdx >= state.shop.slots.length) return { ok: false, reason: 'invalid' };
-  state.shop.pinnedSlot = state.shop.pinnedSlot === slotIdx ? null : slotIdx;
-  return { ok: true };
+  if (!Array.isArray(state.shop.pinnedSlots)) state.shop.pinnedSlots = [];
+  const arr = state.shop.pinnedSlots;
+  const at = arr.indexOf(slotIdx);
+  if (at >= 0) {
+    arr.splice(at, 1);
+    return { ok: true, pinned: false };
+  }
+  // Adding past capacity: drop the oldest pin (FIFO) so the new tap always
+  // takes — feels nicer than rejecting the tap and forces the player to find
+  // and un-pin an old slot manually.
+  if (arr.length >= cap) arr.shift();
+  arr.push(slotIdx);
+  return { ok: true, pinned: true };
 }

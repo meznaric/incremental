@@ -261,7 +261,7 @@ class Column {
       opacity: 0,
     }));
     this.glow.position.set(0, (COLUMN_TOP_Y + COLUMN_BOTTOM_Y) / 2, -0.6);
-    this.glow.scale.set(COLUMN_WIDTH * 2.8, (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 1.2, 1);
+    this.glow.scale.set(COLUMN_WIDTH * 2.0, (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 1.05, 1);
     this.root.add(this.glow);
 
     // Sparkle field: a single Points draw call per column. Per-vertex color
@@ -628,6 +628,9 @@ class Column {
     const pDef = PERIODS[Math.min(this.period, PERIODS.length - 1)];
     this.outline.material.color.setHex(pDef.color);
     this._periodColor.setHex(pDef.color);
+    // Emissive carries the period hue so the buff-driven emissiveIntensity
+    // boost brightens the period color rather than stacking white-on-white.
+    this.material.emissive.setHex(pDef.color);
     this.imesh.geometry = geometryFor(this.period);
     this._curve = curveForPeriod(this.period);
     this._rotSpeeds = rotSpeedsForPeriod(this.period);
@@ -653,26 +656,17 @@ class Column {
     this._boostPulse = this._boost * (0.55 + 0.45 * pulse);
     if (this.outline && this.outline.material) {
       this.outline.material.opacity = 0.22 + this._boostPulse * 0.78;
-      // Shift the outline color toward hot white as boost rises, so the grid
-      // visibly "energises" rather than just brightening.
-      const oc = this.outline.material.color;
-      const baseHex = (PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color;
-      oc.setHex(baseHex);
-      oc.lerp(_white, this._boostPulse * 0.55);
     }
-    // Emissive is what carries in the dark scene — instanceColor only
-    // modulates diffuse, so we lift the material's emissive intensity here
-    // (one uniform per column, cheap) so the falling pieces visibly glow.
+    // Emissive is period-colored (set in assignMagnitude), so lifting intensity
+    // brightens the column in its native hue instead of washing to white.
     if (this.material) {
       this.material.emissiveIntensity = 0.4 + this._boostPulse * 1.6;
     }
-    // Glow envelope behind the column — opacity and warm-tint shift drive the
-    // halo. Quiescent at boost=0 (invisible), fully present at boost=1.
+    // Glow envelope — single uniform period-color halo. Kept simple: opacity
+    // tracks the boost pulse, color stays the period color.
     if (this.glow) {
-      this.glow.material.opacity = this._boostPulse * 0.65;
-      const gc = this.glow.material.color;
-      gc.setHex((PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color);
-      gc.lerp(_white, 0.4 + this._boostPulse * 0.35);
+      this.glow.material.opacity = this._boostPulse * 0.35;
+      this.glow.material.color.setHex((PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color);
     }
     // Sparkle field rides the same boost — spawn rate, brightness, drift all
     // scale together so 1 buff produces a faint twinkle and 10 a constant shimmer.
@@ -803,7 +797,7 @@ class Column {
       s.vx = (Math.random() - 0.5) * 0.35;
       s.vy = 0.25 + Math.random() * 0.6;
     }
-    _color.setHex(baseHex).lerp(_white, 0.5);
+    _color.setHex(baseHex);
     for (let i = 0; i < SPARKLE_COUNT; i++) {
       const s = this._sparkleStates[i];
       if (s.life > 0) {
@@ -895,16 +889,28 @@ class Column {
           tintB = dim * 0.9;
         }
       }
-      // Buff envelope: brighten + slightly enlarge the falling pieces and
-      // give them a subtle additional spin so the boosted column reads as
-      // "energised" without separate geometry. Skipped during gamble FX so
-      // the centre-bound swarm keeps its own tint.
+      // Buff envelope: brighten + slightly enlarge the falling pieces, and
+      // displace them radially with a traveling sine so the column reads as
+      // a ripple/water pulse. Frequency + amplitude scale with the boost
+      // (1 buff = soft shimmer, 10 = strong fast pulse). Applied to every
+      // particle state, so it covers both discrete grid mode and the
+      // streaming continuous mode. Skipped during gamble FX so the swarm
+      // keeps its own motion.
       const boost = this._boost || 0;
       if (!p._gfxActive && boost > 0.01) {
         const bp = this._boostPulse || boost;
-        const tint = 1 + bp * 0.85;
+        const tint = 1 + bp * 0.5;
         tintR *= tint; tintG *= tint; tintB *= tint;
-        scaleMul *= 1 + boost * 0.18;
+        scaleMul *= 1 + boost * 0.15;
+        const freq = 2.5 + boost * 8;
+        const amp = CELL_W * (0.06 + boost * 0.42);
+        const phase = now * freq - py * 1.4;
+        const r = Math.sin(phase) * amp;
+        const radial = Math.hypot(px, pz);
+        const ux = radial > 0.01 ? px / radial : Math.cos(p.spin);
+        const uz = radial > 0.01 ? pz / radial : Math.sin(p.spin);
+        px += ux * r;
+        pz += uz * r;
       }
       _pos.set(px, py, pz);
       _euler.set(p.rotX, p.rotY, p.rotZ || 0);

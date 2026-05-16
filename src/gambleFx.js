@@ -8,6 +8,12 @@
 
 const OVERLAY_ID = 'gambleFxOverlay';
 
+// Module-level lock so the shop can ignore further gamble taps while the
+// WIN/LOSS reveal is on screen. The flag covers the full lead-in + banner
+// hold + fade-out window, not just the in-animation.
+let _active = false;
+export function isGambleFxActive() { return _active; }
+
 function prefersReducedMotion() {
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -71,6 +77,7 @@ function spawnLossDrift(overlay) {
 // sync with the banner build-up.
 export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
   const overlay = ensureOverlay();
+  _active = true;
   if (typeof onStart === 'function') onStart();
 
   // Reduced motion: skip the burst. Show the banner only.
@@ -79,13 +86,23 @@ export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
     banner.classList.add('gx-reduced');
     overlay.appendChild(banner);
     setTimeout(() => { if (typeof onMid === 'function') onMid(); }, 120);
-    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 1200);
+    setTimeout(() => {
+      if (banner.parentNode) banner.remove();
+      _active = false;
+    }, 1200);
     return;
   }
 
   // Tiny lead-in lets the particle attractor begin its sweep before the
   // banner punches in — the eye lands on motion first, headline second.
   const leadMs = 240;
+  // Banner timing budget: in-animation runs 0.7s, then we hold for a beat
+  // before triggering gx-out (0.9s win / 1.0s loss, gentle ease so the fade
+  // is actually visible — ease-in over 0.5s read as a hard cut). Removal
+  // lines up with the fade end so the banner finishes its alpha-to-zero
+  // before the DOM goes away.
+  const outDelay = 900;
+  const outDur = won ? 900 : 1000;
   setTimeout(() => {
     const banner = buildBanner(won, deltaText);
     overlay.appendChild(banner);
@@ -101,11 +118,12 @@ export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
 
     setTimeout(() => {
       banner.classList.add('gx-out');
-    }, won ? 950 : 850);
+    }, outDelay);
     setTimeout(() => {
       if (banner.parentNode) banner.remove();
       const stale = overlay.querySelectorAll('.gx-mote-win, .gx-mote-loss');
       stale.forEach((m) => m.remove());
-    }, 1500);
+      _active = false;
+    }, outDelay + outDur);
   }, leadMs);
 }

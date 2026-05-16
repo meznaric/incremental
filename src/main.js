@@ -27,7 +27,7 @@ import { initBreakdownUi } from './breakdownUi.js';
 import { hasPendingPatternChoice } from './cyclePatterns.js';
 import { showPatternSelect } from './patternUi.js';
 import { installTap } from './tap.js';
-import { fireGambleResult } from './gambleFx.js';
+import { fireGambleResult, isGambleFxActive } from './gambleFx.js';
 
 const state = {
   amount: 0,
@@ -557,6 +557,14 @@ function ensureSlotEls() {
         return;
       }
       if (target.closest('.slot-info')) { openSlotModal(idx); return; }
+      // Block taps on a gamble slot while a WIN/LOSS banner is on screen —
+      // double-rolling through the reveal is jarring and lets the player
+      // stack overlapping bursts. Non-gamble slots still buy through.
+      if (isGambleFxActive()) {
+        const slot = state.shop.slots[idx];
+        const u = slot ? resolveUpgrade(slot) : null;
+        if (u && u.kind === 'gamble') return;
+      }
       const res = tryBuy(state, idx, nowSeconds());
       if (res.ok) {
         // Gambles get the dramatic centred reveal flow — gravity pull, hold,

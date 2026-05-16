@@ -166,16 +166,16 @@ test('gamble: loss subtracts wager, returns cushion refund if buff active', () =
   }
 });
 
-test('gamble: cushion stacks with diminishing returns, capped at 10%', () => {
+test('gamble: cushion stacks with diminishing returns, capped at 15%', () => {
   const origRandom = Math.random;
   Math.random = () => 0.999;
   try {
     const s = freshState({ amount: 1000 });
     installSlot(s, 3, 'coin_flip', 100);
-    // five 50% buffs would be 100% additively, but diminishing gives 1 - 0.5^5 ≈ 0.969, capped at 0.10
+    // five 50% buffs would be 100% additively, but diminishing gives 1 - 0.5^5 ≈ 0.969, capped at 0.15
     for (let i = 0; i < 5; i++) s.buffs.gambleCushion.push({ value: 0.5, duration: 60, expiresAt: 60 });
     tryBuy(s, 3, 0);
-    assert.equal(s.amount, 1000 - 100 + 10);
+    assert.equal(s.amount, 1000 - 100 + 15);
   } finally {
     Math.random = origRandom;
   }
@@ -191,13 +191,13 @@ test('gamble: single cushion keeps coin_flip EV negative', () => {
 
 test('gamble: max-stacked cushions still leave the house ahead', () => {
   // Worst case for the house: every cushion buff stacked, *and* the chance
-  // shading on coin_flip (now 0.47, was 0.5). The 10% cushion cap is the
+  // shading on coin_flip (now 0.47, was 0.5). The 15% cushion cap is the
   // backstop — even at max cushion, EV per unit wager must stay negative so
   // farming the loop forever can't print Echoes.
   const cushionIds = ['insurance', 'steady', 'iron_will', 'bastion', 'last_stand'];
   let lose = 1;
   for (const id of cushionIds) lose *= 1 - getUpgrade(id).refund;
-  const c = Math.min(0.1, 1 - lose);
+  const c = Math.min(0.15, 1 - lose);
   const cf = getUpgrade('coin_flip');
   const ev = cf.chance * (cf.payout - 1) - (1 - cf.chance) * (1 - c);
   assert.ok(ev < 0, `expected house-edge EV, got ${ev}`);

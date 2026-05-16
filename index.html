@@ -1710,7 +1710,11 @@
     .gx-banner.gx-loss .gx-delta { color: #b97078; }
     .gx-banner.gx-in.gx-win  { animation: gx-banner-in-win  0.7s cubic-bezier(0.2, 0.9, 0.25, 1.15) forwards; }
     .gx-banner.gx-in.gx-loss { animation: gx-banner-in-loss 0.7s cubic-bezier(0.2, 0.7, 0.3, 1)    forwards; }
-    .gx-banner.gx-out { animation: gx-banner-out 0.4s ease-in forwards; }
+    /* gx-out variants need 3-class selectors so they override the gx-in rules
+       above; otherwise the higher-specificity gx-in animation keeps applying
+       and the banner just pops out of existence when the JS removes it. */
+    .gx-banner.gx-out.gx-win  { animation: gx-banner-out-win  0.9s cubic-bezier(0.33, 0, 0.4, 1) forwards; }
+    .gx-banner.gx-out.gx-loss { animation: gx-banner-out-loss 1.0s cubic-bezier(0.33, 0, 0.4, 1) forwards; }
     @keyframes gx-banner-in-win {
       0%   { transform: translate(-50%, -50%) scale(0.55) rotate(-6deg); opacity: 0; }
       40%  { transform: translate(-50%, -50%) scale(1.28) rotate(2deg);  opacity: 1; }
@@ -1720,12 +1724,17 @@
     @keyframes gx-banner-in-loss {
       0%   { transform: translate(-50%, -50%) scale(0.65) rotate(2deg); opacity: 0; }
       40%  { transform: translate(-50%, -50%) scale(1.18) rotate(-1deg); opacity: 1; }
-      75%  { transform: translate(-50%, -46%) scale(1.02) rotate(0deg);  opacity: 1; }
-      100% { transform: translate(-50%, -44%) scale(1.0)  rotate(0deg);  opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg);  opacity: 1; }
     }
-    @keyframes gx-banner-out {
-      from { opacity: 1; }
-      to   { opacity: 0; transform: translate(-50%, -50%) scale(1.05) rotate(0deg); }
+    @keyframes gx-banner-out-win {
+      0%   { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg); opacity: 1; }
+      35%  { transform: translate(-50%, -52%) scale(1.03) rotate(0deg); opacity: 0.7; }
+      100% { transform: translate(-50%, -56%) scale(1.10) rotate(0deg); opacity: 0; }
+    }
+    @keyframes gx-banner-out-loss {
+      0%   { transform: translate(-50%, -50%) scale(1.0)  rotate(0deg); opacity: 1; }
+      35%  { transform: translate(-50%, -46%) scale(0.98) rotate(0deg); opacity: 0.7; }
+      100% { transform: translate(-50%, -38%) scale(0.92) rotate(0deg); opacity: 0; }
     }
     /* Green motes radiating from centre on a win. Each rotates by --a and
        travels out --d pixels along that axis. */

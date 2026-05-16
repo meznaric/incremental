@@ -90,6 +90,8 @@ Cache key = `CACHE_VERSION` in `sw.js`. **Bump per deploy = invalidate all cache
 
 Rest of chain robust: SW install uses `{cache: 'reload'}` → bypass HTTP cache. `skipWaiting()` + `clients.claim()` → activate new SW immediately. `controllerchange` listener in `index.html` → auto-reload page on update. Players get fresh build mid-session, no prompt.
 
+**Watch out**: `pages.yml`'s deploy step is an allowlist — `cp -r index.html src vendor styles _site/` and a hand-rolled list of root-level static files. Adding a new top-level directory (`styles/`, future `data/`, etc.) needs an explicit entry there; local dev will serve it from the repo root and hide the omission. Same for new precache entries in `sw.js`.
+
 ## Lore — read before adding content
 
 All story, world, character, naming, voice, image refs under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). Mapping from mechanics to in-world names in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — canonical naming source for new upgrade / buff / gamble / convert.

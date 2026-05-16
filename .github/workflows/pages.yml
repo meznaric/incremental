@@ -42,6 +42,13 @@ jobs:
              apple-touch-icon.png icon-192.png icon-512.png icon-512-maskable.png \
              og-image.png _site/
           cp -r docs/lore/images _site/docs/lore/
+          # Stamp sw.js CACHE_VERSION with the commit SHA so every deploy
+          # invalidates the precache for existing players. Without this, the
+          # cache-first SW would serve stale src/*.js forever after the first
+          # visit. The grep guards against a future refactor silently breaking
+          # the sed pattern.
+          sed -i "s/CACHE_VERSION = '[^']*'/CACHE_VERSION = '${GITHUB_SHA::12}'/" _site/sw.js
+          grep -q "CACHE_VERSION = '${GITHUB_SHA::12}'" _site/sw.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -60,6 +60,14 @@ When `state` shape changes:
 2. Old saves are dropped on next load. That is acceptable during development.
 3. Once we ship, write a migration in `load()` instead.
 
+## Deploy caching
+
+GitHub Pages serves through `sw.js`, a service worker that **cache-firsts every static asset** (incl. `src/*.js`, `vendor/*`). Stale `src/main.js` is the failure mode — fresh HTML still imports the same URL, which the SW intercepts and serves from cache.
+
+The cache key is `CACHE_VERSION` in `sw.js`. **Bumping it per deploy invalidates every cached asset for existing players.** The Pages workflow (`.github/workflows/pages.yml`) does this automatically: a `sed` rewrites `CACHE_VERSION` to the commit SHA inside `_site/sw.js` before upload, and a `grep -q` immediately afterwards fails the build if the substitution didn't land. **Don't break the `CACHE_VERSION = '…'` line shape** in `sw.js` — if you ever rename it or change the quoting, update the sed and grep in `pages.yml` to match. Local dev keeps the static value baked into `sw.js`, which is fine because dev cache state is scoped to `localhost`.
+
+The rest of the chain is robust: SW install uses `{cache: 'reload'}` so it bypasses HTTP cache; `skipWaiting()` + `clients.claim()` activate the new SW immediately; a `controllerchange` listener in `index.html` auto-reloads the page on update, so players get the fresh build mid-session without an explicit prompt.
+
 ## Lore — read before adding content
 
 All story, world, character, naming, voice, and image references live under [`docs/lore/`](./docs/lore/). Start at [`docs/lore/README.md`](./docs/lore/README.md). The mapping from existing mechanics to in-world names is in [`docs/lore/game-mapping.md`](./docs/lore/game-mapping.md) — that is the canonical naming source for any new upgrade / buff / gamble / convert.

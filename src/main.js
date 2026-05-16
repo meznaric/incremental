@@ -768,6 +768,19 @@ installTap(toolbarEl, (_e, target) => {
   if (res && res.ok) renderShop();
 });
 
+// Per-buffType swatch for the shop card. Mirrors the glyph + colour the live
+// buff renders with (BUFF_ICONS below + the .kind-* CSS), so buying a Hunch
+// previews the same red sparkles you'll see in the buff bar a moment later.
+const BUFF_TYPE_THEME = {
+  rateMul:       { icon: 'ri-flashlight-fill',  color: '#9d6ee0' },
+  gambleLuck:    { icon: 'ri-sparkling-2-fill', color: '#ff5a6e' },
+  gambleCushion: { icon: 'ri-shield-fill',      color: '#ff8a8a' },
+  compound:      { icon: 'ri-stack-fill',       color: '#f5d34a' },
+  metaStrength:  { icon: 'ri-flashlight-line',  color: '#c084ff' },
+  metaDuration:  { icon: 'ri-time-line',        color: '#9d6ee0' },
+  metaLuck:      { icon: 'ri-sparkling-2-line', color: '#d8a5f0' },
+};
+
 function renderShop() {
   const now = nowSeconds();
   if (!shopUnlocked && state.amount > SHOP_UNLOCK_AT) shopUnlocked = true;
@@ -788,8 +801,11 @@ function renderShop() {
     const cost = slot.cost;
     const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
     const theme = KIND_THEME[u.kind] || {};
+    const buffTheme = u.kind === 'buff' ? BUFF_TYPE_THEME[u.buffType] : null;
     el.dataset.kind = u.kind;
-    el.querySelector('.kind-icon').className = `kind-icon ri ${theme.icon || ''}`;
+    const iconEl = el.querySelector('.kind-icon');
+    iconEl.className = `kind-icon ri ${(buffTheme || theme).icon || ''}`;
+    iconEl.style.color = buffTheme ? buffTheme.color : '';
     el.querySelector('.rarity').textContent = `${u.rarity} · ${kindLabel(u)}`;
     el.querySelector('.rarity').className = `rarity rarity-${u.rarity}`;
     el.querySelector('.name').textContent = u.name;

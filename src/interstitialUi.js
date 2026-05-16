@@ -147,9 +147,25 @@ export function makeInterstitialUi(state, onShown) {
     return !!(state.contactLog && worldFor(state.contactLog, id));
   }
 
+  // Drop a queue entry that we can't open — keeps drain() from getting stuck
+  // re-trying the same dead id every frame.
+  function dropFromQueue(id) {
+    const q = state.messages.queue;
+    const i = q.indexOf(id);
+    if (i >= 0) q.splice(i, 1);
+    state.messages.shown[id] = true;
+  }
+
   function open(id) {
     const def = INTERSTITIALS[id];
-    if (!def) return;
+    // Defensive: a stale queue entry (older save, removed key, or malformed
+    // def) must not lock the queue — drop it and let drain try the next.
+    if (!def || !Array.isArray(def.steps) || def.steps.length === 0) {
+      console.warn('interstitial skipped (missing def or steps):', id);
+      dropFromQueue(id);
+      drain();
+      return;
+    }
     active = { id, def, stepIdx: 0, isContact: isContactBearing(id) };
     applyContactFrame(id);
     applyCustomFrame(def);
@@ -198,15 +214,23 @@ export function makeInterstitialUi(state, onShown) {
   }
 
   function showStep() {
-    const step = active.def.steps[active.stepIdx];
+    const step = active.def.steps[active.stepIdx] || {};
     renderDots();
     updateNav();
     applySpeaker();
     waitingInput = false;
     autoTimer = 0;
     // Allow dynamic text — a function lets Sera reference past contacts at
-    // run-time without baking strings into the static table.
-    const full = typeof step.text === 'function' ? step.text(state) : step.text;
+    // run-time without baking strings into the static table. Coerce the
+    // result to a string so a missing/null/throwing producer can't take
+    // down the rAF loop via `typing.full.length` on the next tick.
+    let full = '';
+    try {
+      const raw = typeof step.text === 'function' ? step.text(state) : step.text;
+      if (typeof raw === 'string') full = raw;
+    } catch (e) {
+      console.warn('interstitial step text threw', { id: active.id, step: active.stepIdx, error: e });
+    }
     typing = { i: 0, full, doneAt: 0 };
     textEl.textContent = '';
     textEl.classList.add('it-typing');
@@ -269,10 +293,14 @@ export function makeInterstitialUi(state, onShown) {
   function tick(dtMs) {
     if (!active) return;
     if (typing) {
+      // Defensive: if typing.full is somehow not a string (legacy edge case),
+      // treat it as already complete rather than throwing — a thrown error
+      // here would propagate up and kill the rAF loop in main.js.
+      const fullLen = typeof typing.full === 'string' ? typing.full.length : 0;
       typing.i += dtMs / TYPE_MS_PER_CHAR;
-      const len = Math.min(typing.full.length, Math.floor(typing.i));
-      textEl.textContent = typing.full.slice(0, len);
-      if (len >= typing.full.length) {
+      const len = Math.min(fullLen, Math.floor(typing.i));
+      textEl.textContent = typeof typing.full === 'string' ? typing.full.slice(0, len) : '';
+      if (len >= fullLen) {
         typing = null;
         textEl.classList.remove('it-typing');
         finishStepDwell();

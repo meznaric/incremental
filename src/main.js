@@ -1051,8 +1051,12 @@ function tick(raf) {
 
   display.update(state.amount, rate, t, dt);
   hero.update(state.amount, rate, baseRate, dt);
-  interstitialUi.tick(dtMs);
-  interstitialUi.drain();
+  // Belt-and-braces: an exception inside the interstitial system must not
+  // kill the rAF loop. A frozen game-loop ("things stop flowing until I
+  // reload") was previously possible if a bad def or step-text producer
+  // threw inside tick/drain.
+  try { interstitialUi.tick(dtMs); } catch (e) { console.warn('interstitial tick threw', e); }
+  try { interstitialUi.drain(); } catch (e) { console.warn('interstitial drain threw', e); }
 
   if (raf - lastHud > 100) {
     renderShop();

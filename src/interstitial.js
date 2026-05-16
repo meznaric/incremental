@@ -186,11 +186,12 @@ const BASE_INTERSTITIALS = {
     steps: [
       { voice: 'S', text: (s) => `Cycle ${getRun(s.contactLog)}. The file is heavier than it was.` },
       { voice: 'S', text: (s) => {
-        const n = (s.contactLog && s.contactLog.worlds.length) || 0;
+        const ws = (s.contactLog && Array.isArray(s.contactLog.worlds)) ? s.contactLog.worlds : [];
+        const n = ws.length;
         return `I have ${n} name${n === 1 ? '' : 's'} on your log.`;
       } },
       { voice: 'S', text: (s) => {
-        const ws = (s.contactLog && s.contactLog.worlds) || [];
+        const ws = (s.contactLog && Array.isArray(s.contactLog.worlds)) ? s.contactLog.worlds : [];
         const recent = ws.slice().sort((a, b) => (b.contactedAt || 0) - (a.contactedAt || 0)).slice(0, 3);
         const names = recent.map((w) => w.name);
         if (names.length === 0) return 'And not one of them is forgotten.';

@@ -42,7 +42,47 @@ const _scl = new THREE.Vector3();
 const _euler = new THREE.Euler();
 const _mat = new THREE.Matrix4();
 const _color = new THREE.Color();
+const _white = new THREE.Color(0xffffff);
 const _hiddenMat = new THREE.Matrix4().makeScale(0, 0, 0);
+
+const SPARKLE_COUNT = 32;
+let _sparkleTexCached = null;
+let _glowTexCached = null;
+function sparkleTexture() {
+  if (_sparkleTexCached) return _sparkleTexCached;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  // Cross-shaped highlight gives it a star/spark silhouette.
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillRect(31, 6, 2, 52);
+  ctx.fillRect(6, 31, 52, 2);
+  _sparkleTexCached = new THREE.CanvasTexture(c);
+  return _sparkleTexCached;
+}
+function columnGlowTexture() {
+  if (_glowTexCached) return _glowTexCached;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 128, 0, 64, 128, 110);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.5)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 256);
+  _glowTexCached = new THREE.CanvasTexture(c);
+  return _glowTexCached;
+}
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
@@ -210,6 +250,41 @@ class Column {
     this.outline = makeGridOutline(0x444466);
     this.root.add(this.outline);
 
+    // Column glow envelope: a tall additive sprite behind the column. Opacity
+    // and tint are driven by the buff boost so the column visibly halos.
+    this.glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: columnGlowTexture(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+      opacity: 0,
+    }));
+    this.glow.position.set(0, (COLUMN_TOP_Y + COLUMN_BOTTOM_Y) / 2, -0.6);
+    this.glow.scale.set(COLUMN_WIDTH * 2.8, (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 1.2, 1);
+    this.root.add(this.glow);
+
+    // Sparkle field: a single Points draw call per column. Per-vertex color
+    // carries both tint and alpha (additive blend makes RGB act as luminance).
+    const spGeo = new THREE.BufferGeometry();
+    spGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKLE_COUNT * 3), 3));
+    spGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKLE_COUNT * 3), 3));
+    const spMat = new THREE.PointsMaterial({
+      map: sparkleTexture(),
+      size: 0.6,
+      sizeAttenuation: true,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      vertexColors: true,
+    });
+    this.sparkles = new THREE.Points(spGeo, spMat);
+    this.sparkles.frustumCulled = false;
+    this.root.add(this.sparkles);
+    this._sparkleStates = [];
+    for (let i = 0; i < SPARKLE_COUNT; i++) this._sparkleStates.push({ life: 0, ttl: 0, vx: 0, vy: 0 });
+    this._sparkleAcc = 0;
+
     this.material = makeMaterial();
     this.imesh = new THREE.InstancedMesh(geometryFor(0), this.material, POOL_SIZE);
     this.imesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -285,6 +360,17 @@ class Column {
     this.cycleSpawnCount = 0;
     this.aliveCount = 0;
     this._rateEstimate = 0;
+    this._boost = 0;
+    this._boostPulse = 0;
+    if (this.sparkles) {
+      const colAttr = this.sparkles.geometry.attributes.color;
+      for (let i = 0; i < SPARKLE_COUNT; i++) {
+        this._sparkleStates[i].life = 0;
+        colAttr.setXYZ(i, 0, 0, 0);
+      }
+      colAttr.needsUpdate = true;
+    }
+    if (this.glow) this.glow.material.opacity = 0;
     this.freeList.length = 0;
     for (const p of this.particles) {
       p.state = 'idle';
@@ -550,12 +636,47 @@ class Column {
     this._snapHard(amount, now);
   }
 
-  update(now, dt, amount, rate) {
+  update(now, dt, amount, rate, buffCount = 0) {
     if (this.m100 < 0) return;
     // Skip the entire column update when it's effectively invisible (fading
     // out and already tiny). assignMagnitude will repaint instances when the
     // column is brought back to life.
     if (this.scaleTarget < 0.02 && this.root.scale.x < 0.02) return;
+
+    // Buff "energised" envelope. 1 buff = floor 0.3 (clearly visible), 10+
+    // buffs = full strength. Lerp so transitions in/out don't pop. Slow pulse
+    // rides on top so the column visibly *breathes* while boosts are active.
+    const boostTarget = buffCount > 0 ? Math.min(1, 0.3 + (buffCount - 1) * 0.078) : 0;
+    const boostK = 1 - Math.exp(-dt * 3.5);
+    this._boost = (this._boost || 0) + (boostTarget - (this._boost || 0)) * boostK;
+    const pulse = this._boost > 0.01 ? 0.5 + 0.5 * Math.sin(now * 2.4) : 0;
+    this._boostPulse = this._boost * (0.55 + 0.45 * pulse);
+    if (this.outline && this.outline.material) {
+      this.outline.material.opacity = 0.22 + this._boostPulse * 0.78;
+      // Shift the outline color toward hot white as boost rises, so the grid
+      // visibly "energises" rather than just brightening.
+      const oc = this.outline.material.color;
+      const baseHex = (PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color;
+      oc.setHex(baseHex);
+      oc.lerp(_white, this._boostPulse * 0.55);
+    }
+    // Emissive is what carries in the dark scene — instanceColor only
+    // modulates diffuse, so we lift the material's emissive intensity here
+    // (one uniform per column, cheap) so the falling pieces visibly glow.
+    if (this.material) {
+      this.material.emissiveIntensity = 0.4 + this._boostPulse * 1.6;
+    }
+    // Glow envelope behind the column — opacity and warm-tint shift drive the
+    // halo. Quiescent at boost=0 (invisible), fully present at boost=1.
+    if (this.glow) {
+      this.glow.material.opacity = this._boostPulse * 0.65;
+      const gc = this.glow.material.color;
+      gc.setHex((PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color);
+      gc.lerp(_white, 0.4 + this._boostPulse * 0.35);
+    }
+    // Sparkle field rides the same boost — spawn rate, brightness, drift all
+    // scale together so 1 buff produces a faint twinkle and 10 a constant shimmer.
+    this._updateSparkles(now, dt);
 
     const target = Math.floor(amount / this._magFactor);
     const localRate = (rate || 0) / this._magFactor;
@@ -655,6 +776,58 @@ class Column {
     this._writeInstances(now);
   }
 
+  _updateSparkles(now, dt) {
+    if (!this.sparkles) return;
+    const posAttr = this.sparkles.geometry.attributes.position;
+    const colAttr = this.sparkles.geometry.attributes.color;
+    const boost = this._boost || 0;
+    // Spawn rate: up to ~36/sec at full boost. Accumulator handles fractional
+    // spawns across frames so low boost still trickles a handful per second.
+    const spawnRate = boost * 36;
+    this._sparkleAcc = (this._sparkleAcc || 0) + dt * spawnRate;
+    const baseHex = (PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color;
+    while (this._sparkleAcc >= 1) {
+      this._sparkleAcc -= 1;
+      let idx = -1;
+      for (let i = 0; i < SPARKLE_COUNT; i++) {
+        if (this._sparkleStates[i].life <= 0) { idx = i; break; }
+      }
+      if (idx < 0) break;
+      const s = this._sparkleStates[idx];
+      const x = (Math.random() - 0.5) * COLUMN_WIDTH * 1.35;
+      const y = COLUMN_BOTTOM_Y + Math.random() * (COLUMN_TOP_Y - COLUMN_BOTTOM_Y);
+      const z = (Math.random() - 0.5) * 0.7;
+      posAttr.setXYZ(idx, x, y, z);
+      s.ttl = 0.35 + Math.random() * 0.55;
+      s.life = s.ttl;
+      s.vx = (Math.random() - 0.5) * 0.35;
+      s.vy = 0.25 + Math.random() * 0.6;
+    }
+    _color.setHex(baseHex).lerp(_white, 0.5);
+    for (let i = 0; i < SPARKLE_COUNT; i++) {
+      const s = this._sparkleStates[i];
+      if (s.life > 0) {
+        s.life -= dt;
+        const k = Math.max(0, s.life) / s.ttl;
+        // Soft fade in then out across the sparkle's lifetime.
+        const alpha = Math.sin((1 - k) * Math.PI);
+        const intensity = alpha * (0.55 + boost * 0.9);
+        colAttr.setXYZ(i, _color.r * intensity, _color.g * intensity, _color.b * intensity);
+        posAttr.setXYZ(
+          i,
+          posAttr.getX(i) + s.vx * dt,
+          posAttr.getY(i) + s.vy * dt,
+          posAttr.getZ(i),
+        );
+        if (s.life <= 0) colAttr.setXYZ(i, 0, 0, 0);
+      } else {
+        colAttr.setXYZ(i, 0, 0, 0);
+      }
+    }
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+  }
+
   _writeInstances(now) {
     const im = this.imesh;
     const streamT = Math.max(0, Math.min(1, (this._streamSpeed - CONTINUOUS_FALL_SPEED) / (STREAM_MAX_SPEED - CONTINUOUS_FALL_SPEED)));
@@ -722,6 +895,17 @@ class Column {
           tintB = dim * 0.9;
         }
       }
+      // Buff envelope: brighten + slightly enlarge the falling pieces and
+      // give them a subtle additional spin so the boosted column reads as
+      // "energised" without separate geometry. Skipped during gamble FX so
+      // the centre-bound swarm keeps its own tint.
+      const boost = this._boost || 0;
+      if (!p._gfxActive && boost > 0.01) {
+        const bp = this._boostPulse || boost;
+        const tint = 1 + bp * 0.85;
+        tintR *= tint; tintG *= tint; tintB *= tint;
+        scaleMul *= 1 + boost * 0.18;
+      }
       _pos.set(px, py, pz);
       _euler.set(p.rotX, p.rotY, p.rotZ || 0);
       _quat.setFromEuler(_euler);
@@ -778,7 +962,7 @@ export class MagnitudeDisplay {
     }
   }
 
-  update(amount, rate, now, dt) {
+  update(amount, rate, now, dt, buffCount = 0) {
     const { cols } = decomposeByBase100(amount, this.visibleColumns);
     const desired = cols.map((c) => c.m).filter((m) => m >= 0);
     const desiredSet = new Set(desired);
@@ -824,7 +1008,7 @@ export class MagnitudeDisplay {
     }
 
     for (const col of this.columns) {
-      if (col.m100 >= 0) col.update(now, dt, amount, rate);
+      if (col.m100 >= 0) col.update(now, dt, amount, rate, buffCount);
       col.animate(dt);
       if (!col.assigned && col.root.scale.x < 0.02 && col.m100 >= 0) {
         col.reset();

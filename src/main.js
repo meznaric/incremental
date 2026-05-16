@@ -329,7 +329,16 @@ function tick(raf) {
   // a class toggle. Drives the green pulse + the "ready" hint inside the modal.
   contactLogUi.updateAffordance();
 
-  display.update(state.amount, rate, t, dt);
+  let buffCount = 0;
+  const bs = state.buffs;
+  if (bs) {
+    for (const k of ['rateMul', 'gambleLuck', 'gambleCushion', 'compound']) {
+      const xs = bs[k];
+      if (!xs) continue;
+      for (const x of xs) if (x.expiresAt > t) buffCount++;
+    }
+  }
+  display.update(state.amount, rate, t, dt, buffCount);
   hero.update(state.amount, rate, baseRate, dt);
   // Belt-and-braces: an exception inside the interstitial system must not
   // kill the rAF loop. A frozen game-loop ("things stop flowing until I

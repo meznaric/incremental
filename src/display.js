@@ -269,7 +269,7 @@ class Column {
     spGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKLE_COUNT * 3), 3));
     const spMat = new THREE.PointsMaterial({
       map: sparkleTexture(),
-      size: 0.38,
+      size: 0.76,
       sizeAttenuation: true,
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -795,12 +795,11 @@ class Column {
       s.bz = (Math.random() - 0.5) * 0.2;
       s.ttl = 0.55 + Math.random() * 0.55;
       s.life = s.ttl;
-      // Shuttlecock motion: launch upward fast, drag decelerates them quickly
-      // so they shoot up and then taper toward a hover. Outward lateral
-      // velocity is correspondingly stronger; drag pulls it down too. Higher
-      // boost = harder launch, so travel distance grows with energisation.
-      s.vx = side * (0.4 + Math.random() * 0.6);
-      s.vy = 14 + Math.random() * 6 + boost * 5;
+      // Shuttlecock motion: launch upward fast, drag decelerates them
+      // sharply so they shoot up and stop in a short distance. Asymptotic
+      // travel ≈ v0/dragK ≈ 22/12 ≈ 1.8 units. Higher boost = harder launch.
+      s.vx = side * (0.5 + Math.random() * 0.7);
+      s.vy = 20 + Math.random() * 8 + boost * 4;
       // How strongly this spark is dragged by the global ripple wavefront.
       // Floor at 0.3 so every spark visibly tracks the pulse — matches the
       // falling items' coupling baseline — while the random spread keeps
@@ -816,8 +815,9 @@ class Column {
     const sx = this.root.scale.x || 1;
     const rootX = this.root.position.x;
     // Exponential drag — same factor for x and y so each spark's vy and vx
-    // both decay together (shuttlecock-style hard deceleration).
-    const drag = Math.exp(-5 * dt);
+    // both decay together (shuttlecock-style hard deceleration). k=12 keeps
+    // total travel short despite the high launch velocity.
+    const drag = Math.exp(-12 * dt);
     for (let i = 0; i < SPARKLE_COUNT; i++) {
       const s = this._sparkleStates[i];
       if (s.life > 0) {

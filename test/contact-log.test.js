@@ -9,9 +9,22 @@ import {
   engravingCost, canBuyEngraving, buyEngraving,
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount,
   ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
-  echoLoopLevel, isLoopMode,
+  echoLoopLevel, isLoopMode, activeEp, allEpsComplete, isEpComplete,
 } from '../src/contactLog.js';
 import { WORLDS_BY_EP } from '../src/worlds.js';
+
+// Helper: log a synthetic player who has completed every world in EPs 1..n.
+function logWithEpsCompleted(n) {
+  const log = { run: 1, worlds: [] };
+  for (let ep = 1; ep <= n; ep++) {
+    for (const k of Object.keys(WORLDS_BY_EP[ep])) {
+      const def = WORLDS_BY_EP[ep][k];
+      log.worlds.push({ id: def.id, name: def.name, ep: def.ep, status: def.status, contactedAt: 1, run: ep });
+    }
+  }
+  log.run = n + 1;
+  return log;
+}
 
 const freshLog = () => ({ run: 1, worlds: [] });
 
@@ -54,35 +67,37 @@ test('recordContact: ignores unknown interstitial ids', () => {
   assert.equal(log.worlds.length, 0);
 });
 
-test('recordContact: resolves the world per the log.run → EP rotation', () => {
-  const cycle1 = { run: 1, worlds: [] };
-  recordContact(cycle1, 'milestone_1t', 100);
-  assert.equal(cycle1.worlds[0].id, 'ahn_tar_3', 'cycle 1 climax = Ahn-Tar-3');
+test('recordContact: resolves the world per the log\'s active EP (first incomplete)', () => {
+  // Empty log → activeEp = 1; milestone_1t → Ahn-Tar-3.
+  const fresh = { run: 1, worlds: [] };
+  recordContact(fresh, 'milestone_1t', 100);
+  assert.equal(fresh.worlds[0].id, 'ahn_tar_3', 'EP1 active → climax is Ahn-Tar-3');
 
-  const cycle2 = { run: 2, worlds: [] };
-  recordContact(cycle2, 'milestone_1t', 100);
-  assert.equal(cycle2.worlds[0].id, 'solunn', 'cycle 2 climax = Solunn');
+  // EP1 complete → activeEp = 2; milestone_1t → Solunn.
+  const ep2 = logWithEpsCompleted(1);
+  recordContact(ep2, 'milestone_1t', 100);
+  assert.equal(ep2.worlds[ep2.worlds.length - 1].id, 'solunn', 'EP2 active → climax is Solunn');
 
-  const cycle3 = { run: 3, worlds: [] };
-  recordContact(cycle3, 'milestone_1t', 100);
-  assert.equal(cycle3.worlds[0].id, 'vehrn_9', 'cycle 3 climax = Vehrn-9');
-
-  const cycle8 = { run: 8, worlds: [] };
-  recordContact(cycle8, 'milestone_1t', 100);
-  assert.equal(cycle8.worlds[0].id, 'the_cascade', 'cycle 8 climax = The Cascade');
+  // EPs 1-7 complete → activeEp = 8; milestone_1t → The Cascade.
+  const ep8 = logWithEpsCompleted(7);
+  recordContact(ep8, 'milestone_1t', 100);
+  assert.equal(ep8.worlds[ep8.worlds.length - 1].id, 'the_cascade', 'EP8 active → climax is The Cascade');
 });
 
-test('recordContact: tags each entry with the current run', () => {
+test('recordContact: continuation cycle keeps the same EP active until full', () => {
+  // Player closes cycle 1 with only ish_karal logged. Next cycle is still EP1.
   const log = freshLog();
-  recordContact(log, 'milestone_1k', 100);
-  advanceRun(log);
-  advanceRun(log);
-  // run is now 3 → EP3. milestone_1m in EP3 = esnal.
-  recordContact(log, 'milestone_1m', 200);
-  assert.equal(log.worlds[0].run, 1);
-  assert.equal(log.worlds[1].run, 3);
-  assert.equal(log.worlds[0].id, 'ish_karal');
-  assert.equal(log.worlds[1].id, 'esnal');
+  recordContact(log, 'milestone_1k', 100);  // ish_karal
+  closeCycle(log, 1e3);
+  assert.equal(activeEp(log), 1, 'EP1 still active after early close');
+  // milestone_1k → ish_karal again, already logged → no new entry.
+  const dup = recordContact(log, 'milestone_1k', 200);
+  assert.equal(dup, false);
+  // milestone_10k → belnesh, fresh.
+  const added = recordContact(log, 'milestone_10k', 200);
+  assert.equal(added, true);
+  assert.equal(log.worlds[1].id, 'belnesh');
+  assert.equal(log.worlds[1].run, getRun(log), 'tagged with the current run');
 });
 
 test('WORLDS_BY_EP: every entry has the required shape', () => {
@@ -225,16 +240,17 @@ test('canCloseCycle: false again immediately after closing, until next contact',
   assert.equal(canCloseCycle(log), false, 'new cycle starts empty');
 });
 
-test('canCloseCycle: cycle 2 can be closed with EP2 contacts (no dedupe lock)', () => {
+test('canCloseCycle: cycle 2 can be closed with the next EP\'s 1k slot once EP1 is full', () => {
+  // Fill EP1 across one cycle, then close.
   const log = freshLog();
-  recordContact(log, 'milestone_1k', 100);   // ish_karal, cycle 1
+  for (const k of Object.keys(WORLDS_BY_EP[1])) recordContact(log, k, 100);
+  assert.equal(activeEp(log), 2, 'EP1 done → EP2 active');
   closeCycle(log, 0);
   assert.equal(getRun(log), 2);
-  // Cycle 2 plays EP2; same milestone id resolves to a different world (mora_brae),
-  // so the dedupe-by-world-id contract does NOT lock the cycle.
+  // Cycle 2 plays EP2; milestone_1k now resolves to mora_brae.
   const added = recordContact(log, 'milestone_1k', 200);
   assert.equal(added, true);
-  assert.equal(log.worlds[1].id, 'mora_brae');
+  assert.equal(log.worlds[log.worlds.length - 1].id, 'mora_brae');
   assert.equal(canCloseCycle(log), true);
 });
 
@@ -390,42 +406,73 @@ test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
 
 // — Echo Loop mode (post-season prestige) —
 
-test('echoLoopLevel: 0 for runs 1..8, then run-8 from cycle 9 on', () => {
-  for (let r = 1; r <= 8; r++) {
-    assert.equal(echoLoopLevel({ run: r, worlds: [] }), 0, `run ${r}`);
-  }
-  assert.equal(echoLoopLevel({ run: 9,  worlds: [] }), 1);
-  assert.equal(echoLoopLevel({ run: 14, worlds: [] }), 6);
+test('isLoopMode: false until every EP is complete, true afterward', () => {
+  assert.equal(isLoopMode({ run: 1, worlds: [] }), false);
+  assert.equal(isLoopMode(logWithEpsCompleted(7)), false, '7 EPs done is not enough');
+  const allDone = logWithEpsCompleted(8);
+  assert.equal(isLoopMode(allDone), true);
 });
 
-test('isLoopMode: false before cycle 9 closes, true afterward', () => {
-  assert.equal(isLoopMode({ run: 1, worlds: [] }), false);
-  assert.equal(isLoopMode({ run: 8, worlds: [] }), false);
-  assert.equal(isLoopMode({ run: 9, worlds: [] }), true);
+test('echoLoopLevel: tracks loopCycles, not the raw run counter', () => {
+  // Fresh log — never closed, never in loop mode.
+  assert.equal(echoLoopLevel({ run: 1, worlds: [] }), 0);
+  // A log that just entered loop mode (loopCycles still 0).
+  const fresh = { ...logWithEpsCompleted(8), mass: 0, engravings: {}, loopMode: true, loopCycles: 0 };
+  assert.equal(echoLoopLevel(fresh), 0, 'transition cycle does not bump');
+  // Two loop cycles closed.
+  fresh.loopCycles = 2;
+  assert.equal(echoLoopLevel(fresh), 2);
 });
 
 test('canCloseCycle: Loop mode always closes (no contact required)', () => {
-  // run 9 with zero current-cycle contacts — Season 1 mechanic would refuse,
+  // All EPs done, zero contacts this cycle — Season 1 mechanic would refuse,
   // Echo Loop allows the close.
-  const log = { run: 9, worlds: [] };
+  const log = { ...logWithEpsCompleted(8), loopMode: true, loopCycles: 0, mass: 0, engravings: {} };
   assert.equal(canCloseCycle(log), true);
 });
 
 test('memoryMul: each Echo Loop adds the same as one virtual shard', () => {
-  // Same shard count, different loop level → mul scales by ECHO_MEMORY_PER_SHARD.
-  const baseShards = { run: 1, worlds: [{ id: 'a' }, { id: 'b' }] };
-  const oneLoop = { run: 9, worlds: [{ id: 'a' }, { id: 'b' }] };
+  const baseShards = { run: 1, worlds: [{ id: 'a' }, { id: 'b' }], loopCycles: 0 };
+  const oneLoop = { run: 1, worlds: [{ id: 'a' }, { id: 'b' }], loopCycles: 1 };
   assert.equal(memoryMul(baseShards), 1 + 2 * ECHO_MEMORY_PER_SHARD);
   assert.equal(memoryMul(oneLoop),    1 + 3 * ECHO_MEMORY_PER_SHARD);
 });
 
 test('closeCycle: Loop-mode close advances run and banks mass without contacts', () => {
-  // Player ends cycle 8 climactically and prestiges → run = 9. The next
-  // Loop close should work on the very first cycle 9 boot, before they
-  // climb at all, because canCloseCycle is loop-relaxed.
-  const log = { run: 9, worlds: [{ id: 'a', run: 1 }], mass: 0, engravings: {}, bestPeak: 0 };
+  // Player just completed EP8 last cycle → loopMode true, loopCycles 0. The
+  // first Loop close should work even with zero current-cycle contacts.
+  const log = { ...logWithEpsCompleted(8), mass: 0, engravings: {}, bestPeak: 0,
+    loopMode: true, loopCycles: 0 };
+  const startRun = getRun(log);
   const banked = closeCycle(log, 1e9);
   assert.equal(banked, 7);
-  assert.equal(getRun(log), 10);
-  assert.equal(echoLoopLevel(log), 2);
+  assert.equal(getRun(log), startRun + 1);
+  assert.equal(echoLoopLevel(log), 1, 'first loop close bumps to 1');
+});
+
+test('closeCycle: the close that completes EP8 enters loop mode without bumping loopCycles', () => {
+  // Fill EPs 1..7 and 9 of EP8. The 10th EP8 contact lands this cycle, then close.
+  const log = logWithEpsCompleted(7);
+  log.mass = 0; log.engravings = {}; log.bestPeak = 0;
+  log.loopMode = false; log.loopCycles = 0;
+  // Cycle current run is 8 (logWithEpsCompleted set it). Log nine EP8 worlds.
+  const ep8Keys = Object.keys(WORLDS_BY_EP[8]);
+  for (let i = 0; i < 9; i++) recordContact(log, ep8Keys[i], 100);
+  assert.equal(activeEp(log), 8, 'still EP8 with one slot to go');
+  // Final EP8 contact this cycle.
+  recordContact(log, ep8Keys[9], 100);
+  assert.equal(allEpsComplete(log), true);
+  closeCycle(log, 1e6);
+  assert.equal(log.loopMode, true, 'transition close flips loopMode');
+  assert.equal(echoLoopLevel(log), 0, 'loopCycles unchanged on the transition close');
+});
+
+test('isEpComplete + activeEp: track EP fill against the world list', () => {
+  const log = freshLog();
+  assert.equal(activeEp(log), 1);
+  assert.equal(isEpComplete(log, 1), false);
+  for (const k of Object.keys(WORLDS_BY_EP[1])) recordContact(log, k, 100);
+  assert.equal(isEpComplete(log, 1), true);
+  assert.equal(activeEp(log), 2);
+  assert.equal(allEpsComplete(log), false);
 });

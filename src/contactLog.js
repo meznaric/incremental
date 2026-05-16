@@ -10,7 +10,9 @@
 //   * Mutated only via recordContact(), which is keyed on world.id so the
 //     same world is not appended twice across reloads.
 //   * advanceRun() bumps the run counter — call this when a cycle close
-//     happens. Each run plays one episode (EP1..EP8); see worlds.js.
+//     happens. The episode in play is derived from log contents, not the run
+//     counter — see activeEp() below; closing a cycle early keeps the same
+//     EP active next cycle with the remaining names still available.
 //
 // Schema:
 //   { run: number,
@@ -24,15 +26,46 @@
 //   }
 
 import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds.js';
-import { getActiveEp } from './episodes.js';
 
 export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
-// Resolve the world definition for a given milestone id, scoped to the
-// log's current run. Each run plays one episode (EP1..EP8) and each EP
-// defines its own world per milestone slot.
+// Episode order is the natural EP key order: 1..8. Once every world in an EP
+// is on the log, that EP is "done" and the next incomplete one becomes active.
+const EP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
+
+// True if every world defined for `ep` is already in the log. The check is on
+// world id, which is unique across EPs.
+export function isEpComplete(log, ep) {
+  const block = WORLDS_BY_EP[ep];
+  if (!block) return false;
+  const ids = new Set((log && log.worlds) ? log.worlds.map((w) => w.id) : []);
+  for (const def of Object.values(block)) {
+    if (!ids.has(def.id)) return false;
+  }
+  return true;
+}
+
+// Lowest-numbered EP whose ten worlds are not all on the log. Null once every
+// EP is complete (Echo Loop territory). This — not the run counter — is what
+// drives milestone resolution. A cycle that closes early continues the same
+// EP next time, with the remaining names still available.
+export function activeEp(log) {
+  for (const ep of EP_ORDER) {
+    if (!isEpComplete(log, ep)) return ep;
+  }
+  return null;
+}
+
+export function allEpsComplete(log) {
+  return activeEp(log) === null;
+}
+
+// Resolve the world definition for a given milestone id, scoped to the log's
+// active EP. The active EP is the first incomplete EP in the log, so an early
+// close re-binds the same EP next cycle until its 10 worlds are all logged.
 export function worldFor(log, milestoneId) {
-  const ep = getActiveEp(getRun(log));
+  const ep = activeEp(log);
+  if (ep == null) return null;
   return WORLDS_BY_EP[ep]?.[milestoneId] || null;
 }
 
@@ -75,6 +108,7 @@ export const STATUS_MEANING = {
 const fresh = () => ({
   run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
   pattern: null, pendingPatternChoice: false, patternUsed: {},
+  loopMode: false, loopCycles: 0,
 });
 
 // Returns a plain object always — never null. Defensive against corrupted or
@@ -107,10 +141,21 @@ export function loadContactLog() {
     ? Object.fromEntries(Object.entries(s.patternUsed).filter(
         ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
     : {};
+  // Loop-mode bookkeeping. New saves carry both fields directly. Legacy saves
+  // (no fields) are migrated: a log whose 8 EPs are all complete is in loop
+  // mode now, even if it never wrote the flag; loopCycles is approximated
+  // from the run counter (run 9 → 0 loop cycles, run 10 → 1, etc.).
+  const partial = { run, worlds };
+  const legacyAllDone = isEpComplete(partial, 8) && EP_ORDER.every((ep) => isEpComplete(partial, ep));
+  const loopMode = typeof s.loopMode === 'boolean' ? s.loopMode : legacyAllDone;
+  const loopCycles = Number.isFinite(s.loopCycles) && s.loopCycles >= 0
+    ? Math.floor(s.loopCycles)
+    : (legacyAllDone ? Math.max(0, run - 9) : 0);
   return {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     pattern, pendingPatternChoice, patternUsed,
+    loopMode, loopCycles,
   };
 }
 
@@ -223,20 +268,22 @@ export function cycleContactCount(log) {
 
 // — Echo Loop mode (post-season) —
 //
-// Season 1 ends at cycle 8. Once the player closes EP8, the run counter
-// advances to 9 and the game shifts into Echo Loop mode: a holding pattern
-// where Kalen listens back. No new contacts can be logged (EP9+ has no
-// world catalogue), but each loop close still banks Carrier Mass and adds
-// a "Loop Resonance" multiplier to Echo Memory — the rig keeps remembering.
+// Once every EP's worlds are all on the log, the game shifts into Echo Loop
+// mode: a holding pattern where Kalen listens back. No new contacts can be
+// logged (EP catalogue is exhausted), but each loop close still banks Carrier
+// Mass and adds a "Loop Resonance" multiplier to Echo Memory.
 //
-// Loop level = max(0, run - 8). A player who has never closed cycle 8 has
-// loop level 0 and runs the normal contact-bearing mechanic.
+// Loop level = number of cycles closed in loop mode. The cycle that *enters*
+// loop mode (the close that completes the last EP) does not count — the
+// counter starts at 0, then bumps on each subsequent close.
 export function echoLoopLevel(log) {
-  return Math.max(0, getRun(log) - 8);
+  return (log && Number.isFinite(log.loopCycles)) ? log.loopCycles : 0;
 }
 
 export function isLoopMode(log) {
-  return echoLoopLevel(log) > 0;
+  if (!log) return false;
+  if (log.loopMode) return true;
+  return allEpsComplete(log);
 }
 
 // At least one contact in the current cycle is required to close it —
@@ -270,6 +317,12 @@ export function closeCycle(log, peakAmount) {
   const banked = massForPeak(peakAmount);
   log.mass = (log.mass || 0) + banked;
   if ((peakAmount || 0) > (log.bestPeak || 0)) log.bestPeak = peakAmount || 0;
+  // Loop bookkeeping. If we were already in loop mode at the *start* of this
+  // close, this close was a loop cycle → bump the counter. Then re-check
+  // completion: the close that just completed the final EP flips loopMode on
+  // for next time without bumping loopCycles for the transition itself.
+  if (log.loopMode) log.loopCycles = (log.loopCycles || 0) + 1;
+  if (allEpsComplete(log)) log.loopMode = true;
   advanceRun(log);
   // Patterns are per-cycle. Clear the previous pick and flag the next run as
   // owing the player a fresh choice. The chooser modal in main.js gates play

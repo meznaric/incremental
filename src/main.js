@@ -15,7 +15,6 @@ import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
   scheduleTutorialIfEligible, bindEpisode, enqueueSeasonCompleteBeat,
 } from './interstitial.js';
-import { getRun } from './contactLog.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { initMenu } from './menu.js';
 import {
@@ -48,8 +47,10 @@ state.ascentExp = ascentExp(state.contactLog);
 initMenu();
 // Bind the active episode's interstitials (milestone beats + cycle_open) to
 // match the cycle the player is loading into. Must run before checkStart so
-// any cycle_open/milestone enqueue picks up the EP's content.
-bindEpisode(getRun(state.contactLog));
+// any cycle_open/milestone enqueue picks up the EP's content. The active EP
+// is derived from the log itself (first incomplete EP), so a cycle that
+// closed early continues the same EP next time.
+bindEpisode(state.contactLog);
 const contactLogUi = initContactLogUi(state, {
   // "Close the Cycle" — the cycle-close action. Wipes the gameplay save, advances the
   // log's run counter so milestones can fire again, leaves the world list

@@ -1,7 +1,9 @@
 import {
   worldFor, recordContact, saveContactLog, getRun,
+  activeEp, allEpsComplete,
 } from './contactLog.js';
-import { EP_INTERSTITIALS, getActiveEp } from './episodes.js';
+import { WORLDS_BY_EP } from './worlds.js';
+import { EP_INTERSTITIALS } from './episodes.js';
 
 // Staging id for the one-shot First Contact beat. Queued *before* the very
 // first contact-bearing interstitial in a player's history, with the same
@@ -26,9 +28,11 @@ export const FIRST_CONTACT_ID = 'first_contact';
 //
 // `repeat: true` lets a message fire more than once.
 //
-// Each run plays one episode (EP1..EP8). The milestone_* interstitials and
-// the cycle_open beat are EP-scoped — bindEpisode() rewrites those entries
-// in INTERSTITIALS at startup and whenever the run advances.
+// Each EP defines ten milestones plus a cycle_open beat. The active EP is
+// resolved from the contact log (first incomplete EP), so closing a cycle
+// early continues the same EP next time with only the remaining names
+// available. bindEpisode() rewrites the rotating entries in INTERSTITIALS
+// at startup and on every cycle.
 
 const BASE_INTERSTITIALS = {
   // voice: Narrator → Sera. Fires once *ever*, immediately before the first
@@ -236,45 +240,68 @@ const ROTATING_KEYS = [
   'milestone_1t',
 ];
 
-// Echo Loop cycle_open. After the player closes Season 1 (cycle 8 → run 9),
-// every subsequent cycle plays this beat instead of an EP's. No milestone
-// interstitials are bound in Loop mode; the climb is a pure Mass grind.
+// Echo Loop cycle_open. Once every EP is complete, every subsequent cycle
+// plays this beat instead of an EP's. No milestone interstitials are bound in
+// Loop mode; the climb is a pure Mass grind.
 // voice: Kalen. Numbered against the loop, not the cycle, so the player can
 // see they've crossed the finale and are now in holding territory.
 const LOOP_CYCLE_OPEN = {
   repeat: true,
   steps: [
-    { voice: 'K', text: (s) => `Echo Loop ${Math.max(1, getRun(s.contactLog) - 8)}. The desk is the desk.` },
+    { voice: 'K', text: (s) => `Echo Loop ${Math.max(1, ((s.contactLog && s.contactLog.loopCycles) || 0) + 1)}. The desk is the desk.` },
     { voice: 'K', text: 'Sera is not in tonight. The rig is.' },
     { voice: 'K', text: 'I keep listening. The Resonance compounds.' },
   ],
 };
 
+// Within-EP continuation opener. Fires on a cycle that's resuming an EP the
+// player closed early. The EP's own cycle_open is a *transition* beat ("the
+// last folder closed, here's the next one") — wrong for a continuation, where
+// the folder is still open. voice: Kalen.
+const CONTINUATION_CYCLE_OPEN = {
+  repeat: true,
+  steps: [
+    { voice: 'K', text: 'The folder is still open.' },
+    { voice: 'K', text: 'We were not done with it.' },
+  ],
+};
+
 // Swap in the active cycle's milestone interstitials. Called from main.js at
-// startup with the run loaded from the Contact Log; if a cycle close happens
-// inside the running app (the page reloads) the next boot will rebind here.
+// startup with the contact log; if a cycle close happens inside the running
+// app (the page reloads) the next boot will rebind here.
 //
-// Post-finale (run >= 9): only cycle_open is bound, no milestone beats —
-// the player has seen them all, and Echo Loop mode is purposefully sparse.
-export function bindEpisode(epOrRun) {
+// EP is resolved from the log itself (first incomplete EP), not from the run
+// counter. A cycle that closed early surfaces the same EP again with only
+// the remaining names available. Once every EP's worlds are on the log,
+// bindEpisode binds Loop-mode content (no milestones, loop opener).
+export function bindEpisode(log) {
   for (const k of ROTATING_KEYS) {
     delete INTERSTITIALS[k];
   }
-  const run = Number.isFinite(epOrRun) ? Math.floor(epOrRun) : 1;
-  if (run >= 9) {
+  // Back-compat: tests + early callers may pass a run number. Promote it to
+  // a synthetic log so EP resolution still works.
+  if (typeof log === 'number') log = { run: Math.floor(log), worlds: [] };
+  if (!log) log = { run: 1, worlds: [] };
+  if (allEpsComplete(log)) {
     INTERSTITIALS.cycle_open = LOOP_CYCLE_OPEN;
     return;
   }
-  const ep = getActiveEp(run);
+  const ep = activeEp(log);
   const block = EP_INTERSTITIALS[ep] || {};
   for (const k of ROTATING_KEYS) {
     if (block[k]) INTERSTITIALS[k] = block[k];
   }
+  // Detect EP continuation: at least one of this EP's worlds is already on
+  // the log. The EP's transition opener narrates a *handoff between EPs*, so
+  // it shouldn't fire on a continuation. Swap to a generic continuation beat.
+  const epWorldIds = new Set(Object.values(WORLDS_BY_EP[ep] || {}).map((w) => w.id));
+  const epHasContacts = (log.worlds || []).some((w) => epWorldIds.has(w.id));
+  if (epHasContacts) INTERSTITIALS.cycle_open = CONTINUATION_CYCLE_OPEN;
 }
 
 // Bind on module load so the table is populated even before main.js wires up
-// (e.g. unit tests). main.js calls bindEpisode again with the loaded run.
-bindEpisode(1);
+// (e.g. unit tests). main.js calls bindEpisode again with the loaded log.
+bindEpisode(null);
 
 // Thresholds for contact-bearing milestones. Each EP fills all ten slots with
 // distinct worlds, so density is ten contacts per cycle: dense at the bottom
@@ -329,7 +356,15 @@ export function enqueue(state, id) {
   if (!INTERSTITIALS[id]) return false;
   if (m.shown[id] && !INTERSTITIALS[id].repeat) return false;
   if (m.queue.includes(id)) return false;
-  const isContact = !!(state.contactLog && worldFor(state.contactLog, id));
+  const milestoneWorld = state.contactLog ? worldFor(state.contactLog, id) : null;
+  const isContact = !!milestoneWorld;
+  // EP-continuation guard: a cycle that closed early replays the same EP, so
+  // milestone_X may resolve to a world that is *already* on the log. Skip the
+  // beat in that case — the player has already heard it. Without this, the
+  // typewriter would replay every name they've already collected each cycle.
+  if (isContact && (state.contactLog.worlds || []).some((w) => w.id === milestoneWorld.id)) {
+    return false;
+  }
   // Stage the one-shot First Contact beat just *before* the very first
   // contact-bearing interstitial in the player's history. It announces what
   // the loop is. After this fires once, the flag persists in the contact log
@@ -474,14 +509,14 @@ export function enqueueFirstCloseBeat(state) {
 }
 
 // Called from main on boot when the player has just crossed into Echo Loop
-// mode (closed cycle 8 → run 9). Fires the season-finale cinematic beat
-// exactly once; the log carries the flag so a player who reloads mid-beat
+// mode (every EP's worlds are on the log). Fires the season-finale cinematic
+// beat exactly once; the log carries the flag so a player who reloads mid-beat
 // does not retrigger it.
 export function enqueueSeasonCompleteBeat(state) {
   const log = state.contactLog;
   if (!log) return;
   if (log.seasonCompleteShown) return;
-  if (getRun(log) < 9) return;
+  if (!allEpsComplete(log)) return;
   log.seasonCompleteShown = true;
   enqueue(state, 'season_complete');
 }

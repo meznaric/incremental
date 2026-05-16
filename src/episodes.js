@@ -506,10 +506,3 @@ export const EP_INTERSTITIALS = {
     ] },
   },
 };
-
-// Active-EP resolver: cycles 1–8 each play their canonical episode; any cycle
-// beyond 8 replays EP8 (the finale loops as a meditation, not a soft-break).
-export function getActiveEp(run) {
-  if (!Number.isFinite(run) || run < 1) return 1;
-  return Math.min(Math.floor(run), 8);
-}

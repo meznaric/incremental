@@ -9,6 +9,7 @@
 import { PATTERNS, setActivePattern, applyPatternOnFreshBoot } from './cyclePatterns.js';
 import { saveContactLog } from './contactLog.js';
 import { nowSeconds } from './save.js';
+import { installTap } from './tap.js';
 
 export function showPatternSelect(state, onPicked) {
   const modal = document.getElementById('patternModal');
@@ -36,20 +37,27 @@ export function showPatternSelect(state, onPicked) {
     `).join('');
   }
 
-  function onClick(e) {
-    const btn = e.target.closest('.pat-item');
+  // Route through installTap so iOS pointercancel-as-tap-completion works and
+  // the pointerdown's resolved element is what we match against (DOM under
+  // the modal can churn between down and up). Bind once; route via a swappable
+  // closure ref so re-shows of the modal hit their own picker.
+  modal._patHandle = (downTarget) => {
+    const btn = downTarget && downTarget.closest && downTarget.closest('.pat-item');
     if (!btn) return;
     const id = btn.dataset.id;
     if (!setActivePattern(state.contactLog, id)) return;
     saveContactLog(state.contactLog);
-    // Seed one-time effects (buffs, free-purchase charges) now that we know
-    // the pick. nowSeconds() so any seeded buff aligns with the live clock.
     applyPatternOnFreshBoot(state, nowSeconds());
     modal.classList.remove('open');
-    modal.removeEventListener('click', onClick);
+    modal._patHandle = null;
     if (typeof onPicked === 'function') onPicked(id);
+  };
+  if (!modal._patTapBound) {
+    modal._patTapBound = true;
+    installTap(modal, (_e, downTarget) => {
+      if (typeof modal._patHandle === 'function') modal._patHandle(downTarget);
+    });
   }
-  modal.addEventListener('click', onClick);
   modal.classList.add('open');
   return true;
 }

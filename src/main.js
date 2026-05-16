@@ -260,16 +260,17 @@ if (!loaded) {
   }
   amountInput.value = formatAbbrev(state.amount);
   rateInput.value = formatAbbrev(state.basePerSecond);
-  // Cycle Pattern — only on a fresh boot that the player owes a choice. The
-  // chooser modal calls applyPatternOnFreshBoot inside its click handler, so
-  // we don't seed pattern buffs/charges here.
-  if (hasPendingPatternChoice(state.contactLog)) {
-    showPatternSelect(state, () => {
-      // After the pick, render the shop so the free-purchase banner appears
-      // (if any) and the surge buff shows on the next HUD tick.
-      saveState(state);
-    });
-  }
+}
+
+// Cycle Pattern chooser — runs on EVERY boot, fresh or loaded. closeCycle sets
+// pendingPatternChoice; the only way to clear it is for the player to pick.
+// If we gated on !loaded, a reload mid-chooser would lock the player out.
+// applyPatternOnFreshBoot is called inside the click handler so seed effects
+// land exactly once (the moment of the pick), regardless of fresh/loaded path.
+if (hasPendingPatternChoice(state.contactLog)) {
+  showPatternSelect(state, () => {
+    saveState(state);
+  });
 }
 
 amountInput.addEventListener('input', () => {

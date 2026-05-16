@@ -2669,35 +2669,49 @@
       max-width: 640px;
       max-height: calc(100vh - 40px);
       max-height: calc(100dvh - 40px);
-      overflow-y: auto;
       background: rgba(20, 20, 40, 0.96);
       border: 1px solid rgba(212, 154, 85, 0.45);
       border-radius: 14px;
       box-shadow: 0 0 40px -4px rgba(212, 154, 85, 0.35);
-      padding: 22px 22px 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
     }
     .pat-title {
+      flex: 0 0 auto;
       font-size: 10px;
       letter-spacing: 0.32em;
       text-transform: uppercase;
       color: #d49a55;
       text-align: center;
-      margin-bottom: 10px;
+      margin: 0;
+      padding: 22px 22px 10px;
     }
     .pat-intro {
+      flex: 0 0 auto;
       color: #c0c0d8;
       font-size: 13px;
       line-height: 1.55;
       text-align: center;
-      margin: 0 auto 18px;
+      margin: 0 auto;
+      padding: 0 22px 12px;
       max-width: 520px;
     }
+    /* Scroll lives on the list itself so the foot text below it stays outside
+       any gesture-arbitrating ancestor. The items inside still scroll, but the
+       installTap pointercancel-as-tap path keeps stationary taps intact. */
     .pat-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
       margin: 0;
-      padding: 0;
+      padding: 6px 22px 14px;
       list-style: none;
     }
     @media (max-width: 560px) {
@@ -2715,6 +2729,8 @@
       text-align: left;
       font-family: inherit;
       color: inherit;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       transition: border-color 0.14s, background 0.14s, transform 0.08s;
     }
     .pat-item:hover {
@@ -2741,7 +2757,11 @@
       font-variant-numeric: tabular-nums;
     }
     .pat-foot {
-      margin-top: 14px;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 12px 22px 18px;
+      border-top: 1px solid rgba(212, 154, 85, 0.18);
+      background: rgba(20, 20, 40, 0.96);
       color: #8a8ac0;
       font-size: 11px;
       letter-spacing: 0.08em;

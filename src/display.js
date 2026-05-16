@@ -54,16 +54,14 @@ function sparkleTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  // Hot tight core that falls off fast — reads as a spark/ember, not a star.
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 26);
   g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+  g.addColorStop(0.18, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.3)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
-  // Cross-shaped highlight gives it a star/spark silhouette.
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.fillRect(31, 6, 2, 52);
-  ctx.fillRect(6, 31, 52, 2);
   _sparkleTexCached = new THREE.CanvasTexture(c);
   return _sparkleTexCached;
 }
@@ -271,7 +269,7 @@ class Column {
     spGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SPARKLE_COUNT * 3), 3));
     const spMat = new THREE.PointsMaterial({
       map: sparkleTexture(),
-      size: 0.6,
+      size: 0.38,
       sizeAttenuation: true,
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -802,11 +800,11 @@ class Column {
       // travel distance grows with how energised the column is.
       s.vx = side * (0.05 + Math.random() * 0.1);
       s.vy = 1.2 + Math.random() * 1.0 + boost * 0.6;
-      // How strongly this sparkle is dragged by the global ripple wavefront.
-      // 0 = drifts purely on its own velocity, 1 = rides the wave as fully
-      // as the falling items do. Uniform random gives a mix where some hug
-      // the pulse and others ignore it entirely.
-      s.pulseWeight = Math.random();
+      // How strongly this spark is dragged by the global ripple wavefront.
+      // Floor at 0.3 so every spark visibly tracks the pulse — matches the
+      // falling items' coupling baseline — while the random spread keeps
+      // them from moving in perfect lockstep.
+      s.pulseWeight = 0.3 + Math.random() * 0.7;
     }
     _color.setHex(baseHex);
     const waveK = 1.3;

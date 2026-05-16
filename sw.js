@@ -8,7 +8,7 @@
 // Bump CACHE_VERSION whenever shell asset paths or precache contents change.
 // Older caches are dropped on activate.
 
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `echoes-${CACHE_VERSION}`;
 
 const PRECACHE = [

@@ -785,14 +785,22 @@ class Column {
       }
       if (idx < 0) break;
       const s = this._sparkleStates[idx];
-      const x = (Math.random() - 0.5) * COLUMN_WIDTH * 1.35;
-      const y = COLUMN_BOTTOM_Y + Math.random() * (COLUMN_TOP_Y - COLUMN_BOTTOM_Y);
-      const z = (Math.random() - 0.5) * 0.7;
+      // Emit from the column's vertical outline edges (the walls of the grid
+      // rectangle) and rise upward along them. Reads as the column borders
+      // lighting up, integrated with the falling-items frame rather than
+      // ambient noise inside the volume.
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const x = side * (COLUMN_WIDTH / 2);
+      const y = COLUMN_BOTTOM_Y + Math.random() * (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 0.85;
+      const z = (Math.random() - 0.5) * 0.2;
       posAttr.setXYZ(idx, x, y, z);
-      s.ttl = 0.35 + Math.random() * 0.55;
+      s.ttl = 0.55 + Math.random() * 0.55;
       s.life = s.ttl;
-      s.vx = (Math.random() - 0.5) * 0.35;
-      s.vy = 0.25 + Math.random() * 0.6;
+      // Small outward lateral drift so they peel away from the edge as they
+      // rise, plus a steady upward velocity that scales with boost so the
+      // travel distance grows with how energised the column is.
+      s.vx = side * (0.05 + Math.random() * 0.1);
+      s.vy = 1.2 + Math.random() * 1.0 + boost * 0.6;
     }
     _color.setHex(baseHex);
     for (let i = 0; i < SPARKLE_COUNT; i++) {

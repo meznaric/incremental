@@ -1528,32 +1528,6 @@
     .meta-pill.kind-luck     { border-color: rgba(245, 211, 74, 0.35); }
     .meta-pill.kind-luck     .ri, .meta-pill.kind-luck .meta-val { color: #f5d34a; }
 
-    #result {
-      position: fixed;
-      bottom: 200px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-    .result.win  { background: rgba(76, 208, 125, 0.18); border: 1px solid #4cd07d; color: #4cd07d; }
-    .result.lose { background: rgba(255, 90, 110, 0.18); border: 1px solid #ff5a6e; color: #ff5a6e; }
-    .result.fx-pop {
-      animation: result-pop 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.1);
-      text-shadow: 0 0 18px rgba(76, 208, 125, 0.85), 0 0 36px rgba(76, 208, 125, 0.45);
-      box-shadow: 0 0 24px rgba(76, 208, 125, 0.55), 0 0 60px rgba(76, 208, 125, 0.25);
-    }
-    @keyframes result-pop {
-      0%   { transform: translateX(-50%) scale(0.6); letter-spacing: 0.08em; }
-      45%  { transform: translateX(-50%) scale(1.32); letter-spacing: 0.12em; }
-      100% { transform: translateX(-50%) scale(1);   letter-spacing: 0.04em; }
-    }
-
     /* Hail win burst — anchored fixed at the tapped card's centre. Pointer
        events off so it cannot eat input. All sub-elements share a single root
        that is removed on a ~1.3s timer. */
@@ -1642,7 +1616,6 @@
     @media (prefers-reduced-motion: reduce) {
       .win-burst { display: none; }
       .slot.fx-win-glow { animation: none; }
-      .result.fx-pop { animation: none; }
     }
 
     /* Hail result drama — full-screen overlay carrying the centred WIN/LOSS
@@ -2606,7 +2579,6 @@
       .slot .cost { font-size: 12px; margin-top: 4px; }
       .slot .outcomes { font-size: 10px; }
       .slot .rarity { font-size: 8px; }
-      #result { bottom: auto; top: 12px; right: 12px; left: auto; transform: none; font-size: 14px; padding: 6px 12px; }
       #buffs {
         top: auto;
         left: 0;
@@ -2638,8 +2610,6 @@
       #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
       #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
       #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
-      /* Push the win/loss flash below the contact-log button so they don't overlap. */
-      #result { top: calc(max(12px, env(safe-area-inset-top)) + 56px); right: max(12px, env(safe-area-inset-right)); }
     }
 
     /* Phone-width: collapse buff cards into tappable tiles. The expanded
@@ -2858,8 +2828,6 @@
 
   <div id="metaBuffs"></div>
   <div id="buffs"></div>
-
-  <div id="result" class="result"></div>
 
   <div id="toasts" aria-live="polite"></div>
 

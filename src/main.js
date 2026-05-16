@@ -84,7 +84,6 @@ const slotsEl = document.getElementById('slots');
 const buffsEl = document.getElementById('buffs');
 const metaBuffsEl = document.getElementById('metaBuffs');
 const buffModalEl = document.getElementById('buffModal');
-const resultEl = document.getElementById('result');
 
 const openBuffModal = () => buffModalEl.classList.add('open');
 const closeBuffModal = () => buffModalEl.classList.remove('open');
@@ -987,29 +986,6 @@ function renderMetaBuffs(now) {
   setHtmlIfChanged(metaBuffsEl, pills.join(''));
 }
 
-function renderResult(now) {
-  const r = state.lastResult;
-  if (!r) { resultEl.style.display = 'none'; resultEl._fxFiredAt = 0; return; }
-  // Wins linger longer than losses — the win burst itself eats the first
-  // ~1.2s, so the readout needs to be there to be read after the bloom fades.
-  const ttl = r.won ? 3.6 : 2.5;
-  const age = now - r.at;
-  if (age > ttl) { resultEl.style.display = 'none'; resultEl._fxFiredAt = 0; return; }
-  resultEl.style.display = '';
-  resultEl.style.opacity = String(Math.max(0, 1 - age / ttl));
-  resultEl.className = `result ${r.won ? 'win' : 'lose'}`;
-  const sign = r.delta >= 0 ? '+' : '−';
-  resultEl.textContent = `${r.won ? 'WIN' : 'LOSS'} ${sign}${formatAbbrev(Math.abs(r.delta))}`;
-  // One-shot pop the moment a fresh win lands. Re-firing on every HUD tick
-  // would lock the element into a permanent loop.
-  if (r.won && resultEl._fxFiredAt !== r.at) {
-    resultEl._fxFiredAt = r.at;
-    resultEl.classList.remove('fx-pop');
-    void resultEl.offsetWidth;
-    resultEl.classList.add('fx-pop');
-  }
-}
-
 const anomalyEl = document.getElementById('anomalyCounter');
 let _anomalyLast = -1;
 function renderAnomaly() {
@@ -1073,7 +1049,6 @@ function tick(raf) {
     renderShop();
     renderBuffs(t);
     renderMetaBuffs(t);
-    renderResult(t);
     renderAnomaly();
     lastHud = raf;
   }

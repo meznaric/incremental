@@ -725,8 +725,13 @@ class Column {
         p.rotZ += dt * 0.2;
       } else if (p.state === 'streaming') {
         p.y -= this._streamSpeed * dt;
-        p.x = p.slotX + streamWobbleX(periodIdx, now, p.spin);
-        p.z = streamWobbleZ(periodIdx, now, p.spin);
+        // streamWobble adds per-particle incoherent jitter to X/Z. When the
+        // boost ripple is active we damp it so the coherent wavefront isn't
+        // washed out by uncorrelated motion — at full boost it's nearly off
+        // and the ripple is the dominant lateral signal.
+        const wobMul = 1 - (this._boost || 0) * 0.85;
+        p.x = p.slotX + streamWobbleX(periodIdx, now, p.spin) * wobMul;
+        p.z = streamWobbleZ(periodIdx, now, p.spin) * wobMul;
         p.rotX += dt * rs.sx;
         p.rotY += dt * rs.sy;
         p.rotZ += dt * rs.sz;

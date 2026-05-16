@@ -81,6 +81,7 @@ export function makeShopState() {
       pinnedSlot: null,
       offeredRate: 0,
     },
+    lastResult: null,
     messages: {
       shown: {},
       queue: [],
@@ -303,6 +304,7 @@ export function tryBuy(state, slotIdx, now) {
       result = { id: slot.id, won: false, delta: -(cost - refund) };
     }
     state.gambleCd[slot.id] = now + u.cooldown;
+    state.lastResult = { ...result, at: now };
     checkGamble(state, { won: result.won, isAllIn: u.wagerPct >= 1, balanceAfter: state.amount });
     replaceSlot(state, slotIdx, now);
     return { ok: true, result };

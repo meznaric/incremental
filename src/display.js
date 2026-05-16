@@ -795,11 +795,12 @@ class Column {
       s.bz = (Math.random() - 0.5) * 0.2;
       s.ttl = 0.55 + Math.random() * 0.55;
       s.life = s.ttl;
-      // Small outward lateral drift so they peel away from the edge as they
-      // rise, plus a steady upward velocity that scales with boost so the
-      // travel distance grows with how energised the column is.
-      s.vx = side * (0.05 + Math.random() * 0.1);
-      s.vy = 1.2 + Math.random() * 1.0 + boost * 0.6;
+      // Shuttlecock motion: launch upward fast, drag decelerates them quickly
+      // so they shoot up and then taper toward a hover. Outward lateral
+      // velocity is correspondingly stronger; drag pulls it down too. Higher
+      // boost = harder launch, so travel distance grows with energisation.
+      s.vx = side * (0.4 + Math.random() * 0.6);
+      s.vy = 14 + Math.random() * 6 + boost * 5;
       // How strongly this spark is dragged by the global ripple wavefront.
       // Floor at 0.3 so every spark visibly tracks the pulse — matches the
       // falling items' coupling baseline — while the random spread keeps
@@ -814,13 +815,18 @@ class Column {
     const rcy = this._rippleCy || 0;
     const sx = this.root.scale.x || 1;
     const rootX = this.root.position.x;
+    // Exponential drag — same factor for x and y so each spark's vy and vx
+    // both decay together (shuttlecock-style hard deceleration).
+    const drag = Math.exp(-5 * dt);
     for (let i = 0; i < SPARKLE_COUNT; i++) {
       const s = this._sparkleStates[i];
       if (s.life > 0) {
         s.life -= dt;
-        // Base position drifts on the sparkle's own velocity. The ripple
-        // offset is added on top per-frame (transient) so it never
-        // accumulates into the base.
+        // Base position drifts on the spark's own velocity, drag-decayed
+        // each frame. The ripple offset is added on top per-frame (transient)
+        // so it never accumulates into the base.
+        s.vx *= drag;
+        s.vy *= drag;
         s.bx += s.vx * dt;
         s.by += s.vy * dt;
         const k = Math.max(0, s.life) / s.ttl;

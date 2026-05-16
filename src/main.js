@@ -125,12 +125,13 @@ scene.add(rim);
 const display = new MagnitudeDisplay();
 scene.add(display.group);
 
-// Map viewport-centre to a world point on the z=0 plane for FX attractors.
-// Unprojecting NDC(0,0) gives a ray from the camera; we intersect z=0 along it.
+// Map an NDC point (x,y in [-1,1]) onto a world point on the z=0 plane.
+// Used both for the gamble swarm attractor (NDC 0,0 = screen centre) and the
+// boost ripple source (NDC 0,1 = top-middle of the visible canvas).
 const _attractor = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
-function unprojectScreenCenterToZ0() {
-  _attractor.set(0, 0, 0.5).unproject(camera);
+function unprojectNdcToZ0(ndcX, ndcY) {
+  _attractor.set(ndcX, ndcY, 0.5).unproject(camera);
   _camDir.copy(_attractor).sub(camera.position).normalize();
   const tHit = -camera.position.z / _camDir.z;
   _attractor.copy(camera.position).addScaledVector(_camDir, tHit);
@@ -162,7 +163,7 @@ new ResizeObserver(onResize).observe(shopEl);
 // `ui` handle whose methods we call from the bootstrap below and the game loop.
 const ui = initMainUi(state, {
   triggerGambleFx: ({ won, durationMs, now }) => {
-    const attractor = unprojectScreenCenterToZ0();
+    const attractor = unprojectNdcToZ0(0, 0);
     display.triggerGambleFx({ won, durationMs, attractorWorld: attractor, now });
   },
 });
@@ -338,7 +339,9 @@ function tick(raf) {
       for (const x of xs) if (x.expiresAt > t) buffCount++;
     }
   }
-  const rippleCenter = unprojectScreenCenterToZ0();
+  // Ripple emanates from the top-middle of the canvas (NDC 0,1) so the
+  // wavefront sweeps downward across the falling columns.
+  const rippleCenter = unprojectNdcToZ0(0, 1);
   display.update(state.amount, rate, t, dt, buffCount, rippleCenter);
   hero.update(state.amount, rate, baseRate, dt);
   // Belt-and-braces: an exception inside the interstitial system must not

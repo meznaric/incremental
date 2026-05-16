@@ -639,21 +639,18 @@ class Column {
     this._snapHard(amount, now);
   }
 
-  update(now, dt, amount, rate, buffCount = 0) {
+  update(now, dt, amount, rate) {
     if (this.m100 < 0) return;
     // Skip the entire column update when it's effectively invisible (fading
     // out and already tiny). assignMagnitude will repaint instances when the
     // column is brought back to life.
     if (this.scaleTarget < 0.02 && this.root.scale.x < 0.02) return;
 
-    // Buff "energised" envelope. 1 buff = floor 0.3 (clearly visible), 10+
-    // buffs = full strength. Lerp so transitions in/out don't pop. Slow pulse
-    // rides on top so the column visibly *breathes* while boosts are active.
-    const boostTarget = buffCount > 0 ? Math.min(1, 0.3 + (buffCount - 1) * 0.078) : 0;
-    const boostK = 1 - Math.exp(-dt * 3.5);
-    this._boost = (this._boost || 0) + (boostTarget - (this._boost || 0)) * boostK;
-    const pulse = this._boost > 0.01 ? 0.5 + 0.5 * Math.sin(now * 2.4) : 0;
-    this._boostPulse = this._boost * (0.55 + 0.45 * pulse);
+    // _boost / _boostPulse are set externally on each frame by
+    // MagnitudeDisplay so the wavefront and brightness stay coherent across
+    // all columns. Default to 0 for safety on first frame.
+    if (this._boost == null) this._boost = 0;
+    if (this._boostPulse == null) this._boostPulse = 0;
     if (this.outline && this.outline.material) {
       this.outline.material.opacity = 0.22 + this._boostPulse * 0.78;
     }
@@ -890,27 +887,42 @@ class Column {
         }
       }
       // Buff envelope: brighten + slightly enlarge the falling pieces, and
-      // displace them radially with a traveling sine so the column reads as
-      // a ripple/water pulse. Frequency + amplitude scale with the boost
-      // (1 buff = soft shimmer, 10 = strong fast pulse). Applied to every
-      // particle state, so it covers both discrete grid mode and the
-      // streaming continuous mode. Skipped during gamble FX so the swarm
-      // keeps its own motion.
+      // ride a global ripple wavefront emanating outward from the screen
+      // centre (world XY plane). Every active column shares the same wave so
+      // the ripple is a single coherent pulse across the whole display, not
+      // a per-column oscillation. Applied to every particle state — covers
+      // discrete grid mode and streaming continuous mode alike. Skipped
+      // during gamble FX so the swarm keeps its own motion.
       const boost = this._boost || 0;
       if (!p._gfxActive && boost > 0.01) {
         const bp = this._boostPulse || boost;
-        const tint = 1 + bp * 0.5;
-        tintR *= tint; tintG *= tint; tintB *= tint;
         scaleMul *= 1 + boost * 0.15;
-        const freq = 2.5 + boost * 8;
-        const amp = CELL_W * (0.06 + boost * 0.42);
-        const phase = now * freq - py * 1.4;
-        const r = Math.sin(phase) * amp;
-        const radial = Math.hypot(px, pz);
-        const ux = radial > 0.01 ? px / radial : Math.cos(p.spin);
-        const uz = radial > 0.01 ? pz / radial : Math.sin(p.spin);
-        px += ux * r;
-        pz += uz * r;
+        // Particle's world XY (column root has no Y offset; X is set per col).
+        const sx = this.root.scale.x || 1;
+        const worldX = this.root.position.x + px * sx;
+        const worldY = py * sx;
+        const dx = worldX - (this._rippleCx || 0);
+        const dy = worldY - (this._rippleCy || 0);
+        const d = Math.hypot(dx, dy);
+        // freq = temporal rate (rad/s), waveK = spatial frequency (rad/unit).
+        // Wave speed = freq/waveK. Bigger and faster with more buffs.
+        const freq = 4 + boost * 14;
+        const waveK = 1.3;
+        const amp = 0.07 + boost * 0.45;
+        const wave = Math.sin(now * freq - d * waveK);
+        // Brightness pulse at the wavefront crests — particles at the peak
+        // glow brighter, so the ring is visible as it moves outward.
+        const crest = Math.max(0, wave);
+        const tint = 1 + bp * 0.35 + crest * boost * 0.6;
+        tintR *= tint; tintG *= tint; tintB *= tint;
+        if (sx > 0.1 && d > 0.01) {
+          const ux = dx / d;
+          const uy = dy / d;
+          const r = wave * amp;
+          // World offset converted back to local (matrix is in column-local).
+          px += (ux * r) / sx;
+          py += (uy * r) / sx;
+        }
       }
       _pos.set(px, py, pz);
       _euler.set(p.rotX, p.rotY, p.rotZ || 0);
@@ -949,6 +961,10 @@ export class MagnitudeDisplay {
       this.columns.push(new Column(this.group, 0));
     }
     this.visibleColumns = COLUMN_COUNT;
+    // Global buff envelope — single source of truth so every column reads the
+    // same boost and the ripple wavefront stays coherent across them.
+    this._boost = 0;
+    this._boostPulse = 0;
   }
 
   setVisibleColumns(n) {
@@ -968,7 +984,17 @@ export class MagnitudeDisplay {
     }
   }
 
-  update(amount, rate, now, dt, buffCount = 0) {
+  update(amount, rate, now, dt, buffCount = 0, rippleCenter = null) {
+    // Global boost envelope. Lerp toward target so changing buff count fades
+    // in/out smoothly. Floor at 0.3 for 1 buff, climbs linearly to 1.0 at 10.
+    const boostTarget = buffCount > 0 ? Math.min(1, 0.3 + (buffCount - 1) * 0.078) : 0;
+    const boostK = 1 - Math.exp(-dt * 3.5);
+    this._boost = this._boost + (boostTarget - this._boost) * boostK;
+    const pulse = this._boost > 0.01 ? 0.5 + 0.5 * Math.sin(now * 2.4) : 0;
+    this._boostPulse = this._boost * (0.55 + 0.45 * pulse);
+    const rcx = rippleCenter ? rippleCenter.x : 0;
+    const rcy = rippleCenter ? rippleCenter.y : 0;
+
     const { cols } = decomposeByBase100(amount, this.visibleColumns);
     const desired = cols.map((c) => c.m).filter((m) => m >= 0);
     const desiredSet = new Set(desired);
@@ -1014,7 +1040,11 @@ export class MagnitudeDisplay {
     }
 
     for (const col of this.columns) {
-      if (col.m100 >= 0) col.update(now, dt, amount, rate, buffCount);
+      col._boost = this._boost;
+      col._boostPulse = this._boostPulse;
+      col._rippleCx = rcx;
+      col._rippleCy = rcy;
+      if (col.m100 >= 0) col.update(now, dt, amount, rate);
       col.animate(dt);
       if (!col.assigned && col.root.scale.x < 0.02 && col.m100 >= 0) {
         col.reset();

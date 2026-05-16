@@ -338,7 +338,8 @@ function tick(raf) {
       for (const x of xs) if (x.expiresAt > t) buffCount++;
     }
   }
-  display.update(state.amount, rate, t, dt, buffCount);
+  const rippleCenter = unprojectScreenCenterToZ0();
+  display.update(state.amount, rate, t, dt, buffCount, rippleCenter);
   hero.update(state.amount, rate, baseRate, dt);
   // Belt-and-braces: an exception inside the interstitial system must not
   // kill the rAF loop. A frozen game-loop ("things stop flowing until I

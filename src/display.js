@@ -45,7 +45,7 @@ const _color = new THREE.Color();
 const _white = new THREE.Color(0xffffff);
 const _hiddenMat = new THREE.Matrix4().makeScale(0, 0, 0);
 
-const SPARKLE_COUNT = 32;
+const SPARKLE_COUNT = 64;
 let _sparkleTexCached = null;
 let _glowTexCached = null;
 function sparkleTexture() {
@@ -772,9 +772,9 @@ class Column {
     const posAttr = this.sparkles.geometry.attributes.position;
     const colAttr = this.sparkles.geometry.attributes.color;
     const boost = this._boost || 0;
-    // Spawn rate: up to ~36/sec at full boost. Accumulator handles fractional
+    // Spawn rate: up to ~70/sec at full boost. Accumulator handles fractional
     // spawns across frames so low boost still trickles a handful per second.
-    const spawnRate = boost * 36;
+    const spawnRate = boost * 70;
     this._sparkleAcc = (this._sparkleAcc || 0) + dt * spawnRate;
     const baseHex = (PERIODS[Math.min(this.period, PERIODS.length - 1)] || PERIODS[0]).color;
     while (this._sparkleAcc >= 1) {
@@ -829,9 +829,17 @@ class Column {
         s.vy *= drag;
         s.bx += s.vx * dt;
         s.by += s.vy * dt;
-        const k = Math.max(0, s.life) / s.ttl;
-        const alpha = Math.sin((1 - k) * Math.PI);
-        const intensity = alpha * (0.55 + boost * 0.9);
+        // Speed-based fade: spark is bright while moving, fades as drag
+        // bleeds off its velocity. Recycle the slot the moment it stalls
+        // so the pool keeps up with the higher spawn rate.
+        const speed = Math.hypot(s.vx, s.vy);
+        const alpha = Math.min(1, speed / 4);
+        if (alpha < 0.04 || s.life <= 0) {
+          s.life = 0;
+          colAttr.setXYZ(i, 0, 0, 0);
+          continue;
+        }
+        const intensity = alpha * (0.7 + boost * 0.8);
         colAttr.setXYZ(i, _color.r * intensity, _color.g * intensity, _color.b * intensity);
         let fx = s.bx, fy = s.by;
         if (s.pulseWeight > 0.001 && sx > 0.1) {
@@ -848,7 +856,6 @@ class Column {
           }
         }
         posAttr.setXYZ(i, fx, fy, s.bz);
-        if (s.life <= 0) colAttr.setXYZ(i, 0, 0, 0);
       } else {
         colAttr.setXYZ(i, 0, 0, 0);
       }

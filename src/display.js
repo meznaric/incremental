@@ -282,7 +282,9 @@ class Column {
     this.sparkles.frustumCulled = false;
     this.root.add(this.sparkles);
     this._sparkleStates = [];
-    for (let i = 0; i < SPARKLE_COUNT; i++) this._sparkleStates.push({ life: 0, ttl: 0, vx: 0, vy: 0 });
+    for (let i = 0; i < SPARKLE_COUNT; i++) {
+      this._sparkleStates.push({ life: 0, ttl: 0, vx: 0, vy: 0, bx: 0, by: 0, bz: 0, pulseWeight: 0 });
+    }
     this._sparkleAcc = 0;
 
     this.material = makeMaterial();
@@ -790,10 +792,9 @@ class Column {
       // lighting up, integrated with the falling-items frame rather than
       // ambient noise inside the volume.
       const side = Math.random() < 0.5 ? -1 : 1;
-      const x = side * (COLUMN_WIDTH / 2);
-      const y = COLUMN_BOTTOM_Y + Math.random() * (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 0.85;
-      const z = (Math.random() - 0.5) * 0.2;
-      posAttr.setXYZ(idx, x, y, z);
+      s.bx = side * (COLUMN_WIDTH / 2);
+      s.by = COLUMN_BOTTOM_Y + Math.random() * (COLUMN_TOP_Y - COLUMN_BOTTOM_Y) * 0.85;
+      s.bz = (Math.random() - 0.5) * 0.2;
       s.ttl = 0.55 + Math.random() * 0.55;
       s.life = s.ttl;
       // Small outward lateral drift so they peel away from the edge as they
@@ -801,23 +802,48 @@ class Column {
       // travel distance grows with how energised the column is.
       s.vx = side * (0.05 + Math.random() * 0.1);
       s.vy = 1.2 + Math.random() * 1.0 + boost * 0.6;
+      // How strongly this sparkle is dragged by the global ripple wavefront.
+      // 0 = drifts purely on its own velocity, 1 = rides the wave as fully
+      // as the falling items do. Uniform random gives a mix where some hug
+      // the pulse and others ignore it entirely.
+      s.pulseWeight = Math.random();
     }
     _color.setHex(baseHex);
+    const waveK = 1.3;
+    const wavePhase = this._wavePhase || 0;
+    const rippleAmp = 0.07 + boost * 0.45;
+    const rcx = this._rippleCx || 0;
+    const rcy = this._rippleCy || 0;
+    const sx = this.root.scale.x || 1;
+    const rootX = this.root.position.x;
     for (let i = 0; i < SPARKLE_COUNT; i++) {
       const s = this._sparkleStates[i];
       if (s.life > 0) {
         s.life -= dt;
+        // Base position drifts on the sparkle's own velocity. The ripple
+        // offset is added on top per-frame (transient) so it never
+        // accumulates into the base.
+        s.bx += s.vx * dt;
+        s.by += s.vy * dt;
         const k = Math.max(0, s.life) / s.ttl;
-        // Soft fade in then out across the sparkle's lifetime.
         const alpha = Math.sin((1 - k) * Math.PI);
         const intensity = alpha * (0.55 + boost * 0.9);
         colAttr.setXYZ(i, _color.r * intensity, _color.g * intensity, _color.b * intensity);
-        posAttr.setXYZ(
-          i,
-          posAttr.getX(i) + s.vx * dt,
-          posAttr.getY(i) + s.vy * dt,
-          posAttr.getZ(i),
-        );
+        let fx = s.bx, fy = s.by;
+        if (s.pulseWeight > 0.001 && sx > 0.1) {
+          const worldX = rootX + s.bx * sx;
+          const worldY = s.by * sx;
+          const dx = worldX - rcx;
+          const dy = worldY - rcy;
+          const d = Math.hypot(dx, dy);
+          if (d > 0.01) {
+            const wave = Math.sin(wavePhase - d * waveK);
+            const r = wave * rippleAmp * s.pulseWeight;
+            fx += (dx / d) * r / sx;
+            fy += (dy / d) * r / sx;
+          }
+        }
+        posAttr.setXYZ(i, fx, fy, s.bz);
         if (s.life <= 0) colAttr.setXYZ(i, 0, 0, 0);
       } else {
         colAttr.setXYZ(i, 0, 0, 0);

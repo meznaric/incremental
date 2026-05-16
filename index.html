@@ -2452,6 +2452,40 @@
     @media (prefers-reduced-motion: reduce) {
       .it-card.it-first-contact .it-portrait { animation: none; }
     }
+    /* Speaker badge — portrait + name above each text step. Only shown for
+       Kalen / Sera voices; Narrator and Anonymous hide it (italic carries A).
+       The card toggles .it-has-speaker per step. */
+    .it-speaker {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 0 auto 18px;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+    .it-card.it-has-speaker .it-speaker { display: flex; opacity: 1; }
+    .it-speaker-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(138, 160, 255, 0.45);
+      background: #0a0a18;
+      box-shadow: 0 0 14px -4px rgba(138, 160, 255, 0.5);
+    }
+    .it-card.voice-sera .it-speaker-img {
+      border-color: rgba(212, 154, 85, 0.55);
+      box-shadow: 0 0 14px -4px rgba(212, 154, 85, 0.55);
+    }
+    .it-speaker-name {
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(232, 232, 240, 0.7);
+    }
+    .it-card.voice-kalen .it-speaker-name { color: #b9c1ff; }
+    .it-card.voice-sera   .it-speaker-name { color: #d49a55; }
     .it-text {
       font-size: 22px;
       line-height: 1.45;
@@ -2947,6 +2981,10 @@
           <div class="it-contact-status"></div>
           <div class="it-contact-flavor"></div>
         </div>
+      </div>
+      <div class="it-speaker" aria-hidden="true">
+        <img class="it-speaker-img" alt="" />
+        <div class="it-speaker-name"></div>
       </div>
       <div class="it-text"></div>
       <div class="it-dots"></div>

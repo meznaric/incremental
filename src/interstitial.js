@@ -36,20 +36,20 @@ const BASE_INTERSTITIALS = {
   // first reaches anyone is when the loop reveals itself; we let it breathe.
   first_contact: {
     steps: [
-      { text: 'First contact.',                                                 autoMs: 1800 },
-      { text: 'A world returned your carrier. They heard something out there.', autoMs: 2400 },
-      { text: 'Their name goes on the log. The log does not forget.' },
+      { voice: 'N', text: 'First contact.',                                                 autoMs: 1800 },
+      { voice: 'S', text: 'A world returned your carrier. They heard something out there.', autoMs: 2400 },
+      { voice: 'S', text: 'Their name goes on the log. The log does not forget.' },
     ],
   },
 
   // voice: Narrator (step 1), Kalen (steps 2-5). Fresh-game cold open.
   welcome: {
     steps: [
-      { text: 'The dark was never silent.', autoMs: 2400 },
-      { text: 'My name is Kalen Vale. I am a Union comms engineer. I should not be doing this.' },
-      { text: 'There are worlds out there the Quiet Law says I cannot speak to. I have been speaking to them for eleven years.' },
-      { text: 'Every signal that comes back is an Echo. The rig in front of me counts them.' },
-      { text: 'You can leave the Console open. The Echoes keep arriving.' },
+      { voice: 'N', text: 'The dark was never silent.', autoMs: 2400 },
+      { voice: 'K', text: 'My name is Kalen Vale. I am a Union comms engineer. I should not be doing this.' },
+      { voice: 'K', text: 'There are worlds out there the Quiet Law says I cannot speak to. I have been speaking to them for eleven years.' },
+      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig in front of me counts them.' },
+      { voice: 'K', text: 'You can leave the Console open. The Echoes keep arriving.' },
     ],
   },
 
@@ -57,69 +57,69 @@ const BASE_INTERSTITIALS = {
   // player's very first session.
   tutorial_open: {
     steps: [
-      { text: 'The rig is on the carrier. It will pull Echoes whether you sit at the desk or not.' },
-      { text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
-      { text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
-      { text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
-      { text: 'Sit at the desk, Kalen. We will see what answers.' },
+      { voice: 'S', text: 'The rig is on the carrier. It will pull Echoes whether you sit at the desk or not.' },
+      { voice: 'S', text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
+      { voice: 'S', text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
+      { voice: 'S', text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
+      { voice: 'S', text: 'Sit at the desk, Kalen. We will see what answers.' },
     ],
   },
 
   // voice: Kalen. First time a Hail (gamble) fails.
   first_gamble: {
     steps: [
-      { text: 'A push that does not carry is a push that never happened.' },
-      { text: 'Nothing came back. That is not bad luck.' },
-      { text: 'That is just how the medium is. Most signals die.' },
-      { text: 'I keep pushing anyway.' },
+      { voice: 'K', text: 'A push that does not carry is a push that never happened.' },
+      { voice: 'K', text: 'Nothing came back. That is not bad luck.' },
+      { voice: 'K', text: 'That is just how the medium is. Most signals die.' },
+      { voice: 'K', text: 'I keep pushing anyway.' },
     ],
   },
 
   // voice: Sera. Ten failed hails on the log.
   tenth_loss: {
     steps: [
-      { text: 'I have counted ten failed hails on your log.' },
-      { text: 'That is not bad luck. That is a method.' },
-      { text: 'I would like to hear about the method.' },
+      { voice: 'S', text: 'I have counted ten failed hails on your log.' },
+      { voice: 'S', text: 'That is not bad luck. That is a method.' },
+      { voice: 'S', text: 'I would like to hear about the method.' },
     ],
   },
 
   // voice: Kalen. All-in hail wipes balance to zero.
   all_in_zero: {
     steps: [
-      { text: 'Every Echo I had. One push.' },
-      { text: 'Nothing came back. I cannot hear my own carrier any more.' },
-      { text: 'I will start again. Or I will not.' },
+      { voice: 'K', text: 'Every Echo I had. One push.' },
+      { voice: 'K', text: 'Nothing came back. I cannot hear my own carrier any more.' },
+      { voice: 'K', text: 'I will start again. Or I will not.' },
     ],
   },
 
   // voice: Kalen. First base-rate permanent purchase (a Relay Node).
   first_relay: {
     steps: [
-      { text: 'A relay of my own. Patched in. Listening.' },
-      { text: 'It hears nothing in particular. That is not the point.' },
+      { voice: 'K', text: 'A relay of my own. Patched in. Listening.' },
+      { voice: 'K', text: 'It hears nothing in particular. That is not the point.' },
     ],
   },
 
   // voice: Sera. First Seed Relay (convert) — a real, expensive commitment.
   first_convert: {
     steps: [
-      { text: 'You burned a coil today to plant a relay you will never see again.' },
-      { text: 'Walk me through the part where that was kindness.' },
+      { voice: 'S', text: 'You burned a coil today to plant a relay you will never see again.' },
+      { voice: 'S', text: 'Walk me through the part where that was kindness.' },
     ],
   },
 
   // voice: Anonymous. Italic. One sentence. Rare.
   anomaly_threshold_1: {
     steps: [
-      { text: 'You were never alone at that desk.', italic: true },
+      { voice: 'A', text: 'You were never alone at that desk.', italic: true },
     ],
   },
 
   // voice: Anonymous. Italic. One sentence. The second (and last) sting.
   anomaly_threshold_2: {
     steps: [
-      { text: 'Speak louder. They are almost ready.', italic: true },
+      { voice: 'A', text: 'Speak louder. They are almost ready.', italic: true },
     ],
   },
 
@@ -127,27 +127,27 @@ const BASE_INTERSTITIALS = {
   offline_returner: {
     repeat: true,
     steps: [
-      { text: 'You came back.' },
-      { text: 'They kept arriving while you were gone.' },
+      { voice: 'K', text: 'You came back.' },
+      { voice: 'K', text: 'They kept arriving while you were gone.' },
     ],
   },
 
   // voice: Kalen. First cycle close.
   first_cycle_close: {
     steps: [
-      { text: 'The rig has weight now. It did not before.' },
-      { text: 'Sera once told me a carrier accretes — every push leaves a little of itself on the hardware.' },
-      { text: 'I did not believe her. The numbers on the bench say I should.' },
-      { text: 'I can cut this weight into the frame. The next cycle will remember.' },
+      { voice: 'K', text: 'The rig has weight now. It did not before.' },
+      { voice: 'K', text: 'Sera once told me a carrier accretes — every push leaves a little of itself on the hardware.' },
+      { voice: 'K', text: 'I did not believe her. The numbers on the bench say I should.' },
+      { voice: 'K', text: 'I can cut this weight into the frame. The next cycle will remember.' },
     ],
   },
 
   // voice: Sera. First Carrier Engraving purchased.
   first_engraving: {
     steps: [
-      { text: 'You cut something into the frame today.' },
-      { text: 'The mass spectrometer reads it as your handwriting. Three grams, by my count.' },
-      { text: 'Tell me what you wrote.' },
+      { voice: 'S', text: 'You cut something into the frame today.' },
+      { voice: 'S', text: 'The mass spectrometer reads it as your handwriting. Three grams, by my count.' },
+      { voice: 'S', text: 'Tell me what you wrote.' },
     ],
   },
 
@@ -161,12 +161,12 @@ const BASE_INTERSTITIALS = {
     cssClass: 'it-season-finale',
     bgImage: './docs/lore/images/the-dark-was-never-silent.png',
     steps: [
-      { text: 'Season 1 closed.',                                                       autoMs: 2400 },
-      { text: 'Eighty contacts on the log. Eight folders, all open on the desk.',       autoMs: 2800 },
-      { text: 'The cascade is broadcasting. We do not know to whom.',                   autoMs: 2600 },
-      { text: 'Sera tells me to sleep. She says tomorrow is — pending.',                autoMs: 2800 },
-      { text: 'The dark was never silent. It is louder now.', italic: true,             autoMs: 2800 },
-      { text: 'The rig stays on the carrier. The Echoes keep arriving.' },
+      { voice: 'N', text: 'Season 1 closed.',                                                       autoMs: 2400 },
+      { voice: 'N', text: 'Eighty contacts on the log. Eight folders, all open on the desk.',       autoMs: 2800 },
+      { voice: 'K', text: 'The cascade is broadcasting. We do not know to whom.',                   autoMs: 2600 },
+      { voice: 'K', text: 'Sera tells me to sleep. She says tomorrow is — pending.',                autoMs: 2800 },
+      { voice: 'A', text: 'The dark was never silent. It is louder now.', italic: true,             autoMs: 2800 },
+      { voice: 'K', text: 'The rig stays on the carrier. The Echoes keep arriving.' },
     ],
   },
 
@@ -174,12 +174,12 @@ const BASE_INTERSTITIALS = {
   sera_interrogation_open: {
     repeat: true,
     steps: [
-      { text: (s) => `Cycle ${getRun(s.contactLog)}. The file is heavier than it was.` },
-      { text: (s) => {
+      { voice: 'S', text: (s) => `Cycle ${getRun(s.contactLog)}. The file is heavier than it was.` },
+      { voice: 'S', text: (s) => {
         const n = (s.contactLog && s.contactLog.worlds.length) || 0;
         return `I have ${n} name${n === 1 ? '' : 's'} on your log.`;
       } },
-      { text: (s) => {
+      { voice: 'S', text: (s) => {
         const ws = (s.contactLog && s.contactLog.worlds) || [];
         const recent = ws.slice().sort((a, b) => (b.contactedAt || 0) - (a.contactedAt || 0)).slice(0, 3);
         const names = recent.map((w) => w.name);
@@ -188,14 +188,14 @@ const BASE_INTERSTITIALS = {
         if (names.length === 2) return `${names[0]}. ${names[1]}. In that order, I think.`;
         return `${names[0]}. ${names[1]}. ${names[2]}. We will take them in that order.`;
       } },
-      { text: 'Walk me through the part where you said this would be the last one.' },
+      { voice: 'S', text: 'Walk me through the part where you said this would be the last one.' },
     ],
   },
 
   // Episode-rotated keys are layered in by bindEpisode() at boot. They are
   // declared here as placeholders so non-rotated callers do not crash before
   // bindEpisode() runs (e.g. unit tests that exercise enqueue() in isolation).
-  cycle_open: { repeat: true, steps: [{ text: 'The console boots. I have been here before.' }] },
+  cycle_open: { repeat: true, steps: [{ voice: 'K', text: 'The console boots. I have been here before.' }] },
 };
 
 // Public interstitials table. The static (cross-episode) entries live in
@@ -203,6 +203,27 @@ const BASE_INTERSTITIALS = {
 // table is intentionally mutable — callers reach in by id every frame and
 // must see the current cycle's content without re-importing.
 export const INTERSTITIALS = { ...BASE_INTERSTITIALS };
+
+// Speaker identity per voice. K/S get a portrait + name; N/A render no
+// speaker frame (Narrator is authorial, Anonymous stays italic-only).
+// Voice ids match the comments in episodes.js and BASE_INTERSTITIALS.
+export const VOICE_META = {
+  K: { name: 'Kalen', portrait: './docs/lore/images/kalen-portrait.png' },
+  S: { name: 'Sera',  portrait: './docs/lore/images/sera-portrait.png'  },
+  N: { name: '',      portrait: null },
+  A: { name: '',      portrait: null },
+};
+
+// Resolve a step's voice: explicit `voice` on the step wins; otherwise
+// inherit from the prior step; otherwise fall back to the most common
+// voice ('K') so a missing tag never crashes the UI.
+export function resolveStepVoice(steps, idx) {
+  for (let i = Math.min(idx, steps.length - 1); i >= 0; i--) {
+    const v = steps[i] && steps[i].voice;
+    if (v) return v;
+  }
+  return 'K';
+}
 
 // Every EP defines this set of milestone slots plus a cycle_open beat.
 // Listed once so bindEpisode() knows which keys to strip before layering in
@@ -223,9 +244,9 @@ const ROTATING_KEYS = [
 const LOOP_CYCLE_OPEN = {
   repeat: true,
   steps: [
-    { text: (s) => `Echo Loop ${Math.max(1, getRun(s.contactLog) - 8)}. The desk is the desk.` },
-    { text: 'Sera is not in tonight. The rig is.' },
-    { text: 'I keep listening. The Resonance compounds.' },
+    { voice: 'K', text: (s) => `Echo Loop ${Math.max(1, getRun(s.contactLog) - 8)}. The desk is the desk.` },
+    { voice: 'K', text: 'Sera is not in tonight. The rig is.' },
+    { voice: 'K', text: 'I keep listening. The Resonance compounds.' },
   ],
 };
 

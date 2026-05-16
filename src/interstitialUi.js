@@ -1,4 +1,4 @@
-import { INTERSTITIALS, FIRST_CONTACT_ID } from './interstitial.js';
+import { INTERSTITIALS, FIRST_CONTACT_ID, VOICE_META, resolveStepVoice } from './interstitial.js';
 import { worldFor } from './contactLog.js';
 import { installTap } from './tap.js';
 
@@ -29,8 +29,32 @@ export function makeInterstitialUi(state, onShown) {
   const contactStatusEl = root.querySelector('.it-contact-status');
   const contactFlavorEl = root.querySelector('.it-contact-flavor');
   const contactTagEl = root.querySelector('.it-contact-tag');
+  const speakerImgEl = root.querySelector('.it-speaker-img');
+  const speakerNameEl = root.querySelector('.it-speaker-name');
   const prevBtn = root.querySelector('.it-prev');
   const nextBtn = root.querySelector('.it-next');
+
+  const VOICE_CLASSES = ['voice-kalen', 'voice-sera', 'voice-narrator', 'voice-anonymous'];
+  const VOICE_CLASS = { K: 'voice-kalen', S: 'voice-sera', N: 'voice-narrator', A: 'voice-anonymous' };
+
+  function applySpeaker() {
+    if (!card) return;
+    card.classList.remove('it-has-speaker', ...VOICE_CLASSES);
+    if (!active) return;
+    const voice = resolveStepVoice(active.def.steps, active.stepIdx);
+    const meta = VOICE_META[voice];
+    const cls = VOICE_CLASS[voice];
+    if (cls) card.classList.add(cls);
+    if (!meta || !meta.portrait) return;
+    card.classList.add('it-has-speaker');
+    if (speakerNameEl) speakerNameEl.textContent = meta.name;
+    if (speakerImgEl) {
+      speakerImgEl.alt = meta.name;
+      if (speakerImgEl.getAttribute('src') !== meta.portrait) {
+        speakerImgEl.src = meta.portrait;
+      }
+    }
+  }
 
   let active = null;       // { id, def, stepIdx, isContact }
   let typing = null;       // { i, full, raf, doneAt }
@@ -148,7 +172,7 @@ export function makeInterstitialUi(state, onShown) {
     autoTimer = 0;
     if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
     clearCustomFrame();
-    if (card) card.classList.remove('it-single');
+    if (card) card.classList.remove('it-single', 'it-has-speaker', ...VOICE_CLASSES);
     root.classList.remove('it-visible', 'it-guard');
     setTimeout(() => { if (!active) root.style.display = 'none'; }, 180);
     state.messages.shown[id] = true;
@@ -170,6 +194,7 @@ export function makeInterstitialUi(state, onShown) {
     const step = active.def.steps[active.stepIdx];
     renderDots();
     updateNav();
+    applySpeaker();
     waitingInput = false;
     autoTimer = 0;
     hintEl.style.opacity = '0';

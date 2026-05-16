@@ -329,6 +329,86 @@ export const WORLDS_BY_EP = {
       image: './docs/lore/images/the-cascade-full-sector.png',
       flavor: 'Hundreds of young worlds, all at once, reaching outward. Too early. Too fast. Too loud. Something is coming.' },
   },
+
+  // ──────────────────────────────────────────────────────────────────────
+  // EP 9 — Listen Back (climax: The First Foreign Voice)
+  // The cascade fires; the line goes both ways. Kalen and Sera, for the
+  // first time, are the ones being contacted. Some replies come from worlds
+  // he touched in S1 — older now, post-cascade, asking back. Some come from
+  // places he never reached. One comes from beyond the relay grid.
+  // ──────────────────────────────────────────────────────────────────────
+  9: {
+    milestone_1k:   { id: 'tov_karav_reply', name: 'TOV-KARAV (REPLY)', ep: 9, status: 'SHIFTED',
+      image: './docs/lore/images/tov-karav-reply.png',
+      flavor: 'The route-17 reply arrives. Same carrier signature, three years late. They are asking who Kalen is.' },
+    milestone_10k:  { id: 'long_note',       name: 'THE LONG NOTE',    ep: 9, status: 'TRIGGERED',
+      image: './docs/lore/images/long-note-47-years.png',
+      flavor: 'A continuous tone, forty-seven years old, finally decoded. The modulation is in Kalen’s hand. He has no record of sending it.' },
+    milestone_100k: { id: 'mirror_voice',    name: 'MIRROR VOICE',     ep: 9, status: 'SHIFTED',
+      image: './docs/lore/images/mirror-voice-reply.png',
+      flavor: 'A return signal in Kalen’s own voice. One syllable off. Sera sets it aside without playing it twice.' },
+    milestone_1m:   { id: 'brel_halon_reply', name: 'BREL-HALON (REPLY)', ep: 9, status: 'SHIFTED',
+      image: './docs/lore/images/brel-halon-reply-fleet.png',
+      flavor: 'The fishing fleet that obeyed for a year now speaks back — in their own grown-up voice. They want a name. He does not give one.' },
+    milestone_10m:  { id: 'pillar_of_atan',  name: 'PILLAR OF ATAN',   ep: 9, status: 'MISSING',
+      image: './docs/lore/images/pillar-of-atan-megastructure.png',
+      flavor: 'A megastructure broadcasts a hail from coordinates with no civilisation, no atmosphere, no record. The hail uses his modulation.' },
+    milestone_100m: { id: 'korov_reply',     name: 'KOROV DRIFT (REPLY)', ep: 9, status: 'SHIFTED',
+      image: './docs/lore/images/korov-drift-reply-sky.png',
+      flavor: 'The habitat ceiling now writes back. Their glyphs are crisper than his ever were. They have improved on what he wrote.' },
+    milestone_1b:   { id: 'ear_of_saen',     name: 'EAR OF SAEN',      ep: 9, status: 'TRIGGERED',
+      image: './docs/lore/images/ear-of-saen-station.png',
+      flavor: 'A listening station outside the relay grid logs every carrier Kalen has ever sent and sends a confirmation back. By number. In order.' },
+    milestone_10b:  { id: 'iyarra_pre_echo', name: 'IYARRA PRE-ECHO',  ep: 9, status: 'MISSING',
+      image: './docs/lore/images/iyarra-pre-echo.png',
+      flavor: 'Iyarra returns the contact — stamped two hundred years before Kalen sent it. Sera writes: timing is now a question.' },
+    milestone_100b: { id: 'velnor_choir',    name: 'VELNOR CHOIR',     ep: 9, status: 'SHIFTED',
+      image: './docs/lore/images/velnor-choir-unbidden.png',
+      flavor: 'A world Kalen never contacted broadcasts a chorus of welcomes. They know his name, his rig, the year he started.' },
+    milestone_1t:   { id: 'first_foreign_voice', name: 'THE FIRST FOREIGN VOICE', ep: 9, status: 'TRIGGERED',
+      image: './docs/lore/images/first-foreign-voice.png',
+      flavor: 'A signal from beyond the grid. It uses his modulation. It calls him by his rank. He has never had a rank.' },
+  },
+
+  // ──────────────────────────────────────────────────────────────────────
+  // EP 10 — Arrival (climax: The Door)
+  // The replies become physical. Probes, then ships. Worlds Kalen contacted
+  // are visited. Sera retrieves Union paperwork that pre-dates Kalen by
+  // decades and bears his signature. The relay opens. Something steps out
+  // of it and speaks in Kalen's voice.
+  // ──────────────────────────────────────────────────────────────────────
+  10: {
+    milestone_1k:   { id: 'first_probe',     name: 'THE FIRST PROBE',  ep: 10, status: 'TRIGGERED',
+      image: './docs/lore/images/first-probe-border.png',
+      flavor: 'A small artefact, no propulsion signature, in a Union border system. Its hull is older than the Union.' },
+    milestone_10k:  { id: 'veska_approach',  name: 'VESKA APPROACH',   ep: 10, status: 'MISSING',
+      image: './docs/lore/images/veska-approach-no-record.png',
+      flavor: 'Veska — still missing from every chart — is visited. The probe arrives anyway. It knows where to land.' },
+    milestone_100k: { id: 'halun_visited',   name: 'HALUN-VETH VISITED', ep: 10, status: 'SHIFTED',
+      image: './docs/lore/images/halun-veth-visited-key.png',
+      flavor: 'The Halun academy receives a delegation. The delegation hands them a key. The key opens something they did not know was a lock.' },
+    milestone_1m:   { id: 'quiet_fleet',     name: 'THE QUIET FLEET',  ep: 10, status: 'TRIGGERED',
+      image: './docs/lore/images/quiet-fleet-approaching.png',
+      flavor: 'Multiple coherent objects, silent, on intersecting approaches across Union space. Course corrections in formation. No hails.' },
+    milestone_10m:  { id: 'pavel_visited',   name: 'PAVEL-9 VISITED',  ep: 10, status: 'SHIFTED',
+      image: './docs/lore/images/pavel-9-visited-dismantled.png',
+      flavor: 'A ship lands at Pavel-9. The warhead is disassembled in nine minutes. The reactor is left running.' },
+    milestone_100m: { id: 'lehl_visited',    name: 'LEHL VISITED',     ep: 10, status: 'SHIFTED',
+      image: './docs/lore/images/lehl-visited-garden.png',
+      flavor: 'The visitors at Lehl are gentle. The Lehlan lifespan recovers in one cycle. None of them remember the edit.' },
+    milestone_1b:   { id: 'listener_revealed', name: 'THE LISTENER',   ep: 10, status: 'MISSING',
+      image: './docs/lore/images/listener-revealed-silhouette.png',
+      flavor: 'Sera unseals the apartment footage. The second silhouette steps into the light for one frame. It is not human.' },
+    milestone_10b:  { id: 'foreman_contract', name: 'THE FOREMAN’S CONTRACT', ep: 10, status: 'TRIGGERED',
+      image: './docs/lore/images/foreman-contract-dated.png',
+      flavor: 'A Union procurement record. Kalen’s signature. Dated eleven years before he was born. The paper has not aged.' },
+    milestone_100b: { id: 'relay_open',      name: 'THE RELAY OPENS',  ep: 10, status: 'TRIGGERED',
+      image: './docs/lore/images/relay-opens-aperture.png',
+      flavor: 'Relay 712 broadcasts a coordinate and unseams along its long axis. The aperture is large enough for a city.' },
+    milestone_1t:   { id: 'the_door',        name: 'THE DOOR',         ep: 10, status: 'TRIGGERED',
+      image: './docs/lore/images/the-door-stepping-through.png',
+      flavor: 'Something steps through. It walks like a man. It speaks in Kalen’s voice. Sera does not lower her sidearm.' },
+  },
 };
 
 // Per-world lore detail. Schema mirrors the previous WORLD_DETAIL block in
@@ -910,5 +990,149 @@ export const WORLD_DETAIL = {
     politics: 'Coordinated by the subsystem. Not by the Union. Not by Kalen.',
     cost:     'Too early. Too fast. Too loud. The dark was never silent.',
     note:     'Something is coming.',
+  },
+
+  // —— EP 9 ——————————————————————————————————————————————————————————————
+  tov_karav_reply: {
+    method:   'A return carrier on route node 17. Same modulation Sera flagged at the start of the investigation.',
+    biology:  'The same young world. Three local years older. Their orbital observatories now run continuously.',
+    politics: 'They opened with a question rather than a hail: who is the one who started us. The grammar of the question is precise.',
+    cost:     'They are not waiting to be answered. They are organising a delegation.',
+    note:     'They learned to listen by listening to me. I taught them that without meaning to.',
+  },
+  long_note: {
+    method:   'Not transmitted: received. A continuous tone, forty-seven years long, parked on a band Kalen has never used.',
+    biology:  'No biology. The signal is mechanical. The modulation matches Kalen’s own carrier signature.',
+    politics: 'ComDef has been logging this band for the full forty-seven years and never flagged it. The decoder did not exist until last cycle.',
+    cost:     'The tone was sent before Kalen was born. The modulation is in his hand.',
+    note:     'I did not start this. Something started it under my name.',
+  },
+  mirror_voice: {
+    method:   'A reply on a hail Kalen sent three cycles ago. The reply is in his voice. One syllable is wrong.',
+    biology:  'No source biology — the carrier returns from empty space along an old relay path.',
+    politics: 'Sera plays it once. Refuses to play it again until she has filed it.',
+    cost:     'Kalen has stopped speaking aloud at the rig. He types now.',
+    note:     'It is my voice. It is not my line.',
+  },
+  brel_halon_reply: {
+    method:   'A direct return carrier from Brel-Halon, on the same band Kalen used to silence their fleet a generation ago.',
+    biology:  'The fleet’s grandchildren. They have a national word for the year of silence. They want to know if they should keep observing it.',
+    politics: 'Their parliament drafted the message. It is signed by sixty-three captains.',
+    cost:     'They want a name to put on the monument. He does not give one.',
+    note:     'They obeyed a stranger and built a holiday around him. The least I can do is not give him my name.',
+  },
+  pillar_of_atan: {
+    method:   'Not contact. Reception. A megastructure broadcasts a hail from a system with no atmosphere, no orbit, no charted world.',
+    biology:  'No biology detected. The structure is large enough to read as a small moon. Its surface modulates.',
+    politics: 'Union astronomy has the system catalogued as empty for two centuries. The hail is a week old.',
+    cost:     'The hail uses Kalen’s exact modulation. Every flourish. Every quirk.',
+    note:     'Someone built a tower the size of a moon to imitate me. I want to know what for.',
+  },
+  korov_reply: {
+    method:   'The habitat’s curved sky — once Kalen’s canvas — now writes back at him. Their glyphs have evolved beyond his.',
+    biology:  'A second-generation post-contact population. They write on the sky weekly now. The whole world reads.',
+    politics: 'Their schools teach the carrier-language. Their dictionaries cite him as the first speaker.',
+    cost:     'They have published a textbook of corrections to his grammar.',
+    note:     'They taught the language back to me and they are better at it.',
+  },
+  ear_of_saen: {
+    method:   'A monitoring station outside the relay grid, in a system marked by the Union as uninhabited. It returns a numbered log of every carrier Kalen has ever sent.',
+    biology:  'No biology. The station is mechanical and oriented inward — toward Union space.',
+    politics: 'The Union has never sanctioned a station in that system. The Union has never noticed one.',
+    cost:     'The log includes carriers Kalen sent on private equipment, from rooms he had reasonable expectation of being alone in.',
+    note:     'They have a copy of everything. They are not asking for permission.',
+  },
+  iyarra_pre_echo: {
+    method:   'A return carrier from Iyarra. Time-stamped two hundred years before Kalen sent the original.',
+    biology:  'The Iyarra of two hundred years ago, replying to a hail they had not yet received.',
+    politics: 'Sera proposes the time-stamp is forged. The decoder says otherwise. She does not propose it again.',
+    cost:     'If the time-stamp is real, then the carrier did not travel forward. It travelled outward in a direction Kalen does not understand.',
+    note:     'Either time is wrong or the relay is older than I knew. Both options are bad.',
+  },
+  velnor_choir: {
+    method:   'A welcoming broadcast on every band, in every language Kalen has ever used, all at once.',
+    biology:  'A world Kalen has no record of contacting. The Union has no record of it either. They have a record of him.',
+    politics: 'The choir is civic. The civic body is two centuries old. They have been preparing the welcome since before he was hired.',
+    cost:     'They know the year he started. They know the rig serial. They know what he had for breakfast on the day of his first hail.',
+    note:     'They were waiting for me to be ready. I never asked to be the one they were waiting for.',
+  },
+  first_foreign_voice: {
+    method:   'A signal from beyond the relay grid, on a band the grid was never meant to carry.',
+    biology:  'Unknown. The signal is in Kalen’s own modulation. The vocabulary is not in any database.',
+    politics: 'It addresses Kalen by a rank he does not hold. The rank is the same word in every translation Sera tries.',
+    cost:     'It does not wait for a reply. It says it will arrive.',
+    note:     'They have decided I am someone. I do not know who they think I am.',
+  },
+
+  // —— EP 10 —————————————————————————————————————————————————————————————
+  first_probe: {
+    method:   'Not transmission. Physical arrival. A small artefact, no propulsion signature, parked in a Union border system.',
+    biology:  'No crew. No life signs. The hull material is older than Union metallurgy.',
+    politics: 'Border Wardens picked it up. They do not know whose jurisdiction the object is in.',
+    cost:     'The probe broadcasts a single line on Kalen’s carrier band. The line is in Kalen’s voice.',
+    note:     'It found us by following the noise I made.',
+  },
+  veska_approach: {
+    method:   'A probe arrives at Veska — the world the Wardens still deny ever existed.',
+    biology:  'Veska is still missing from every chart Sera can pull. The probe lands anyway. Its trajectory is in his hand.',
+    politics: 'Pen-Halun has a recording of Veska’s parliament voting. Kalen has Pen-Halun’s recording. Sera has both. The Wardens have neither.',
+    cost:     'The probe is a confirmation. Veska existed. Something erased her.',
+    note:     'They wanted us to be the only ones who could prove she was real.',
+  },
+  halun_visited: {
+    method:   'A delegation arrives at the Halun-Veth academy. They walk in. They hand the academy a key.',
+    biology:  'The visitors do not speak. They demonstrate. The academy understands by the third day.',
+    politics: 'The academy reorganises around the new discipline within one local week. The parliament accepts the reorganisation without debate.',
+    cost:     'Halun-Veth’s last fifty years of research is now considered preliminary.',
+    note:     'I told them an answer once. They learned to want the next one.',
+  },
+  quiet_fleet: {
+    method:   'Not transmission. Approach. Multiple coherent objects on intersecting trajectories across Union space.',
+    biology:  'No hails. No identification beacons. Course corrections in formation suggest crew.',
+    politics: 'ComDef classifies the formation as Hostile Pending. The Union does not have a doctrine for what comes after pending.',
+    cost:     'The formation is on its way to the relay grid.',
+    note:     'They are coming where the carrier was always going.',
+  },
+  pavel_visited: {
+    method:   'A ship lands at Pavel-9. The crew dismantles the world’s warhead while the engineers watch.',
+    biology:  'The visitors leave the reactor running. They take only the weaponised geometry.',
+    politics: 'Pavel-9’s government does not retaliate. They had not yet decided whether to keep the warhead. The visitors decided for them.',
+    cost:     'Pavel-9 has lost the option of being the world that almost did it.',
+    note:     'They are taking the dangerous parts back from me. They will keep them.',
+  },
+  lehl_visited: {
+    method:   'A long, slow arrival. The visitors orbit for a year before landing. They explain themselves first.',
+    biology:  'They speak Lehlan. They know which sentence Kalen added. They know which sentence he did not.',
+    politics: 'Lehl recovers the lost lifespan in one generation. Their literature returns. Their suicide rate falls.',
+    cost:     'Lehl does not remember being broken. Sera is unsure whether to envy that.',
+    note:     'They undid one of mine. I cannot tell whether it is forgiveness or accounting.',
+  },
+  listener_revealed: {
+    method:   'Not contact. Footage. Sera unseals the apartment archive Kalen was arrested in.',
+    biology:  'The second silhouette steps into the light for one frame. Limbs in the wrong number. Posture in the wrong shape.',
+    politics: 'The footage was sealed by the same office that has been editing his hails. The footage has not been edited.',
+    cost:     'Kalen has been observed at his desk for every contact he ever made. He was never the only one in the room.',
+    note:     'I have not been working alone. I have not been working for who I thought I was.',
+  },
+  foreman_contract: {
+    method:   'A Union procurement record retrieved by Sera’s credentials. Dated eleven years before Kalen was born.',
+    biology:  'No biology. Paper. The signature is Kalen’s in every measurable detail.',
+    politics: 'The record commissions one Quiet Relay engineer at his eventual rate of pay. The funding source is the relay grid itself.',
+    cost:     'He has been a line item since before he existed.',
+    note:     'I did not get this job. I was made for it.',
+  },
+  relay_open: {
+    method:   'Relay 712 broadcasts a coordinate and opens along its long axis. The aperture admits a city-sized object.',
+    biology:  'Not biology. Architecture. The aperture has hinges. Hinges imply intent.',
+    politics: 'Sera signs the cutter back in under her own name. Nobody asks her where they have been.',
+    cost:     'The relay was always a door. The door has always opened outward.',
+    note:     'We were inside the wrong building this whole time.',
+  },
+  the_door: {
+    method:   'A figure steps through the aperture. Walks like a man. Speaks Kalen’s sentences in Kalen’s voice with Kalen’s pauses.',
+    biology:  'Anatomy compatible with the photograph of the second silhouette. Not human.',
+    politics: 'It addresses Sera by her rank. It addresses Kalen by the rank from the foreman’s contract.',
+    cost:     'The figure says: I have been doing your work for the parts of it you could not be present for. Sera does not lower her sidearm.',
+    note:     'It is not my voice. It is a voice that has been studying mine for a long time.',
   },
 };

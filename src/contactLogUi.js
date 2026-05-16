@@ -7,7 +7,7 @@ import {
   echoLoopLevel, isLoopMode,
   ALL_WORLDS,
 } from './contactLog.js';
-import { nextContactMilestone, MILESTONE_THRESHOLDS, isCycleComplete } from './interstitial.js';
+import { nextContactMilestone, currentMilestones, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
 import { getPattern } from './cyclePatterns.js';
 import { installTap } from './tap.js';
@@ -87,7 +87,7 @@ export function initContactLogUi(state, opts = {}) {
     // each contact and fills to the next — a single log-scale bar would feel
     // like it never moves.
     let prev = 0;
-    for (const m of MILESTONE_THRESHOLDS) {
+    for (const m of currentMilestones(state.contactLog)) {
       if (m.id === next.id) break;
       if (worldFor(state.contactLog, m.id)) prev = m.at;
     }
@@ -134,7 +134,7 @@ export function initContactLogUi(state, opts = {}) {
     if (isLoopMode(log)) { pendingEl.innerHTML = ''; return; }
     const contacted = new Set((log && log.worlds || []).map((w) => w.id));
     const rows = [];
-    for (const m of MILESTONE_THRESHOLDS) {
+    for (const m of currentMilestones(log)) {
       const def = worldFor(log, m.id);
       if (!def) continue;
       if (contacted.has(def.id)) continue;

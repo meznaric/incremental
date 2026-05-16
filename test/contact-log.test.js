@@ -146,7 +146,7 @@ test('WORLDS_BY_EP: every EP fills the 10 milestone slots', () => {
     'milestone_1b', 'milestone_10b', 'milestone_100b',
     'milestone_1t',
   ];
-  for (const ep of [1, 2, 3, 4, 5, 6, 7, 8]) {
+  for (const ep of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     for (const slot of required) {
       assert.ok(WORLDS_BY_EP[ep][slot], `EP${ep}.${slot} missing`);
     }
@@ -408,8 +408,8 @@ test('firstLightAmount: 0 by default, FIRST_LIGHT_AMOUNT once cut', () => {
 
 test('isLoopMode: false until every EP is complete, true afterward', () => {
   assert.equal(isLoopMode({ run: 1, worlds: [] }), false);
-  assert.equal(isLoopMode(logWithEpsCompleted(7)), false, '7 EPs done is not enough');
-  const allDone = logWithEpsCompleted(8);
+  assert.equal(isLoopMode(logWithEpsCompleted(9)), false, '9 EPs done is not enough');
+  const allDone = logWithEpsCompleted(10);
   assert.equal(isLoopMode(allDone), true);
 });
 
@@ -450,17 +450,17 @@ test('closeCycle: Loop-mode close advances run and banks mass without contacts',
   assert.equal(echoLoopLevel(log), 1, 'first loop close bumps to 1');
 });
 
-test('closeCycle: the close that completes EP8 enters loop mode without bumping loopCycles', () => {
-  // Fill EPs 1..7 and 9 of EP8. The 10th EP8 contact lands this cycle, then close.
-  const log = logWithEpsCompleted(7);
+test('closeCycle: the close that completes the final EP enters loop mode without bumping loopCycles', () => {
+  // Fill EPs 1..9 and 9 of EP10. The 10th EP10 contact lands this cycle, then close.
+  const log = logWithEpsCompleted(9);
   log.mass = 0; log.engravings = {}; log.bestPeak = 0;
   log.loopMode = false; log.loopCycles = 0;
-  // Cycle current run is 8 (logWithEpsCompleted set it). Log nine EP8 worlds.
-  const ep8Keys = Object.keys(WORLDS_BY_EP[8]);
-  for (let i = 0; i < 9; i++) recordContact(log, ep8Keys[i], 100);
-  assert.equal(activeEp(log), 8, 'still EP8 with one slot to go');
-  // Final EP8 contact this cycle.
-  recordContact(log, ep8Keys[9], 100);
+  // Log nine EP10 worlds.
+  const ep10Keys = Object.keys(WORLDS_BY_EP[10]);
+  for (let i = 0; i < 9; i++) recordContact(log, ep10Keys[i], 100);
+  assert.equal(activeEp(log), 10, 'still EP10 with one slot to go');
+  // Final EP10 contact this cycle.
+  recordContact(log, ep10Keys[9], 100);
   assert.equal(allEpsComplete(log), true);
   closeCycle(log, 1e6);
   assert.equal(log.loopMode, true, 'transition close flips loopMode');
@@ -475,4 +475,37 @@ test('isEpComplete + activeEp: track EP fill against the world list', () => {
   assert.equal(isEpComplete(log, 1), true);
   assert.equal(activeEp(log), 2);
   assert.equal(allEpsComplete(log), false);
+});
+
+// — Per-EP threshold scaling —
+
+import { thresholdsForEp, currentMilestones, MILESTONE_SLOT_IDS } from '../src/interstitial.js';
+
+test('thresholdsForEp: EP1 matches the historical 10^3..10^12 flat table', () => {
+  const ts = thresholdsForEp(1);
+  assert.deepEqual(ts.map((t) => t.at), [1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12]);
+  assert.deepEqual(ts.map((t) => t.id), MILESTONE_SLOT_IDS);
+});
+
+test('thresholdsForEp: EP2 starts at 10^4 and steps 2 periods', () => {
+  const ts = thresholdsForEp(2).map((t) => Math.log10(t.at));
+  assert.deepEqual(ts, [4, 6, 8, 10, 12, 14, 16, 18, 20, 22]);
+});
+
+test('thresholdsForEp: EP10 climax reaches roughly 10^100', () => {
+  const ts = thresholdsForEp(10).map((t) => Math.log10(t.at));
+  assert.deepEqual(ts, [12, 22, 32, 42, 52, 62, 72, 82, 92, 102]);
+});
+
+test('currentMilestones: scales to the log\'s active EP', () => {
+  const ep2Log = logWithEpsCompleted(1);
+  const ms = currentMilestones(ep2Log).map((m) => m.at);
+  assert.equal(ms[0], 1e4, 'EP2 first contact at 10^4');
+  assert.equal(ms[9], 1e22, 'EP2 climax at 10^22');
+});
+
+test('currentMilestones: empty in loop mode', () => {
+  const log = logWithEpsCompleted(10);
+  log.loopMode = true;
+  assert.deepEqual(currentMilestones(log), []);
 });

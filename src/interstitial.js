@@ -48,6 +48,7 @@ const BASE_INTERSTITIALS = {
 
   // voice: Narrator (step 1), Kalen (steps 2-5). Fresh-game cold open.
   welcome: {
+    bgImage: './docs/lore/images/console-dark.png',
     steps: [
       { voice: 'N', text: 'The dark was never silent.', autoMs: 2400 },
       { voice: 'K', text: 'My name is Kalen Vale. I am a Union comms engineer. I should not be doing this.' },
@@ -60,6 +61,7 @@ const BASE_INTERSTITIALS = {
   // voice: Sera. The "how do I play" beat. Fires ~10s after welcome on the
   // player's very first session.
   tutorial_open: {
+    bgImage: './docs/lore/images/console-bands.png',
     steps: [
       { voice: 'S', text: 'The rig is on the carrier. It will pull Echoes whether you sit at the desk or not.' },
       { voice: 'S', text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
@@ -71,6 +73,7 @@ const BASE_INTERSTITIALS = {
 
   // voice: Kalen. First time a Hail (gamble) fails.
   first_gamble: {
+    bgImage: './docs/lore/images/carrier-empty-push.png',
     steps: [
       { voice: 'K', text: 'A push that does not carry is a push that never happened.' },
       { voice: 'K', text: 'Nothing came back. That is not bad luck.' },
@@ -138,6 +141,7 @@ const BASE_INTERSTITIALS = {
 
   // voice: Kalen. First cycle close.
   first_cycle_close: {
+    bgImage: './docs/lore/images/rig-with-weight.png',
     steps: [
       { voice: 'K', text: 'The rig has weight now. It did not before.' },
       { voice: 'K', text: 'Sera once told me a carrier accretes — every push leaves a little of itself on the hardware.' },
@@ -148,6 +152,7 @@ const BASE_INTERSTITIALS = {
 
   // voice: Sera. First Carrier Engraving purchased.
   first_engraving: {
+    bgImage: './docs/lore/images/engraving-handwriting.png',
     steps: [
       { voice: 'S', text: 'You cut something into the frame today.' },
       { voice: 'S', text: 'The mass spectrometer reads it as your handwriting. Three grams, by my count.' },
@@ -177,6 +182,7 @@ const BASE_INTERSTITIALS = {
   // voice: Sera. Once per cycle from cycle 4 onward.
   sera_interrogation_open: {
     repeat: true,
+    bgImage: './docs/lore/images/interrogation-cell.png',
     steps: [
       { voice: 'S', text: (s) => `Cycle ${getRun(s.contactLog)}. The file is heavier than it was.` },
       { voice: 'S', text: (s) => {
@@ -229,16 +235,16 @@ export function resolveStepVoice(steps, idx) {
   return 'K';
 }
 
-// Every EP defines this set of milestone slots plus a cycle_open beat.
-// Listed once so bindEpisode() knows which keys to strip before layering in
-// the next EP's content.
-const ROTATING_KEYS = [
-  'cycle_open',
-  'milestone_1k',  'milestone_10k', 'milestone_100k',
-  'milestone_1m',  'milestone_10m', 'milestone_100m',
-  'milestone_1b',  'milestone_10b', 'milestone_100b',
-  'milestone_1t',
-];
+// All keys any EP block can contribute (cycle_open + milestones + filler
+// beats). Computed once from the source so adding a new filler in an EP
+// doesn't require updating this list.
+const ROTATING_KEYS = (() => {
+  const set = new Set(['cycle_open']);
+  for (const block of Object.values(EP_INTERSTITIALS)) {
+    for (const k of Object.keys(block)) set.add(k);
+  }
+  return Array.from(set);
+})();
 
 // Echo Loop cycle_open. Once every EP is complete, every subsequent cycle
 // plays this beat instead of an EP's. No milestone interstitials are bound in
@@ -303,22 +309,39 @@ export function bindEpisode(log) {
 // (e.g. unit tests). main.js calls bindEpisode again with the loaded log.
 bindEpisode(null);
 
-// Thresholds for contact-bearing milestones. Each EP fills all ten slots with
-// distinct worlds, so density is ten contacts per cycle: dense at the bottom
-// of the climb (where the player needs the most feedback) and pacing out
-// toward the climactic 1t beat.
-export const MILESTONE_THRESHOLDS = [
-  { id: 'milestone_1k',   at: 1e3  },
-  { id: 'milestone_10k',  at: 1e4  },
-  { id: 'milestone_100k', at: 1e5  },
-  { id: 'milestone_1m',   at: 1e6  },
-  { id: 'milestone_10m',  at: 1e7  },
-  { id: 'milestone_100m', at: 1e8  },
-  { id: 'milestone_1b',   at: 1e9  },
-  { id: 'milestone_10b',  at: 1e10 },
-  { id: 'milestone_100b', at: 1e11 },
-  { id: 'milestone_1t',   at: 1e12 },
+// Slot identifiers — positional, 10 per EP. Threshold *amounts* are computed
+// per EP by thresholdsForEp() below; the same slot id (e.g. milestone_1k) is
+// at 10^3 in EP1 but 10^4 in EP2, 10^5 in EP3, etc. The keys are kept as
+// magnitude-style labels so existing logs (which carry them on world rows)
+// continue to read cleanly.
+export const MILESTONE_SLOT_IDS = [
+  'milestone_1k',  'milestone_10k', 'milestone_100k',
+  'milestone_1m',  'milestone_10m', 'milestone_100m',
+  'milestone_1b',  'milestone_10b', 'milestone_100b',
+  'milestone_1t',
 ];
+
+// Per-EP thresholds. Each EP gets its own climb: the n-th EP starts at
+// 10^(2+n) and contacts step n periods apart, so EP1 spans 10^3..10^12
+// (current shape), EP2 spans 10^4..10^22, …, EP10 spans 10^12..10^102.
+// The episodes themselves are sequential narrative arcs against an
+// exponentially larger climb each time.
+export function thresholdsForEp(ep) {
+  const startExp = 2 + ep;
+  const stepExp = ep;
+  return MILESTONE_SLOT_IDS.map((id, i) => ({
+    id,
+    at: Math.pow(10, startExp + i * stepExp),
+  }));
+}
+
+// Active EP's thresholds — what the player actually has on the climb right
+// now. Loop mode (no active EP) returns an empty list so the contact-log UI
+// renders no progress / pending entries.
+export function currentMilestones(log) {
+  const ep = activeEp(log);
+  return ep == null ? [] : thresholdsForEp(ep);
+}
 
 // Returns the next contact-bearing milestone the player has not yet hit, or
 // null if every one has fired in the current cycle. The Contact Log UI uses
@@ -326,8 +349,12 @@ export const MILESTONE_THRESHOLDS = [
 // the green-pulse close-cycle affordance (null ⇒ cycle is full).
 export function nextContactMilestone(state) {
   const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || 0;
-  for (const m of MILESTONE_THRESHOLDS) {
-    if (!worldFor(state.contactLog, m.id)) continue;
+  const ms = currentMilestones(state.contactLog);
+  const contactedIds = new Set((state.contactLog && state.contactLog.worlds || []).map((w) => w.id));
+  for (const m of ms) {
+    const def = worldFor(state.contactLog, m.id);
+    if (!def) continue;
+    if (contactedIds.has(def.id)) continue; // already logged in a prior cycle
     if (peak < m.at) return m;
   }
   return null;
@@ -385,6 +412,18 @@ export function enqueue(state, id) {
   if (isContact) {
     if (recordContact(state.contactLog, id, Date.now() / 1000)) {
       saveContactLog(state.contactLog);
+      // Filler beats: enqueue a `filler_after_N` recap when the count of
+      // logged worlds in this EP hits N (across all cycles, not just this
+      // one). The EP's bound interstitials decide which N values exist;
+      // missing keys are silently skipped. EP transition beats are the
+      // cycle_open for the next EP, so we don't fire filler_after_10.
+      const ep = milestoneWorld.ep;
+      const epIds = new Set(Object.values(WORLDS_BY_EP[ep] || {}).map((w) => w.id));
+      const epCount = state.contactLog.worlds.filter((w) => epIds.has(w.id)).length;
+      if (epCount < 10) {
+        const fillerKey = `filler_after_${epCount}`;
+        if (INTERSTITIALS[fillerKey]) enqueue(state, fillerKey);
+      }
     }
   }
   return true;
@@ -525,7 +564,7 @@ export function enqueueSeasonCompleteBeat(state) {
 export function checkAmount(state, amount) {
   const s = state.messages.stats;
   if (amount <= (s.peakAmount || 0)) return;
-  for (const m of MILESTONE_THRESHOLDS) {
+  for (const m of currentMilestones(state.contactLog)) {
     if (amount >= m.at && (s.peakAmount || 0) < m.at) enqueue(state, m.id);
   }
   s.peakAmount = amount;

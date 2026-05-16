@@ -29,9 +29,10 @@ import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds.js';
 
 export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
-// Episode order is the natural EP key order: 1..8. Once every world in an EP
-// is on the log, that EP is "done" and the next incomplete one becomes active.
-const EP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
+// Episode order is the natural EP key order: 1..10. Once every world in an
+// EP is on the log, that EP is "done" and the next incomplete one becomes
+// active. EP9/EP10 land post-finale: the Cascade itself is the cliffhanger.
+const EP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // True if every world defined for `ep` is already in the log. The check is on
 // world id, which is unique across EPs.
@@ -141,16 +142,16 @@ export function loadContactLog() {
     ? Object.fromEntries(Object.entries(s.patternUsed).filter(
         ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
     : {};
-  // Loop-mode bookkeeping. New saves carry both fields directly. Legacy saves
-  // (no fields) are migrated: a log whose 8 EPs are all complete is in loop
-  // mode now, even if it never wrote the flag; loopCycles is approximated
-  // from the run counter (run 9 → 0 loop cycles, run 10 → 1, etc.).
+  // Loop-mode bookkeeping. New saves carry both fields directly. Legacy
+  // saves (no fields) are migrated: only true loop if every EP in the
+  // current EP_ORDER is logged. Old players who "finished" the 8-EP version
+  // will now see EP9/EP10 content because those EPs are now part of the run.
   const partial = { run, worlds };
-  const legacyAllDone = isEpComplete(partial, 8) && EP_ORDER.every((ep) => isEpComplete(partial, ep));
+  const legacyAllDone = EP_ORDER.every((ep) => isEpComplete(partial, ep));
   const loopMode = typeof s.loopMode === 'boolean' ? s.loopMode : legacyAllDone;
   const loopCycles = Number.isFinite(s.loopCycles) && s.loopCycles >= 0
     ? Math.floor(s.loopCycles)
-    : (legacyAllDone ? Math.max(0, run - 9) : 0);
+    : 0;
   return {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,

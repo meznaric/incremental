@@ -760,6 +760,245 @@ IMAGES = [
         "The lights collectively suggest a slow expanding tide. No spacecraft, no foreground planets, no clear origin point. "
         "Painterly soft brushwork, simplified, severe overwhelming-but-quiet mood, no readable text or markings."
     ),
+
+    # ──────────────────────────────────────────────────────────────────────
+    # EP 9 — Listen Back. Incoming voices. Some from worlds Kalen touched
+    # in Season 1; some from places he never reached.
+    # ──────────────────────────────────────────────────────────────────────
+    (
+        "tov-karav-reply", "16:9", False,
+        "Painted wide illustration of a small young pre-stellar world with primitive observatory domes on its surface. "
+        "An array of newly-built radio dishes points outward into the night, each ringed with warm tungsten work-lights. "
+        "A faint cool-blue thread of carrier rises off the array toward the deep starfield. "
+        "Painterly atmospheric depth, severe curious-asking-back mood, no readable text or markings."
+    ),
+    (
+        "long-note-47-years", "16:9", False,
+        "Painted wide interior illustration of a Quiet Relay decoder room at deep night. "
+        "A long horizontal strip of waveform display dominates the frame — a single continuous tone holding steady across decades of accumulated chart paper that drapes off the console and pools on the floor. "
+        "One figure stands at the far end of the room, small in scale, examining a recent metre of the strip. "
+        "Painterly atmospheric depth, severe forty-seven-year-tone mood, no readable text or numbers."
+    ),
+    (
+        "mirror-voice-reply", "16:9", False,
+        "Painted wide interior illustration of Kalen's listening rig at deep night. "
+        "Two waveform displays sit side by side, both displaying nearly-identical voice patterns in cool-blue. One waveform has a single subtle warm tungsten misalignment at one syllable, just enough to be wrong. "
+        "No figures. The room is empty. "
+        "Painterly atmospheric depth, severe own-voice-but-not mood, no readable text or markings."
+    ),
+    (
+        "brel-halon-reply-fleet", "16:9", False,
+        "Painted wide illustration of a fishing fleet at sea on a young pre-stellar world, at dusk, lanterns lit. "
+        "Each boat carries a tall newly-built antenna mast. The masts collectively form a forest of vertical lines against the darkening sky. "
+        "A single faint cool-blue carrier thread rises from the largest boat toward the heavens. "
+        "Painterly atmospheric depth, severe generations-asking-back mood, no readable text or markings."
+    ),
+    (
+        "pillar-of-atan-megastructure", "16:9", False,
+        "Painted wide illustration of cold deep space, dominated by a single enormous mechanical structure roughly half the size of a small moon. "
+        "The structure is mostly dark, with a few faint cool-blue indicator lights scattered across its surface. No surrounding planets, no atmosphere, no other infrastructure. "
+        "Deep starfield behind. "
+        "Painterly atmospheric depth, severe impossibly-large-tower mood, no readable markings or text."
+    ),
+    (
+        "korov-drift-reply-sky", "16:9", False,
+        "Painted wide interior illustration of a Korov habitat at night, looking up at the inside surface of the curved sky-ceiling. "
+        "The whole inner sky is covered in crisp cool-blue glyph-script — far more elaborate and precise than the earlier writing Kalen pushed there. The glyphs spell out an elaborate response, unmistakably language. "
+        "Two small figures stand at the bottom of the frame, dwarfed, reading. "
+        "Painterly atmospheric depth, severe corrected-grammar mood, no actually-readable characters."
+    ),
+    (
+        "ear-of-saen-station", "16:9", False,
+        "Painted wide illustration of cold deep space showing a single isolated monitoring station — a clustered ring of dish antennas and small bunkers in low orbit around a barren rocky world. "
+        "Every dish is angled inward, oriented toward Union space (off-frame to the left). Faint cool-blue receive indicators on each dish. "
+        "Deep starfield behind. "
+        "Painterly atmospheric depth, severe always-listening mood, no readable text or markings."
+    ),
+    (
+        "iyarra-pre-echo", "16:9", False,
+        "Painted wide illustration of a stately archive interior at deep night, lit by a single low cool-blue desk lamp. "
+        "An open ledger lies on a wooden table, the page showing a hand-recorded waveform diagram and a time-stamp far older than its surroundings. A single small carrier-trace line extends from the ledger upward into a thin painted depiction of a starfield bleeding into the room's ceiling. "
+        "No figures. "
+        "Painterly atmospheric depth, severe wrong-time mood, no readable text or numbers."
+    ),
+    (
+        "velnor-choir-unbidden", "16:9", False,
+        "Painted wide illustration of a low-orbit view of a never-contacted young pre-stellar world at deep night. "
+        "Across the world's night side, broadcast antennas mass in a circular plaza, every one lit by warm tungsten welcome-light. From the plaza, a single thick cool-blue carrier thread rises into the dark above. "
+        "Deep starfield behind. "
+        "Painterly atmospheric depth, severe stranger-knows-your-name mood, no readable markings or text."
+    ),
+    (
+        "first-foreign-voice", "16:9", False,
+        "Painted wide illustration of cold deep space, deep beyond the edge of charted Union infrastructure. "
+        "A single sharp cool-blue carrier thread crosses the wide frame, originating from a small unfamiliar point of light far in the depth of the void. The thread terminates at a small Quiet Relay node in the near foreground, which is the only Union object in the painting. "
+        "Deep starfield with foreign-coloured nebular dust at the edges, not the usual slate. "
+        "Painterly atmospheric depth, severe from-outside mood, no readable markings or text."
+    ),
+
+    # ──────────────────────────────────────────────────────────────────────
+    # EP 10 — Arrival. Replies become physical: probes, ships, the relay
+    # opens. The Listener is revealed. The figure speaks.
+    # ──────────────────────────────────────────────────────────────────────
+    (
+        "first-probe-border", "16:9", False,
+        "Painted wide illustration of cold deep space at a Union border station — a small dark mechanical artefact, no propulsion signature, parked in the near foreground. "
+        "Its hull is matte and ancient, with a few faint cool-blue indicator points. A small Union surveillance buoy nearby is dwarfed by it. "
+        "Deep starfield behind. "
+        "Painterly atmospheric depth, severe older-than-the-Union mood, no readable markings or text."
+    ),
+    (
+        "veska-approach-no-record", "16:9", False,
+        "Painted wide illustration of a probe descending into the atmosphere of a small terrestrial world at dusk. "
+        "The world's continents are faintly visible through painterly haze. A small dark probe streaks downward at the middle of the frame, leaving a faint warm tungsten re-entry trail. "
+        "A faint annotated chart overlay along the lower edge of the painting shows the system as empty — a single thin line where the world should be. "
+        "Painterly atmospheric depth, severe knows-where-to-land mood, no readable text or numbers."
+    ),
+    (
+        "halun-veth-visited-key", "16:9", False,
+        "Painted wide interior illustration of the Halun-Veth academy at deep night — vaulted stone hall with long bookshelves receding into the dark. "
+        "At a central reading table, three robed academy figures face a single slender visitor whose silhouette is wrong in scale and posture. The visitor extends a small metallic object across the table. The object emits a faint cool-blue glow. "
+        "Painterly atmospheric depth, severe given-a-key mood, no readable text on any book or paper."
+    ),
+    (
+        "quiet-fleet-approaching", "16:9", False,
+        "Painted wide illustration of cold deep space showing multiple small dark ships in coherent formation, all on parallel approach vectors toward an unseen destination off-frame. "
+        "Each ship is matte and unmarked, with the merest single cool-blue running light. No drive trails, no exhaust. "
+        "Deep starfield with thin slate nebular dust. "
+        "Painterly atmospheric depth, severe coordinated-silent-approach mood, no readable markings or text."
+    ),
+    (
+        "pavel-9-visited-dismantled", "16:9", False,
+        "Painted wide illustration of the surface of an atomic-age industrial world at dusk. "
+        "A large industrial reactor complex dominates the middle distance, still running, faint warm tungsten interior lights visible. Outside the perimeter, a small slim alien shuttle has landed and several alien figures are removing a single dark weaponised core from a wheeled cart. The reactor's own systems are clearly being left running. "
+        "Painterly atmospheric depth, severe taking-back-the-dangerous-part mood, no readable text or signage."
+    ),
+    (
+        "lehl-visited-garden", "16:9", False,
+        "Painted wide illustration of a tranquil Lehlan garden plaza at the soft hour after dawn. "
+        "A small group of Lehlan elders sits at low stone benches in conversation with two slim visitors of unfamiliar silhouette. A faint cool-blue corrective glow rests gently above the plaza, painted as an abstract restorative aura, not a beam. "
+        "Painterly atmospheric depth, severe undoing-the-edit mood, no readable text or markings."
+    ),
+    (
+        "listener-revealed-silhouette", "16:9", False,
+        "Painted wide interior illustration of a small private engineering apartment at deep night, lit only by a single cool-blue console screen. "
+        "Kalen sits at the console in the middle of the frame, back to the viewer, slight slump, headphones on. Just behind his left shoulder stands a second silhouette of incompatible proportions — too many limbs, the wrong posture, painted in a slightly less-than-real opacity as though stepping into the room across the threshold of being seen. "
+        "Painterly atmospheric depth, severe never-alone mood, no readable text or markings on any surface."
+    ),
+    (
+        "foreman-contract-dated", "16:9", False,
+        "Painted wide tabletop illustration at deep night, lit by a single low cool-blue desk lamp. "
+        "A single bureaucratic procurement document lies open on a worn wooden table. A signature line is visible at the bottom in painterly pen-stroke, with a date stamp in the upper corner clearly painted as a year decades older than the document's apparent contents. The paper is uncreased, the signature crisp. A small magnifying loupe lies beside the page. "
+        "Painterly atmospheric depth, severe line-item-from-before-my-birth mood, no actually-readable text on the page."
+    ),
+    (
+        "relay-opens-aperture", "16:9", False,
+        "Painted wide illustration of cold deep space dominated by the side of an enormous ancient relay structure. "
+        "Along the structure's long axis, an aperture has unseamed open, painted as a vast painterly slit revealing absolute black inside — a darkness deeper than the surrounding starfield. A faint warm tungsten line traces the inside edge of the aperture. The opening is unmistakably large enough to admit a city. "
+        "Deep starfield behind, with a single small Union cutter ship in the foreground for scale. "
+        "Painterly atmospheric depth, severe hinged-door mood, no readable markings or text."
+    ),
+    (
+        "the-door-stepping-through", "16:9", False,
+        "Painted wide illustration looking through a vast open aperture in the side of an ancient relay structure at deep space-night. "
+        "A single tall thin figure has just stepped through the aperture and stands in the near foreground, painted in mostly silhouette with one warm tungsten edge-light catching one side of the face. The proportions are subtly wrong — slightly too tall, joints in places they should not be. "
+        "Behind the figure, the absolute black of the aperture's interior. Faint cool-blue stars dust the deep field beyond the structure. "
+        "Painterly atmospheric depth, severe long-awaited-arrival mood, no readable text or markings."
+    ),
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Per-EP recap backgrounds. One shared image per EP, used as bgImage on
+    # all three filler beats within that EP.
+    # ──────────────────────────────────────────────────────────────────────
+    (
+        "recap-ep2-sea-choir", "16:9", False,
+        "Painted wide illustration of a thermocline-deep ocean at slow dusk. "
+        "Painterly horizontal bands of layered sea, lit by a faint cool-blue acoustic shimmer rising from the abyss. Distant slow shapes of large unseen creatures hint at the deep choir. No surface ships, no shore. "
+        "Painterly atmospheric depth, severe restructured-around-you mood, no readable markings or text."
+    ),
+    (
+        "recap-ep3-sky-language", "16:9", False,
+        "Painted wide illustration of an industrial-age night sky over a smoggy city horizon. "
+        "Auroras run across the sky in painterly cool-blue waves, with subtle warm tungsten glyph-shapes embedded in the curtains — language, but unreadable. The city below is dark and indistinct. "
+        "Painterly atmospheric depth, severe writing-in-the-sky mood, no actually-readable characters or text."
+    ),
+    (
+        "recap-ep4-fire-given", "16:9", False,
+        "Painted wide illustration of an atomic-age industrial horizon at deep night. "
+        "Cooling towers and refinery stacks recede into the middle distance, lit by warm tungsten safety lamps. A single faint cool-blue flicker on the horizon hints at a recent fusion-test bloom that should not have happened. "
+        "Painterly atmospheric depth, severe better-was-not-safer mood, no readable text or signage."
+    ),
+    (
+        "recap-ep5-perfect-garden", "16:9", False,
+        "Painted wide illustration of a long Lehlan garden terrace at slow dawn. "
+        "Painterly rows of low planted beds receding into mist, with a single small stone bench in the near foreground. Soft cool-blue mist clings to the ground; warm tungsten lamps light the path. A faint single edited line of text-glyph is just barely visible carved into the stone bench, almost ornamental, not actually readable. "
+        "Painterly atmospheric depth, severe careful-but-not-enough mood, no readable text."
+    ),
+    (
+        "recap-ep6-missing-world", "16:9", False,
+        "Painted wide interior illustration of a Union archive corridor at deep night. "
+        "Long rows of plain filing cabinets recede into the dark, lit by a single overhead cool-blue lamp. One filing drawer in the middle of the frame is open, the file slot inside empty — a single black gap among the rows. No figures. "
+        "Painterly atmospheric depth, severe folder-without-content mood, no readable labels or text."
+    ),
+    (
+        "recap-ep7-echoes", "16:9", False,
+        "Painted wide interior illustration of an evidence wall in a small private investigation room at deep night. "
+        "A large board covers the wall, painted with cool-blue map traces, route lines, and pinned cards. Several thin warm tungsten threads connect groups of cards in painterly geometry, converging on one central node. A single overhead desk lamp throws cool-blue light across the wall. No figures. "
+        "Painterly atmospheric depth, severe cataloguing-the-puppeteer mood, no actually-readable text on any card."
+    ),
+    (
+        "recap-ep8-finale", "16:9", False,
+        "Painted wide illustration of the interior of a small Union cutter ship's cockpit at deep night, looking past the pilot's chair through the forward viewport. "
+        "Distant in the void ahead, the silhouette of an enormous relay structure half the size of a small moon. A handful of cool-blue indicator points lit on the relay's surface in a regular geometric pattern. The viewport frames the relay precisely centred. No pilot visible from this angle. "
+        "Painterly atmospheric depth, severe walking-toward-the-door mood, no readable text or instrumentation."
+    ),
+    (
+        "recap-ep9-listen-back", "16:9", False,
+        "Painted wide interior illustration of Kalen's listening rig at deep night, but from a slight overhead angle. "
+        "An inbox-like stack of decoded waveform printouts piles to one side of the console, several still spooling out of the printer in painterly cool-blue trace. The chair is empty. The receive indicator on the console is steady warm-tungsten — actively pulling something in. "
+        "Painterly atmospheric depth, severe inbox-no-longer-empty mood, no readable text on any printout."
+    ),
+    (
+        "recap-ep10-arrival", "16:9", False,
+        "Painted wide illustration of a Union border surveillance station at deep night, looking outward over a quiet starfield. "
+        "In the foreground, a small dark mechanical artefact hangs motionless in the near void — no propulsion, no signature, no markings. Behind it, distant in the depth of the field, the faint silhouettes of additional similar shapes in formation, on approach. "
+        "Painterly atmospheric depth, severe arrivals-not-signals mood, no readable markings or text."
+    ),
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Background imagery for non-contact existing interstitials.
+    # Wired in src/interstitial.js via bgImage on the corresponding beats.
+    # ──────────────────────────────────────────────────────────────────────
+    (
+        "console-dark", "16:9", False,
+        "Painted wide interior illustration of Kalen's listening rig at deep night, viewed from behind his shoulder. "
+        "A worn engineering desk, two stacked decoder boxes, a single curved waveform display showing a faint cool-blue carrier line. A single warm tungsten desk lamp catches the side of one decoder face. The chair is empty in this frame. "
+        "Painterly atmospheric depth, severe quiet-rig mood, no readable text or labels."
+    ),
+    (
+        "console-bands", "16:9", False,
+        "Painted wide interior illustration of Kalen's listening rig at deep night, focusing on the band-sweep panel. "
+        "A row of four tall narrow waveform columns side by side, each showing a different carrier band. One column glows cool-blue and is clearly the active band; the others are dim. A few small warm tungsten indicator lamps along the bottom edge. No figures. "
+        "Painterly atmospheric depth, severe explain-the-bands mood, no readable text on any panel."
+    ),
+    (
+        "carrier-empty-push", "16:9", False,
+        "Painted wide interior illustration of a single waveform display at deep night, isolated against a dark engineering wall. "
+        "The display shows a single cool-blue carrier line that flattens completely halfway across the frame — a push that died. The right half of the display is empty black. A faint warm tungsten 'sent' indicator at the corner is unlit. No figures. "
+        "Painterly atmospheric depth, severe push-that-did-not-carry mood, no readable text or numbers."
+    ),
+    (
+        "rig-with-weight", "16:9", False,
+        "Painted wide interior illustration of Kalen's listening rig at deep night, after a long cycle. "
+        "The desk is the same as elsewhere, but the rig itself looks subtly heavier — extra cabling coiled at its base, a thin metal plate bolted into the chassis side, a small additional weight hanging from a hook. A single warm tungsten lamp catches the new addition. The chair is empty. "
+        "Painterly atmospheric depth, severe accretion mood, no readable text or labels."
+    ),
+    (
+        "engraving-handwriting", "16:9", False,
+        "Painted close-up illustration of a small section of Kalen's rig chassis at deep night, lit by a single low cool-blue desk lamp. "
+        "Fine hand-cut linework is scored directly into the matte metal — painterly engraver marks, looped and irregular like handwriting, three grams of removed material. A single tuning loupe lies beside the cut, casting a small warm tungsten reflection. No figures. "
+        "Painterly atmospheric depth, severe handwriting-in-metal mood, no actually-readable characters."
+    ),
 ]
 
 

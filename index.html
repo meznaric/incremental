@@ -2296,8 +2296,9 @@
        of being eaten as advance/dismiss. */
     #interstitial.it-guard { pointer-events: none; }
     .it-card {
-      max-width: 620px;
-      padding: 36px 40px 28px;
+      width: 100%;
+      max-width: min(960px, calc(100vw - 64px));
+      padding: 36px 40px 64px;
       text-align: center;
       transform: translateY(8px);
       opacity: 0;
@@ -2310,9 +2311,9 @@
        lands. Used by the `season_complete` interstitial; future season
        openers reuse the same class via the interstitial def's cssClass. */
     .it-card.it-season-finale {
-      max-width: 880px;
+      max-width: min(1100px, calc(100vw - 64px));
       min-height: 360px;
-      padding: 60px 56px 48px;
+      padding: 60px 56px 84px;
       transition: transform 0.6s ease, opacity 0.6s ease;
       border-color: rgba(212, 154, 85, 0.55);
       background:
@@ -2565,8 +2566,8 @@
     .it-nav:hover { opacity: 1; border-color: rgba(138, 160, 255, 0.6); color: #e8e8f0; }
     .it-nav:disabled { opacity: 0.15; cursor: default; }
     .it-nav span { font-size: 22px; line-height: 1; display: block; transform: translateY(-1px); }
-    .it-prev { left: 8px;  top: 50%; transform: translateY(-50%); }
-    .it-next { right: 8px; top: 50%; transform: translateY(-50%); }
+    .it-prev { left: 16px;  bottom: 14px; }
+    .it-next { right: 16px; bottom: 14px; }
     /* Single-step interstitials hide the prev/next pair entirely. */
     .it-card.it-single .it-prev,
     .it-card.it-single .it-next { display: none; }
@@ -2580,8 +2581,8 @@
       color: #f0c080;
     }
     @media (max-width: 520px) {
-      .it-prev { left: 2px; }
-      .it-next { right: 2px; }
+      .it-prev { left: 8px; }
+      .it-next { right: 8px; }
       .it-nav { width: 44px; height: 44px; }
       .it-text { min-height: 9.5em; }
     }

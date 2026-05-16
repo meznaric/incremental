@@ -48,6 +48,10 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 // Path curves: map t in [0,1] to a 3D offset (dx, dy, dz) added on top of the
 // straight-line spawn->slot interpolation. Each curve fades its swing to 0 at
 // t=1 so particles still land exactly in their grid slot. Amplitudes capped at
@@ -262,6 +266,7 @@ class Column {
     this._streamInterval = CONTINUOUS_SPAWN_INTERVAL;
     this._curve = curveStraight;
     this._rotSpeeds = rotSpeedsForPeriod(0);
+    this._gfx = null;
   }
 
   animate(dt) {
@@ -472,6 +477,62 @@ class Column {
     this._snapSmooth(amount, now);
   }
 
+  // Gamble result FX: capture every alive particle as part of this column's
+  // contribution to the centre-bound swarm. Each tagged particle stores a
+  // randomised orbit angle + outward direction so phase 2/3 reads as a live
+  // cloud, not a parallel sheet. We resolve the world attractor into this
+  // column's local frame so the per-instance write can stay cheap.
+  triggerGambleFx(now, durationMs, attractorWorld, won) {
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+    // Local attractor: undo this column's root position + scale. Scale is
+    // usually 1 when the column is fully shown; guard against the tiny-scale
+    // edge case so we don't divide by zero during fade-out.
+    const sx = this.root.scale.x || 1;
+    const ax = (attractorWorld.x - this.root.position.x) / sx;
+    const ay = (attractorWorld.y - this.root.position.y) / sx;
+    const az = (attractorWorld.z - this.root.position.z) / sx;
+    const tagged = [];
+    for (const p of this.particles) {
+      if (p.state === 'idle') continue;
+      p._gfxOrigX = p.x;
+      p._gfxOrigY = p.y;
+      p._gfxOrigZ = p.z || 0;
+      p._gfxAngle = Math.random() * Math.PI * 2;
+      p._gfxOrbit = 0.18 + Math.random() * 0.35;
+      // Outward direction for phase 3 — slight randomisation so the swarm
+      // doesn't collapse into a single line on release.
+      const a = Math.random() * Math.PI * 2;
+      p._gfxOutX = Math.cos(a);
+      p._gfxOutY = won ? Math.sin(a) * 0.9 : -0.6 - Math.random() * 0.5;
+      p._gfxOutZ = Math.sin(a) * 0.6;
+      p._gfxActive = true;
+      tagged.push(p);
+    }
+    this._gfx = {
+      startedAt: now,
+      durationS: durationMs / 1000,
+      ax, ay, az,
+      won,
+      tagged,
+    };
+  }
+
+  _clearGambleFx() {
+    if (!this._gfx) return;
+    for (const p of this._gfx.tagged) {
+      if (p._gfxActive) {
+        p._gfxActive = false;
+        // Particles that rode the effect are "spent" — release them so the
+        // column's normal spawn loop can replenish without snap-back.
+        if (p.state !== 'idle') {
+          this._release(p);
+          this.aliveCount = Math.max(0, this.aliveCount - 1);
+        }
+      }
+    }
+    this._gfx = null;
+  }
+
   assignMagnitude(m100, amount, now) {
     this.m100 = m100;
     this._magFactor = Math.pow(100, m100);
@@ -591,23 +652,81 @@ class Column {
       }
     }
 
-    this._writeInstances();
+    this._writeInstances(now);
   }
 
-  _writeInstances() {
+  _writeInstances(now) {
     const im = this.imesh;
     const streamT = Math.max(0, Math.min(1, (this._streamSpeed - CONTINUOUS_FALL_SPEED) / (STREAM_MAX_SPEED - CONTINUOUS_FALL_SPEED)));
     const stretchY = 1 + 2 * streamT;
+    const gfx = this._gfx;
+    let gfxT = 0;
+    if (gfx) {
+      gfxT = (now - gfx.startedAt) / gfx.durationS;
+      if (gfxT >= 1) { this._clearGambleFx(); }
+    }
     for (const p of this.particles) {
       if (p.state === 'idle') {
         im.setMatrixAt(p.index, _hiddenMat);
         continue;
       }
-      _pos.set(p.x, p.y, p.z || 0);
+      let px = p.x, py = p.y, pz = p.z || 0;
+      let opacity = p.opacity;
+      let tintR = 1, tintG = 1, tintB = 1;
+      if (this._gfx && p._gfxActive) {
+        const t = Math.max(0, Math.min(1, (now - this._gfx.startedAt) / this._gfx.durationS));
+        const ax = this._gfx.ax, ay = this._gfx.ay, az = this._gfx.az;
+        if (t < 0.35) {
+          // Phase 1: smooth curve to centre. easeInOutCubic on the blend so
+          // it eases in (lets the column motion read for a beat) then snaps
+          // toward the attractor.
+          const e = easeInOutCubic(t / 0.35);
+          px = p._gfxOrigX + (ax - p._gfxOrigX) * e;
+          py = p._gfxOrigY + (ay - p._gfxOrigY) * e;
+          pz = p._gfxOrigZ + (az - p._gfxOrigZ) * e;
+        } else if (t < 0.60) {
+          // Phase 2: hold with tight orbit + jitter. Orbits in local XZ
+          // around the attractor so the cloud breathes without dispersing.
+          const u = (t - 0.35) / 0.25;
+          const a = p._gfxAngle + u * Math.PI * 2 * 0.6;
+          const r = p._gfxOrbit * (0.7 + 0.3 * Math.sin(u * Math.PI));
+          px = ax + Math.cos(a) * r;
+          py = ay + Math.sin(u * Math.PI * 2) * 0.08;
+          pz = az + Math.sin(a) * r;
+        } else {
+          // Phase 3: outward release. Linear distance ramp × ease so it
+          // accelerates; loss case biases downward via p._gfxOutY.
+          const u = (t - 0.60) / 0.40;
+          const e = easeOutCubic(u) * (this._gfx.won ? 9 : 7);
+          px = ax + p._gfxOutX * e;
+          py = ay + p._gfxOutY * e;
+          pz = az + p._gfxOutZ * e;
+          // Fade as we leave.
+          opacity = p.opacity * (1 - easeOutCubic(u) * 0.9);
+        }
+        if (this._gfx.won) {
+          // Green tint that grows as we approach centre, then explodes.
+          const k = t < 0.6 ? t / 0.6 : 1;
+          tintR = 1 - 0.5 * k;
+          tintG = 1 + 0.6 * k;
+          tintB = 1 - 0.2 * k;
+        } else {
+          // Loss: dim + desaturate (multiplicative, single tint factor).
+          const k = t < 0.6 ? t / 0.6 : 1;
+          const dim = 1 - 0.55 * k;
+          tintR = dim;
+          tintG = dim * 0.85;
+          tintB = dim * 0.9;
+        }
+      }
+      _pos.set(px, py, pz);
       _euler.set(p.rotX, p.rotY, p.rotZ || 0);
       _quat.setFromEuler(_euler);
       _scl.setScalar(p.scale);
-      if (p.state === 'streaming' && stretchY > 1) {
+      // Streaming stretch reads as motion blur along the column's fall axis;
+      // suppress it during the attractor pull so centre-bound particles look
+      // like deliberate orbs, not motion-blurred streaks.
+      if (!p._gfxActive && p.state === 'streaming' && stretchY > 1) {
         // Stretch along world Y (fall axis) after rotation so column footprint stays at p.scale.
         _mat.compose(_pos, _quat, _scl);
         _mat.elements[1] *= stretchY;
@@ -620,7 +739,8 @@ class Column {
       // Bake opacity into the per-instance color. Against the dark fog
       // background this fades particles to invisible without needing a
       // per-instance alpha attribute (which InstancedMesh doesn't ship).
-      _color.copy(this._periodColor).multiplyScalar(p.opacity);
+      _color.copy(this._periodColor).multiplyScalar(opacity);
+      _color.r *= tintR; _color.g *= tintG; _color.b *= tintB;
       im.setColorAt(p.index, _color);
     }
     im.instanceMatrix.needsUpdate = true;
@@ -641,6 +761,18 @@ export class MagnitudeDisplay {
   setVisibleColumns(n) {
     const clamped = Math.max(1, Math.min(COLUMN_COUNT, n | 0));
     this.visibleColumns = clamped;
+  }
+
+  // Pull every alive particle across every column toward `attractorWorld`,
+  // hold, then disperse. `attractorWorld` is a THREE.Vector3-ish world-space
+  // point (typically screen-centre unprojected onto z=0). Reduced-motion is
+  // the caller's call — main.js can skip this entirely.
+  triggerGambleFx({ won, durationMs, attractorWorld, now }) {
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (const col of this.columns) {
+      if (col.m100 < 0 || !col.assigned) continue;
+      col.triggerGambleFx(now, durationMs, attractorWorld, won);
+    }
   }
 
   update(amount, rate, now, dt) {

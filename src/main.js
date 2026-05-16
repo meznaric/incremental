@@ -304,6 +304,18 @@ scene.add(rim);
 const display = new MagnitudeDisplay();
 scene.add(display.group);
 
+// Map viewport-centre to a world point on the z=0 plane for FX attractors.
+// Unprojecting NDC(0,0) gives a ray from the camera; we intersect z=0 along it.
+const _attractor = new THREE.Vector3();
+const _camDir = new THREE.Vector3();
+function unprojectScreenCenterToZ0() {
+  _attractor.set(0, 0, 0.5).unproject(camera);
+  _camDir.copy(_attractor).sub(camera.position).normalize();
+  const tHit = -camera.position.z / _camDir.z;
+  _attractor.copy(camera.position).addScaledVector(_camDir, tHit);
+  return _attractor;
+}
+
 const hero = new HeroDisplay();
 scene.add(hero.group);
 
@@ -559,11 +571,14 @@ function ensureSlotEls() {
           const won = !!res.result.won;
           const deltaText = formatAbbrev(Math.abs(res.result.delta || 0));
           fireGambleResult({
-            slotsEl,
             tappedEl: el,
             won,
             deltaText,
             onMid: () => { renderShop(); markContentFresh(el); },
+            onStart: () => {
+              const attractor = unprojectScreenCenterToZ0();
+              display.triggerGambleFx({ won, durationMs: 1400, attractorWorld: attractor, now: nowSeconds() });
+            },
           });
           // Keep the card-anchored ring burst as a secondary flourish on
           // wins — it blooms around the tapped card while the central

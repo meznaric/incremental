@@ -18,6 +18,8 @@ import {
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount, getEngraving, QUICK_WAKE_DURATION,
 } from './contactLog.js';
 import { initContactLogUi } from './contactLogUi.js';
+import { recordCycleClose } from './gameLog.js';
+import { initGameLogUi } from './gameLogUi.js';
 import { showWelcomeBack } from './welcomeBack.js';
 import { initBreakdownUi } from './breakdownUi.js';
 import { hasPendingPatternChoice } from './cyclePatterns.js';
@@ -31,6 +33,10 @@ const state = {
   basePerSecond: 0,
   freeRerolls: 0,
   patternFreeLeft: 0,
+  // Wall-clock seconds at which this run began. Persisted in the save so a
+  // mid-cycle refresh keeps the timer honest. loadState overrides on resume;
+  // fresh boots fall back to this value.
+  cycleStartedAt: nowSeconds(),
   ...makeShopState(),
   // The Contact Log persists across save resets — it is the run-accumulating
   // narrative state, separate from the gameplay save.
@@ -42,6 +48,7 @@ state.memoryMul = memoryMul(state.contactLog);
 state.ascentExp = ascentExp(state.contactLog);
 
 initMenu();
+initGameLogUi();
 // Bind the active episode's interstitials (milestone beats + cycle_open) to
 // match the cycle the player is loading into. Must run before checkStart so
 // any cycle_open/milestone enqueue picks up the EP's content. The active EP
@@ -55,8 +62,21 @@ const contactLogUi = initContactLogUi(state, {
   // cycle's peakAmount, then reloads.
   onCloseCycle() {
     const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+    const endedAt = nowSeconds();
+    const startedAt = Number.isFinite(state.cycleStartedAt) ? state.cycleStartedAt : endedAt;
+    const cycle = (state.contactLog.run || 1);
+    const contacts = state.contactLog.worlds.filter((w) => (w.run || 1) === cycle).length;
+    const memoryShards = state.contactLog.worlds.length;
     const banked = closeCycle(state.contactLog, peak);
     if (banked === false) return false;
+    // Capture the run's footprint *after* closeCycle so massBanked reflects
+    // what was just credited. Cycle counter is the run we just finished, not
+    // the new one closeCycle advanced to.
+    recordCycleClose({
+      endedAt, cycle, runDurationS: Math.max(0, endedAt - startedAt),
+      endAmount: state.amount || 0, peakAmount: peak,
+      contacts, massBanked: banked || 0, memoryShards,
+    });
     saveContactLog(state.contactLog);
     clearSave();
     location.reload();

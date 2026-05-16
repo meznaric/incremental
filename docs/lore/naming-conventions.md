@@ -81,6 +81,7 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Cold Sky** | A Cycle Pattern. Carrier windows arrive shorter than usual but every one of them runs at twice the strength. |
 | **Patched Frame** | A Cycle Pattern. Three bands ride free at cycle open; every re-tune after that bills double. |
 | **Bare Wire** | A Cycle Pattern. Base listening runs half-strength, but windows hold twice as long and hail carry-chance climbs five points. |
+| **Past Cycles** | The retrospective log of every cycle the player has closed. Opened from the hamburger menu. Read-only — duration, end balance, peak, contacts, mass banked, memory shards. Lives in its own localStorage key so it survives Cycle close. |
 
 ## Worlds, by cycle (Season 1)
 
@@ -181,3 +182,4 @@ If a term in this file ever needs to change:
 - 2026-05-14 — Added Cycle Pattern + the four canonical Pattern names (Surge Tide, Cold Sky, Patched Frame, Bare Wire). Each is a per-cycle strategy modifier the player picks the moment the rig boots into a new cycle.
 - 2026-05-15 — Added eighty new worlds across cycles 1–8 (full Season 1 build-out). Each cycle now plays one canonical episode arc with ten contacts; the canonical world is the climactic 1t milestone. See the per-cycle world list above.
 - 2026-05-15 — Split the carrier-buff pool into two canonical groups — **burst** (seconds-to-minutes windows, strong multipliers) and **long** (hour-to-week windows, modest multipliers). Long-group buffs roll 2× as often as burst-group at the same rarity. New long buffs: **Low Tide** (common, 1h, 1.08×), **Morning Drift** (common, 2h, 1.05×), **Quiet Shift** (uncommon, 3h, 1.1×), **Slow Drip** (uncommon, 6h, +0.005%/s compounding).
+- 2026-05-16 — Added **Past Cycles**, a retrospective log opened from the hamburger menu. Each Cycle close appends a flat entry (duration, end balance, peak, contacts, mass banked, memory shards). Stored under its own localStorage key so it survives Cycle close.

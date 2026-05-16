@@ -33,6 +33,7 @@ const PRECACHE = [
   './styles/interstitial.css',
   './styles/cyclePattern.css',
   './styles/network.css',
+  './styles/gameLog.css',
 
   './src/main.js',
   './src/mainUi.js',
@@ -45,6 +46,8 @@ const PRECACHE = [
   './src/display.js',
   './src/episodes.js',
   './src/gambleFx.js',
+  './src/gameLog.js',
+  './src/gameLogUi.js',
   './src/hero.js',
   './src/interstitial.js',
   './src/interstitialUi.js',

@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="./styles/interstitial.css" />
   <link rel="stylesheet" href="./styles/cyclePattern.css" />
   <link rel="stylesheet" href="./styles/network.css" />
+  <link rel="stylesheet" href="./styles/gameLog.css" />
   <script type="importmap">
     {
       "imports": {
@@ -66,6 +67,7 @@
     <button id="menuToggle" class="menu-toggle" aria-label="Menu" type="button"><i class="ri-menu-line"></i></button>
     <div class="menu-body">
       <div class="menu-view active" data-view="list">
+        <button class="menu-item" type="button" data-action="open-game-log"><i class="ri ri-history-line"></i>Past Cycles</button>
         <button class="menu-item" type="button" data-action="open-debug"><i class="ri ri-bug-line"></i>Debug</button>
         <button class="menu-item" type="button" data-action="open-community"><i class="ri ri-discord-line"></i>Community</button>
         <button class="menu-item danger" type="button" data-action="open-reset"><i class="ri ri-refresh-line"></i>Reset save</button>
@@ -185,6 +187,20 @@
         <div class="cl-panel" data-panel="rig" role="tabpanel">
           <div class="cl-engravings"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameLogModal" role="dialog" aria-modal="true" aria-label="Past Cycles">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Past Cycles</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body gl-body">
+        <div class="gl-intro"></div>
+        <ul class="gl-list"></ul>
+        <div class="gl-empty">No cycles closed yet. Past runs land here once you close one.</div>
       </div>
     </div>
   </div>

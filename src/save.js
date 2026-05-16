@@ -37,6 +37,7 @@ export function saveState(state) {
       lostCount: state.network.lostCount || 0,
     } : null,
     messages: state.messages,
+    cycleStartedAt: state.cycleStartedAt,
     savedAt: nowSeconds(),
   };
   try {
@@ -145,6 +146,10 @@ export function loadState(state) {
   const now = nowSeconds();
   const savedAt = Number(s.savedAt) || now;
   const offline = Math.max(0, now - savedAt);
+  // Pre-existing saves predate cycle-start tracking — anchor to the most
+  // recent savedAt so duration figures land plausibly low rather than 0.
+  const cs = Number(s.cycleStartedAt);
+  state.cycleStartedAt = Number.isFinite(cs) && cs > 0 ? cs : savedAt;
   // Reconcile discovery losses across the offline window *before* integrating
   // the rate — the integral samples networkContribution at t1, so anything
   // lost while away should already be gone by then.

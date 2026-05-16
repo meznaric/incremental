@@ -28,6 +28,8 @@ import { hasPendingPatternChoice } from './cyclePatterns.js';
 import { showPatternSelect } from './patternUi.js';
 import { installTap } from './tap.js';
 import { fireGambleResult, isGambleFxActive } from './gambleFx.js';
+import { ensureNetwork, tickNetwork, tickBleedDrip, SECTORS } from './network.js';
+import { makeNetworkUi } from './networkUi.js';
 
 const state = {
   amount: 0,
@@ -76,7 +78,11 @@ const contactLogUi = initContactLogUi(state, {
     saveContactLog(state.contactLog);
   },
 });
-initBreakdownUi(state);
+const breakdownUi = initBreakdownUi(state);
+ensureNetwork(state);
+const networkUi = makeNetworkUi(state, {
+  openDiagnostic: (tab) => breakdownUi && breakdownUi.open && breakdownUi.open(tab),
+});
 
 const canvas = document.getElementById('canvas');
 const amountInput = document.getElementById('amountInput');
@@ -113,7 +119,7 @@ const KIND_EXPLAIN = {
   buff:
     'Window = timed boost. Stacks while it holds. Multiple Carrier windows multiply (×3 × ×3 = ×9). Multiple Carry windows add. The duration runs in real time, even when the tab is hidden.',
   convert:
-    'Seed Relay = permanent base-rate bribe. Burns the listed % of balance and folds it into your base Echoes/s for the rest of this cycle. Lost on cycle close.',
+    'Seed Relay = a placement token. The burn queues a relay; drop it on a hex in the Network map. It ripens (20m–2h), then carries Echoes until ComDef finds it. Sector picks risk vs reward; clustering pays more but is easier to triangulate.',
   gift:
     'Bleed = a one-shot Echo payout. Adds the listed Echoes to your balance. No ongoing effect.',
 };
@@ -140,11 +146,13 @@ function openSlotModal(idx) {
       `<div class="slot-modal-row"><span>Cooldown</span><span>${u.cooldown}s</span></div>`,
     );
   } else if (u.kind === 'convert') {
-    const eff = marginalRateForPurchase(state, slot, nowSeconds());
-    const baseGain = slot.cost * u.ratio;
+    // Token-style preview: this purchase queues a placement, not a /s bump.
+    // Show what the token carries; sector and clustering multipliers land later.
+    const tokenYield = slot.cost * u.ratio;
     rows.push(
-      `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
-      `<div class="slot-modal-row"><span>Base added</span><span>+${formatAbbrev(baseGain)}/s before multipliers</span></div>`,
+      `<div class="slot-modal-row"><span>Token tier</span><span>${u.rarity}</span></div>`,
+      `<div class="slot-modal-row"><span>Base yield</span><span>+${formatAbbrev(tokenYield)}/s (before sector × cluster)</span></div>`,
+      `<div class="slot-modal-row"><span>On purchase</span><span>Queue for placement on the Network map</span></div>`,
     );
   } else if (u.kind === 'permanent' && u.permType === 'add') {
     const eff = marginalRateForPurchase(state, slot, nowSeconds());
@@ -217,13 +225,26 @@ if (loaded) {
   if (loaded.offline > 1) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
   }
+  if (loaded.networkLosses > 0 && loaded.offline < 60) {
+    // Short absences (< 60s) skip the Signal Lock screen entirely, so the
+    // toast is the only feedback. Long absences surface losses inside the
+    // welcomeBack panel — see showWelcomeBack below.
+    const n = loaded.networkLosses;
+    setTimeout(() => showToast(`ComDef pulled ${n} relay${n === 1 ? '' : 's'} while you were away.`), 0);
+  }
   // Signal Lock — celebratory accounting of what came in while away. Earnings
   // are already credited inside loadState; this screen only displays them.
   showWelcomeBack({
     state,
     offline: loaded.offline,
-    earnings: loaded.earnings,
+    // Headline number = everything that landed during the away window —
+    // integrated foreground rate plus ambient mesh bleed. The breakdown
+    // row "Mesh bleed" tells the player how much of that came from drips.
+    earnings: (loaded.earnings || 0) + (loaded.networkBleed || 0),
     savedAt: loaded.savedAt,
+    networkBleed: loaded.networkBleed || 0,
+    networkLosses: loaded.networkLosses || 0,
+    networkLossDetails: loaded.networkLossDetails || [],
   });
 }
 
@@ -785,7 +806,13 @@ function renderShop() {
       outcomes =
         `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
         `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
-    } else if (u.kind === 'convert' || (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul'))) {
+    } else if (u.kind === 'convert') {
+      // Convert no longer credits flatBonus on purchase — the burn buys a
+      // placement token. Preview what the token will be worth before sector
+      // and clustering multipliers.
+      const tokenYield = cost * u.ratio;
+      outcomes = `<div class="outcome win"><i class="ri ri-add-circle-line"></i> Queue token · +${formatAbbrev(tokenYield)}/s base</div>`;
+    } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
       const eff = marginalRateForPurchase(state, slot, now);
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
     } else if (u.kind === 'gift') {
@@ -1034,6 +1061,22 @@ function tick(raf) {
   const wallDt = Math.max(0, t - lastWall);
   lastWall = t;
 
+  // Network discovery + ripening pass runs before rate integration so any
+  // status changes are reflected in this frame's accrual.
+  const losses = tickNetwork(state, wallDt, t);
+  for (const r of losses) {
+    const sLabel = (SECTORS[r.sector] && SECTORS[r.sector].label) || r.sector;
+    showToast(`ComDef pulled a relay in ${sLabel}.`);
+  }
+  // Sparse-only Bleed drip — isolated relays drop ambient Echoes per their
+  // tier's period. Credited directly to balance, no permMul. Visual feedback
+  // through the chip so the player sees the sparse-only payoff land.
+  const drip = tickBleedDrip(state, wallDt, t);
+  if (drip > 0) {
+    state.amount += drip;
+    networkUi.flashBleed(drip);
+  }
+
   const rate = effectiveRate(state, t);
   const baseRate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
   // Use closed-form integral over wall-clock so backgrounded tabs (where rAF
@@ -1063,6 +1106,7 @@ function tick(raf) {
     renderBuffs(t);
     renderMetaBuffs(t);
     renderAnomaly();
+    networkUi.refresh();
     lastHud = raf;
   }
   if (raf - lastSave > SAVE_INTERVAL_MS) {

@@ -108,7 +108,7 @@ test('convert: refused when cost is 0', () => {
   assert.equal(res.ok, false);
 });
 
-test('convert: deducts cost and adds to flatBonus', () => {
+test('convert: deducts cost and queues a placement token (no flatBonus delta)', () => {
   const conv = ['burn_perm', 'side_gig', 'empire']
     .map((id) => getUpgrade(id))
     .filter(Boolean)[0];
@@ -118,7 +118,13 @@ test('convert: deducts cost and adds to flatBonus', () => {
   const flatBefore = s.flatBonus;
   tryBuy(s, 1, 0);
   assert.equal(s.amount, 9000);
-  assert.equal(s.flatBonus, flatBefore + 1000 * conv.ratio);
+  // flatBonus no longer moves on a convert purchase — the burn buys a token
+  // the player drops on a hex; yield is realized after placement + ripening.
+  assert.equal(s.flatBonus, flatBefore);
+  assert.ok(s.network, 'convert should ensure network state exists');
+  assert.equal(s.network.queued.length, 1);
+  assert.equal(s.network.queued[0].tier, conv.rarity);
+  assert.equal(s.network.queued[0].baseYield, 1000 * conv.ratio);
 });
 
 test('gamble: cooldown blocks repeat buys', () => {

@@ -5,6 +5,7 @@ import {
   patternBuffRateMulStrength, patternGambleLuckBonus,
   patternFreeLeft, consumePatternFreePurchase,
 } from './cyclePatterns.js';
+import { networkContribution, queueToken } from './network.js';
 
 export const DEFAULT_SLOTS = 2;
 export const MAX_SLOTS = 10;
@@ -162,8 +163,14 @@ export function applyDampening(rate) {
   return DAMPEN_AT * Math.pow(rate / DAMPEN_AT, DAMPEN_ALPHA);
 }
 
+// Seed-Relay yield folds into the additive base, same place as flatBonus,
+// so it rides every multiplier downstream (permMul, buffs, memory, ascent).
+function additiveBase(state, now) {
+  return (state.basePerSecond || 0) + (state.flatBonus || 0) + networkContribution(state, now);
+}
+
 export function effectiveRate(state, now) {
-  let rate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
+  let rate = additiveBase(state, now) * state.permMul;
   rate *= patternBaseRateMul(state);
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
   rate *= memoryFactor(state);
@@ -187,7 +194,12 @@ export function integrateRate(state, t0, t1) {
     }
   }
   const sorted = [...transitions].sort((x, y) => x - y);
-  const base = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul
+  // Network contribution is treated as constant across the integration window
+  // — adjacency and coverage can shift mid-window (ripens, discoveries) but we
+  // sample at t1, the value the player will see post-load. Overestimates a
+  // ripen-during-window by a small margin; underestimates a discovery. Both
+  // small relative to flatBonus over a typical window.
+  const base = ((state.basePerSecond || 0) + state.flatBonus + networkContribution(state, t1)) * state.permMul
     * patternBaseRateMul(state) * memoryFactor(state);
   const exp = ascentExp(state);
   let total = 0;
@@ -264,10 +276,10 @@ export function marginalRateForPurchase(state, slot, now) {
     after = effectiveRate(state, now);
     state.permMul = orig;
   } else if (u.kind === 'convert') {
-    const orig = state.flatBonus;
-    state.flatBonus = orig + slot.cost * u.ratio;
-    after = effectiveRate(state, now);
-    state.flatBonus = orig;
+    // Convert is a placement queue — no immediate rate change. The shop card
+    // surfaces "queue token" rather than effective /s; the actual gain lands
+    // after the player places the relay and it ripens.
+    after = before;
   }
   return Math.max(0, after - before);
 }
@@ -331,12 +343,14 @@ export function tryBuy(state, slotIdx, now) {
   }
 
   if (u.kind === 'convert') {
-    // Convert burns the *current cost* into flatBonus. A free-purchase charge
-    // covers the spend but the planted yield still scales with the slot's cost.
+    // Convert no longer credits flatBonus directly. The burn buys a placement
+    // token (tier + frozen baseYield = cost × ratio) that the player drops on
+    // a hex in the Network screen. The hex's sector + adjacency then decide
+    // how much that yield actually delivers.
     if (!usePatternFree && (cost <= 0 || state.amount < cost)) return { ok: false, reason: 'broke' };
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
-    state.flatBonus += cost * u.ratio;
+    queueToken(state, u.rarity, cost * u.ratio);
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };

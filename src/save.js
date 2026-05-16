@@ -1,6 +1,7 @@
 import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
+import { ensureNetwork, reconcileOffline, reconcileOfflineBleeds, getHexAt } from './network.js';
 
-export const SAVE_KEY = 'incremental.save.v12';
+export const SAVE_KEY = 'incremental.save.v13';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -29,6 +30,11 @@ export function saveState(state) {
       pinnedSlot: state.shop.pinnedSlot,
       offeredRate: state.shop.offeredRate,
     },
+    network: state.network ? {
+      relays: state.network.relays,
+      queued: state.network.queued,
+      lostCount: state.network.lostCount || 0,
+    } : null,
     messages: state.messages,
     savedAt: nowSeconds(),
   };
@@ -100,13 +106,58 @@ export function loadState(state) {
     }
   }
 
+  // Network state: relays + queued tokens. Hex layout is derived; only the
+  // placement record needs to persist. Sanitize because the snapshot may have
+  // come from a different (older or future) schema.
+  const net = ensureNetwork(state);
+  if (s.network && typeof s.network === 'object') {
+    const now0 = nowSeconds();
+    const relays = Array.isArray(s.network.relays) ? s.network.relays : [];
+    net.relays = relays.map((r) => {
+      if (!r || typeof r !== 'object') return null;
+      const q = Number(r.hex && r.hex.q);
+      const rr = Number(r.hex && r.hex.r);
+      if (!Number.isFinite(q) || !Number.isFinite(rr)) return null;
+      if (!getHexAt(q, rr)) return null;
+      const plantedAt = Number(r.plantedAt);
+      const ripensAt = Number(r.ripensAt);
+      return {
+        id: String(r.id || `r_${Math.floor(now0 * 1000)}_${Math.random()}`),
+        tier: typeof r.tier === 'string' ? r.tier : 'common',
+        baseYield: Math.max(0, Number(r.baseYield) || 0),
+        hex: { q, r: rr },
+        sector: typeof r.sector === 'string' ? r.sector : 'frontier',
+        plantedAt: Number.isFinite(plantedAt) ? plantedAt : now0,
+        ripensAt: Number.isFinite(ripensAt) ? ripensAt : now0,
+      };
+    }).filter(Boolean);
+    const queued = Array.isArray(s.network.queued) ? s.network.queued : [];
+    net.queued = queued.map((t) => ({
+      tier: typeof t.tier === 'string' ? t.tier : 'common',
+      baseYield: Math.max(0, Number(t.baseYield) || 0),
+    }));
+    net.lostCount = Math.max(0, Number(s.network.lostCount) || 0);
+  }
+
   const now = nowSeconds();
   const savedAt = Number(s.savedAt) || now;
   const offline = Math.max(0, now - savedAt);
+  // Reconcile discovery losses across the offline window *before* integrating
+  // the rate — the integral samples networkContribution at t1, so anything
+  // lost while away should already be gone by then.
+  const offlineLosses = offline > 0 ? reconcileOffline(state, offline, now) : [];
   const earnings = offline > 0 ? integrateRate(state, savedAt, now) : 0;
-  state.amount += earnings;
+  // Bleed drips are isolated-relay ambient gifts. Closed-form expectation over
+  // the offline window — see reconcileOfflineBleeds. Credited as a flat sum.
+  const offlineBleed = offline > 0 ? reconcileOfflineBleeds(state, offline, now) : 0;
+  state.amount += earnings + offlineBleed;
   validateSlate(state, now);
-  return { offline, earnings, savedAt, now };
+  return {
+    offline, earnings, savedAt, now,
+    networkLosses: offlineLosses.length,
+    networkLossDetails: offlineLosses.map((r) => ({ tier: r.tier, sector: r.sector })),
+    networkBleed: offlineBleed,
+  };
 }
 
 export function clearSave() {

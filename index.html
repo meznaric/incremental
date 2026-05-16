@@ -228,6 +228,77 @@
     }
     #contactLogBtn { right: 16px; }
     #diagnosticBtn { right: 64px; }
+    #networkChip {
+      top: 16px;
+      right: 112px;
+      padding: 0 12px;
+      height: 40px;
+      min-width: 40px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #e8e8f0;
+      font-size: 13px;
+      cursor: pointer;
+      z-index: 50;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      position: fixed;
+    }
+    #networkChip .ri { font-size: 18px; }
+    #networkChip:hover { color: #8aa0ff; border-color: #8aa0ff; }
+    #networkChip.has-loss { border-color: rgba(192, 90, 120, 0.6); color: #d97a92; }
+    /* Action-required state — yellow + soft pulse when a token is queued. */
+    #networkChip.has-queue {
+      color: #ffd86b;
+      border-color: rgba(255, 216, 107, 0.65);
+      animation: net-chip-queue-pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes net-chip-queue-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 216, 107, 0); }
+      50%      { box-shadow: 0 0 14px 2px rgba(255, 216, 107, 0.45); }
+    }
+    #networkChip.has-queue::after {
+      content: '';
+      position: absolute;
+      top: -3px; right: -3px;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #ffd86b;
+      box-shadow: 0 0 8px rgba(255, 216, 107, 0.9);
+      animation: net-chip-dot-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes net-chip-dot-pulse {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50%      { opacity: 1; transform: scale(1.25); }
+    }
+    /* Bleed drip flash — brief blue glow when an isolated relay drops. */
+    #networkChip.fx-bleed { animation: net-chip-bleed 600ms ease-out; }
+    @keyframes net-chip-bleed {
+      0%   { box-shadow: 0 0 0 0 rgba(157, 209, 255, 0); }
+      50%  { box-shadow: 0 0 14px 4px rgba(157, 209, 255, 0.55); }
+      100% { box-shadow: 0 0 0 0 rgba(157, 209, 255, 0); }
+    }
+    .net-bleed-float {
+      position: absolute;
+      left: 50%;
+      top: 4px;
+      transform: translateX(-50%);
+      color: #9dd1ff;
+      font-size: 11px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      white-space: nowrap;
+      opacity: 0;
+      animation: net-bleed-float 1100ms ease-out forwards;
+      text-shadow: 0 0 4px rgba(8, 8, 18, 0.9);
+    }
+    @keyframes net-bleed-float {
+      0%   { transform: translateX(-50%) translateY(0); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translateX(-50%) translateY(-26px); opacity: 0; }
+    }
     #contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
     /* Anomaly counter — deliberately ugly. Top-right, under the buttons.
        No background, no border, no glow. Dirty red, low opacity, monospace.
@@ -1778,7 +1849,7 @@
       .gx-mote-win, .gx-mote-loss { display: none; }
     }
 
-    #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal {
+    #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal {
       position: fixed;
       inset: 0;
       display: none;
@@ -1794,7 +1865,7 @@
         max(20px, env(safe-area-inset-left));
       box-sizing: border-box;
     }
-    #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open { display: flex; }
+    #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open, #networkModal.open { display: flex; }
     /* Cover every interactive surface inside a modal: skips iOS's 300ms tap
        delay and the tap-highlight flash that occasionally swallows first taps
        on iOS Chrome. Mirrors what the slot cards already do. */
@@ -1808,7 +1879,7 @@
     /* On phones the modal overlay's 20px padding eats real estate. Drop it to
        8px so the body has room and the close button stays in the viewport. */
     @media (max-width: 520px) {
-      #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal {
+      #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal {
         padding:
           max(8px, env(safe-area-inset-top))
           max(8px, env(safe-area-inset-right))
@@ -2734,6 +2805,7 @@
       #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
       #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
       #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
+      #networkChip   { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 96px); padding: 0 10px; font-size: 12px; }
     }
 
     /* Phone-width: collapse buff cards into tappable tiles. The expanded
@@ -2867,6 +2939,265 @@
       text-transform: uppercase;
     }
 
+    /* Seed Relay network modal */
+    .net-card { width: 100%; max-width: 1040px; }
+    .net-body { padding: 0; }
+    .net-layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 18px 18px;
+    }
+    .net-map {
+      flex: 1 1 520px;
+      min-width: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .net-side {
+      flex: 0 1 320px;
+      min-width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .netmap-svg { width: 100%; height: auto; display: block; }
+    .relay-label {
+      font-size: 11px;
+      font-weight: 600;
+      fill: #f3f4ff;
+      text-anchor: middle;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      paint-order: stroke;
+      stroke: rgba(8, 8, 18, 0.85);
+      stroke-width: 2.4;
+      stroke-linejoin: round;
+    }
+    .relay-label.ripen-label { fill: #d8d2ff; font-size: 10px; }
+    @media (max-width: 520px) {
+      .relay-label { font-size: 9px; }
+      .relay-label.ripen-label { font-size: 8.5px; }
+    }
+    .hex-cell polygon {
+      stroke: rgba(8, 8, 18, 0.7);
+      stroke-width: 1.5;
+      opacity: 0.55;
+      transition: opacity 120ms ease;
+      cursor: pointer;
+    }
+    .hex-cell.empty:hover polygon { opacity: 0.85; }
+    .hex-cell.has-relay polygon { opacity: 0.8; }
+    .hex-cell.selected polygon { stroke: #ffe082; stroke-width: 2.5; }
+
+    /* Cluster edges between adjacent online relays — mechanic A's visual cue. */
+    .cluster-edge {
+      stroke: rgba(255, 216, 107, 0.5);
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+    .relay-mark { pointer-events: all; cursor: pointer; }
+    .relay-mark circle { fill: #f3f4ff; stroke: rgba(8, 8, 18, 0.85); stroke-width: 1.2; }
+    .relay-mark.clustered circle { fill: #ffd86b; }
+    .relay-mark.isolated circle  { fill: #9dd1ff; }
+    .relay-mark .relay-core { fill: rgba(8, 8, 18, 0.65); stroke: none; }
+    .relay-mark.ripening circle.ripe-base { fill: rgba(8, 8, 18, 0.55); stroke: rgba(220, 220, 240, 0.18); stroke-width: 1.2; }
+    .relay-mark.ripening circle.ripe-fill { fill: none; stroke: #c6b4ff; stroke-width: 3; }
+    .relay-mark.ripening .relay-core { fill: rgba(220, 220, 240, 0.45); }
+    .relay-mark.selected circle { stroke: #ffe082; stroke-width: 2.4; }
+
+    .net-status {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .net-stat { display: flex; flex-direction: column; align-items: center; }
+    .net-stat-num { font-size: 18px; font-weight: 600; color: #e8e8f0; font-variant-numeric: tabular-nums; }
+    .net-stat-lab { font-size: 10px; letter-spacing: 0.08em; color: #8a8ac0; text-transform: uppercase; }
+    .net-stat.dim .net-stat-num { color: #d97a92; }
+
+    .net-summary {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .net-summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #c4c4d8;
+      padding: 2px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Sector swatches under Coverage — covered ones glow with sector color. */
+    .net-cov-chips {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .net-cov-chip {
+      width: 22px;
+      height: 8px;
+      border-radius: 3px;
+      background: var(--sec-color);
+      opacity: 0.25;
+      transition: opacity 200ms ease, box-shadow 200ms ease;
+    }
+    .net-cov-chip.on {
+      opacity: 1;
+      box-shadow: 0 0 6px var(--sec-color);
+    }
+
+    .net-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+      margin-bottom: 6px;
+    }
+    .net-help-link {
+      background: none;
+      border: none;
+      color: #8aa0ff;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: none;
+      cursor: pointer;
+      padding: 2px 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .net-help-link:hover { color: #c4cfff; }
+    .net-help-link .ri { font-size: 12px; }
+    /* Diagnostic-tab tables + bullets — reused by the Network tab. */
+    .diag-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .diag-table th, .diag-table td {
+      padding: 5px 8px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .diag-table th {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8a8ac0;
+      font-weight: 500;
+    }
+    .diag-table td { color: #c4c4d8; }
+    .diag-table td strong { color: #e8e8f0; font-weight: 500; }
+    .diag-table .net-legend-sw {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+    .diag-bullets {
+      margin: 6px 0;
+      padding-left: 18px;
+      color: #c4c4d8;
+      font-size: 13px;
+    }
+    .diag-bullets li { margin: 4px 0; }
+    .diag-formula {
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 2px solid #6fa5e8;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      color: #c4cfff;
+      border-radius: 0 4px 4px 0;
+    }
+    .net-queue, .net-detail, .net-legend {
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .net-queue-row {
+      display: grid;
+      grid-template-columns: 14px 1fr auto 44px;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 12px;
+      color: #c4c4d8;
+      font-variant-numeric: tabular-nums;
+    }
+    .net-queue-row + .net-queue-row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+    .net-token-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #8aa0ff;
+    }
+    .net-token-dot.rar-common    { background: #8aa0ff; }
+    .net-token-dot.rar-uncommon  { background: #6fb88c; }
+    .net-token-dot.rar-rare      { background: #c89c5c; }
+    .net-token-dot.rar-legendary { background: #d8649c; }
+    .net-token-dot.rar-mythic    { background: #ffd86b; }
+    .net-token-tier { color: #e8e8f0; }
+    .net-token-pos { color: #8a8ac0; font-size: 10px; text-align: right; }
+    .net-empty { font-size: 12px; color: #8a8ac0; padding: 4px 0; }
+    .net-hint { font-size: 11px; color: #8a8ac0; margin-top: 8px; font-style: italic; }
+
+    .net-detail-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .net-detail-name { font-size: 13px; color: #e8e8f0; font-weight: 500; }
+    .net-detail-sec  { font-size: 10px; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .net-detail-row {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: #c4c4d8; padding: 2px 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sec-tag-core     { background: rgba(95, 176, 232, 0.18); color: #9bcaf2; }
+    .sec-tag-frontier { background: rgba(111, 165, 107, 0.18); color: #a8d2a4; }
+    .sec-tag-edge     { background: rgba(181, 149, 80, 0.18); color: #d8c184; }
+    .sec-tag-silent   { background: rgba(138, 127, 176, 0.18); color: #c1b8e2; }
+    .sec-tag-watch    { background: rgba(192, 90, 120, 0.20); color: #e6a4b8; }
+    .sec-tag-dark     { background: rgba(74, 90, 120, 0.25); color: #a0aec8; }
+
+    .net-legend-row {
+      display: grid;
+      grid-template-columns: 12px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+      font-size: 11px;
+      color: #c4c4d8;
+      background: transparent;
+      border-radius: 0;
+    }
+    .net-legend-sw { width: 10px; height: 10px; border-radius: 2px; }
+    .net-legend-name { color: #e8e8f0; }
+    .net-legend-mults { color: #8a8ac0; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 640px) {
+      .net-layout { flex-direction: column; }
+      .net-side   { flex: 1 1 auto; }
+    }
+
   </style>
   <script type="importmap">
     {
@@ -2943,6 +3274,11 @@
     <i class="ri ri-radar-line"></i>
   </button>
 
+  <button id="networkChip" class="panel net-chip" type="button" aria-label="Open Seed Relay network" style="display:none">
+    <i class="ri ri-share-circle-line"></i>
+    <span class="net-chip-label">0</span>
+  </button>
+
   <div id="anomalyCounter" class="anomaly-count" aria-hidden="true"></div>
 
   <div id="shop" class="panel">
@@ -2966,6 +3302,16 @@
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body" id="slotModalBody"></div>
+    </div>
+  </div>
+
+  <div id="networkModal" role="dialog" aria-modal="true" aria-label="Seed Relay network">
+    <div class="bm-card net-card">
+      <div class="bm-head">
+        <span class="bm-title" id="networkModalTitle">Network</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body net-body" id="networkModalBody"></div>
     </div>
   </div>
 
@@ -3012,12 +3358,14 @@
           <button type="button" class="diag-tab is-active" data-tab="pulse" role="tab" aria-selected="true">Pulse</button>
           <button type="button" class="diag-tab" data-tab="windows" role="tab" aria-selected="false">Windows</button>
           <button type="button" class="diag-tab" data-tab="hail" role="tab" aria-selected="false">Hail</button>
+          <button type="button" class="diag-tab" data-tab="network" role="tab" aria-selected="false">Network</button>
           <button type="button" class="diag-tab" data-tab="persist" role="tab" aria-selected="false">Names &amp; Mass</button>
           <button type="button" class="diag-tab" data-tab="glossary" role="tab" aria-selected="false">Glossary</button>
         </div>
         <div class="diag-panel is-active" data-panel="pulse" role="tabpanel"></div>
         <div class="diag-panel" data-panel="windows" role="tabpanel"></div>
         <div class="diag-panel" data-panel="hail" role="tabpanel"></div>
+        <div class="diag-panel" data-panel="network" role="tabpanel"></div>
         <div class="diag-panel" data-panel="persist" role="tabpanel"></div>
         <div class="diag-panel" data-panel="glossary" role="tabpanel"></div>
       </div>

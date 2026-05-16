@@ -109,10 +109,13 @@ const BASE_INTERSTITIALS = {
   },
 
   // voice: Sera. First Seed Relay (convert) — a real, expensive commitment.
+  // Third beat is procedural so the player knows the Network map exists and
+  // what to do with the placement token they just bought.
   first_convert: {
     steps: [
       { voice: 'S', text: 'You burned a coil today to plant a relay you will never see again.' },
       { voice: 'S', text: 'Walk me through the part where that was kindness.' },
+      { voice: 'S', text: 'The token is in the queue. Open the Network map — top right of the rig. Drop the seed where ComDef cannot find it. Each sector pays differently. Pick carefully.' },
     ],
   },
 

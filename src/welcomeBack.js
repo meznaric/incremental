@@ -41,7 +41,7 @@ function fmtAway(s) {
 
 // Build the breakdown rows. Reads the snapshot the player left behind, not
 // any post-load fresh-boot state.
-function buildBreakdown(state, savedAt, offline) {
+function buildBreakdown(state, savedAt, offline, extras) {
   const rows = [];
 
   const base = ((state.basePerSecond || 0) + (state.flatBonus || 0)) * (state.permMul || 1);
@@ -74,6 +74,17 @@ function buildBreakdown(state, savedAt, offline) {
     rows.push({ label: 'Ascent', value: `rate^(1 + ${exp.toFixed(2)})` });
   }
 
+  // Seed-Relay network outcomes. Only surface rows that actually have value
+  // — empty mesh means no extra noise on the panel.
+  const bleed = Number(extras && extras.networkBleed) || 0;
+  if (bleed > 0) {
+    rows.push({ label: 'Mesh bleed', value: `+${formatAbbrev(bleed)} Echoes` });
+  }
+  const losses = Number(extras && extras.networkLosses) || 0;
+  if (losses > 0) {
+    rows.push({ label: 'Relays pulled', value: `${losses} compromised` });
+  }
+
   return rows;
 }
 
@@ -95,9 +106,16 @@ function copyLines(offline) {
   ];
 }
 
-export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }) {
+export function showWelcomeBack({
+  state, offline, earnings, savedAt, onDismiss,
+  networkBleed = 0, networkLosses = 0,
+}) {
   if (!Number.isFinite(offline) || offline < MIN_OFFLINE_S) return false;
-  if (!Number.isFinite(earnings) || earnings <= 0) return false;
+  // The mesh can carry a session even when foreground earnings are zero —
+  // pure-bleed sessions and pure-loss sessions both deserve the screen.
+  const meshPositive = networkBleed > 0;
+  const meshSignal = meshPositive || networkLosses > 0;
+  if ((!Number.isFinite(earnings) || earnings <= 0) && !meshSignal) return false;
 
   const root = document.getElementById('welcomeBack');
   if (!root) return false;
@@ -113,7 +131,7 @@ export function showWelcomeBack({ state, offline, earnings, savedAt, onDismiss }
   const lines = copyLines(offline);
   linesEl.innerHTML = lines.map((l) => `<div class="wb-line">${l}</div>`).join('');
 
-  const rows = buildBreakdown(state, savedAt, offline);
+  const rows = buildBreakdown(state, savedAt, offline, { networkBleed, networkLosses });
   breakdownEl.innerHTML = rows
     .map((r) => `<div class="wb-row"><span class="wb-row-label">${r.label}</span><span class="wb-row-value">${r.value}</span></div>`)
     .join('');

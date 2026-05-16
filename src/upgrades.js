@@ -283,26 +283,30 @@ export const UPGRADES = [
   // pctCost is 1/7 of the prior values (cheaper to invoke) and the per-rarity
   // CONVERT_BOOST_CAP below is 1/10, so the ceiling on what a single convert
   // can add to the rate is correspondingly tighter.
+  // Convert tokens are placement-only now — the burn-cost queues a Seed Relay
+  // you drop on a hex in the Network screen. Yield = cost × ratio at buy
+  // time, captured on the token. The relay ripens, then carries until ComDef
+  // finds it. Sector you place into decides yield/discovery/ripen multipliers.
   { id: 'tip_jar',   kind: 'convert', rarity: 'common',
-    name: 'Loose Cable', desc: 'Burn ~0.7% balance — bury a cheap antenna. +0.02% of spent /s.',
+    name: 'Loose Cable', desc: 'Field antenna kit. Burn ~0.7% balance to queue placement.',
     pctCost: 0.05 / 7, ratio: 0.0002 },
   { id: 'side_gig',  kind: 'convert', rarity: 'uncommon',
-    name: 'Hidden Antenna', desc: 'Burn ~1.4% balance — off-books, off-grid. +0.1% of spent /s.',
+    name: 'Hidden Antenna', desc: 'Yagi-class array, off-books. Burn ~1.4% to queue placement.',
     pctCost: 0.10 / 7, ratio: 0.001 },
   { id: 'franchise', kind: 'convert', rarity: 'rare',
-    name: 'Buried Array', desc: 'Burn ~3.6% balance — a real installation. +0.4% of spent /s.',
+    name: 'Buried Array', desc: 'A real phased installation. Burn ~3.6% to queue placement.',
     pctCost: 0.25 / 7, ratio: 0.004 },
   { id: 'empire',    kind: 'convert', rarity: 'legendary',
-    name: 'Forbidden Network', desc: 'Burn ~14% balance — somewhere they cannot find. +1% of spent /s.',
+    name: 'Forbidden Network', desc: 'Deep-sky listener; pick a quiet hex. Burn ~14% to queue placement.',
     pctCost: 1.0 / 7,  ratio: 0.01 },
   { id: 'vending',   kind: 'convert', rarity: 'common',
-    name: 'Seed Coil', desc: 'Burn ~0.3% balance — a coil you bury and forget. +0.006% of spent /s.',
+    name: 'Seed Coil', desc: 'A coil you bury and forget. Burn ~0.3% to queue placement.',
     pctCost: 0.02 / 7, ratio: 0.00006 },
   { id: 'kiosk',     kind: 'convert', rarity: 'uncommon',
-    name: 'Quiet Outpost', desc: 'Burn ~1% balance — a small staffed listening post. +0.05% of spent /s.',
+    name: 'Quiet Outpost', desc: 'A small staffed listening post. Burn ~1% to queue placement.',
     pctCost: 0.07 / 7, ratio: 0.0005 },
   { id: 'conglomerate', kind: 'convert', rarity: 'rare',
-    name: 'Distributed Mesh', desc: 'Burn ~7% balance — a network you cannot lose all of. +0.75% of spent /s.',
+    name: 'Distributed Mesh', desc: 'Redundant phased mesh. Burn ~7% to queue placement.',
     pctCost: 0.5 / 7,  ratio: 0.0075 },
 ];
 
@@ -312,7 +316,11 @@ export const getUpgrade = (id) => BY_ID.get(id);
 // id isn't in the static table. Prefer it over the registry.
 export const resolveUpgrade = (slot) => slot && (slot.dyn || BY_ID.get(slot.id)) || null;
 
-export const CONVERT_MIN_RATE = 100;
+// Convert slots are gated to mid-game. Below this rate, the Network is
+// thematically and mechanically inert — there's nothing meaningful to seed,
+// and the placement loop crowds the early shop. The chip stays hidden until
+// the first token is queued, which can only happen after the gate opens.
+export const CONVERT_MIN_RATE = 1000;
 
 // Per-slot type pin. Slots 0..4 are typed; slot 1's *first* roll is seeded to
 // a cheap common mul by main.js, but the filter stays permissive so rerolls/buys

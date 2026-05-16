@@ -93,13 +93,29 @@ export function makeNetworkUi(state, opts) {
 
   const bounds = computeBounds();
   let selectedRelayId = null;
+  let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation
+  // Mobile-only pan offset on the SVG (in CSS pixels). The map element is kept
+  // stable across renders so the drag-in-progress and these listeners survive.
+  const pan = { tx: 0, ty: 0, centered: false };
+  let dragState = null;
 
   const open = () => {
     ensureNetwork(state);
     modalEl.classList.add('open');
+    pan.centered = false;
     render();
   };
-  const close = () => modalEl.classList.remove('open');
+  const close = () => {
+    modalEl.classList.remove('open');
+    pendingPlacement = null;
+  };
+  // On viewport resize the cover-fit dimensions change, so the existing pan
+  // offset no longer centers correctly. Recenter on the next render.
+  window.addEventListener('resize', () => {
+    if (!modalEl.classList.contains('open')) return;
+    pan.centered = false;
+    render();
+  });
 
   installTap(chipEl, () => open());
   installTap(modalEl, (e) => {
@@ -116,10 +132,27 @@ export function makeNetworkUi(state, opts) {
       if (openDiagnostic) openDiagnostic('network');
       return;
     }
+    if (target.closest('[data-act="confirm-placement"]')) {
+      if (pendingPlacement) {
+        placeRelay(state, pendingPlacement, nowSeconds());
+        pendingPlacement = null;
+        render();
+      }
+      return;
+    }
+    if (target.closest('[data-act="cancel-placement"]')) {
+      pendingPlacement = null;
+      render();
+      return;
+    }
+    // Taps that landed on the placement bar (but not a button) shouldn't
+    // bleed through to the hex underneath.
+    if (target.closest('.net-place-bar')) return;
     const hexEl = target.closest('[data-hex]');
     const relayEl = target.closest('[data-relay]');
     if (relayEl) {
       selectedRelayId = relayEl.getAttribute('data-relay');
+      pendingPlacement = null;
       render();
       return;
     }
@@ -131,11 +164,11 @@ export function makeNetworkUi(state, opts) {
         const occupied = net && net.relays.some((rr) => rr.hex.q === q && rr.hex.r === r);
         if (occupied) {
           const rr = net.relays.find((x) => x.hex.q === q && x.hex.r === r);
-          if (rr) { selectedRelayId = rr.id; render(); }
+          if (rr) { selectedRelayId = rr.id; pendingPlacement = null; render(); }
           return;
         }
         if (net && net.queued.length > 0) {
-          placeRelay(state, { q, r }, nowSeconds());
+          pendingPlacement = { q, r };
           selectedRelayId = null;
           render();
         }
@@ -156,7 +189,8 @@ export function makeNetworkUi(state, opts) {
       const sector = SECTORS[h.sector] || SECTORS.frontier;
       const occ = occupiedByHex.get(`${h.q},${h.r}`);
       const isSelected = occ && occ.id === selectedRelayId;
-      const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : ''].filter(Boolean).join(' ');
+      const isStaged = !occ && pendingPlacement && pendingPlacement.q === h.q && pendingPlacement.r === h.r;
+      const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : '', isStaged ? 'staged' : ''].filter(Boolean).join(' ');
       const tip = `${sector.label} · ×${sector.yieldMul} yield · ×${sector.discoveryMul} discovery risk · ×${sector.ripenMul} ripen time`;
       // Sector colour bound as a CSS variable so the stylesheet can mix fills
       // and strokes from one source. Cyberpunk treatment is in the CSS — low
@@ -245,11 +279,31 @@ export function makeNetworkUi(state, opts) {
       }
     }
 
+    // Ghost reticle on the staged hex — same shape as a real relay frame but
+    // dashed/pulsing so the player sees it's a preview.
+    let ghostNode = '';
+    if (pendingPlacement) {
+      const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
+      const alreadyOccupied = ph && relays.some((rr) => rr.hex.q === ph.q && rr.hex.r === ph.r);
+      if (ph && !alreadyOccupied) {
+        const { x, y } = hexCenterFromBounds(ph.q, ph.r, bounds);
+        const ret = reticle(x, y, 1);
+        ghostNode = `
+          <g class="relay-mark pending">
+            <polygon class="r-frame" points="${ret.framePts}" />
+            ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
+            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
+          </g>
+        `;
+      }
+    }
+
     return `
       <svg class="netmap-svg" viewBox="0 0 ${bounds.width.toFixed(0)} ${bounds.height.toFixed(0)}" preserveAspectRatio="xMidYMid meet">
         ${hexNodes.join('')}
         ${clusterEdges.join('')}
         ${relayNodes.join('')}
+        ${ghostNode}
       </svg>
     `;
   }
@@ -352,7 +406,7 @@ export function makeNetworkUi(state, opts) {
       <div class="net-queue">
         <div class="net-section-head">Placement queue</div>
         ${queuedRows}
-        ${queued.length > 0 ? `<div class="net-hint">Tap an empty hex to drop the next token.</div>` : ''}
+        ${queued.length > 0 ? `<div class="net-hint">Tap an empty hex to choose where to place the next token.</div>` : ''}
       </div>
       ${detailHtml}
       <div class="net-legend">
@@ -371,6 +425,124 @@ export function makeNetworkUi(state, opts) {
     `;
   }
 
+  // --- Mobile pan support -------------------------------------------------
+  // The SVG is visually enlarged via a CSS transform inside the mobile media
+  // query. We drive --map-tx / --map-ty on the (stable) .net-map element and
+  // clamp to keep at least a fraction of the SVG inside the viewport.
+  function visualSize(mapEl) {
+    const svgEl = mapEl.querySelector('.netmap-svg');
+    if (!svgEl) return null;
+    // SVG elements don't implement offsetWidth/Height in every engine. The
+    // bounding rect already reflects the active transform (scale + translate),
+    // so it's exactly the visual size we want.
+    const rect = svgEl.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) return null;
+    return { w: rect.width, h: rect.height };
+  }
+  function clampPan(mapEl) {
+    const vs = visualSize(mapEl);
+    if (!vs) return;
+    const rect = mapEl.getBoundingClientRect();
+    const minTx = Math.min(0, rect.width - vs.w);
+    const minTy = Math.min(0, rect.height - vs.h);
+    const maxTx = Math.max(0, rect.width - vs.w);
+    const maxTy = Math.max(0, rect.height - vs.h);
+    pan.tx = Math.max(minTx, Math.min(maxTx, pan.tx));
+    pan.ty = Math.max(minTy, Math.min(maxTy, pan.ty));
+  }
+  function centerPan(mapEl) {
+    const vs = visualSize(mapEl);
+    if (!vs) return { tx: 0, ty: 0 };
+    const rect = mapEl.getBoundingClientRect();
+    return { tx: (rect.width - vs.w) / 2, ty: (rect.height - vs.h) / 2 };
+  }
+  function applyPan(mapEl) {
+    mapEl.style.setProperty('--map-tx', `${pan.tx.toFixed(1)}px`);
+    mapEl.style.setProperty('--map-ty', `${pan.ty.toFixed(1)}px`);
+  }
+  function attachPan(mapEl) {
+    mapEl.addEventListener('pointerdown', (e) => {
+      // Only enable pan for touch input. Desktop mouse keeps the existing
+      // tap-only behaviour (the SVG fits the container on wide viewports).
+      if (e.pointerType !== 'touch') return;
+      // Pan only when the SVG actually overflows its container (i.e. mobile
+      // cover-fit is in effect). Otherwise there's nothing to scroll.
+      const vs = visualSize(mapEl);
+      const rect = mapEl.getBoundingClientRect();
+      if (!vs || (vs.w <= rect.width + 1 && vs.h <= rect.height + 1)) return;
+      dragState = {
+        pointerId: e.pointerId,
+        startX: e.clientX, startY: e.clientY,
+        baseTx: pan.tx, baseTy: pan.ty,
+        active: false,
+      };
+    });
+    mapEl.addEventListener('pointermove', (e) => {
+      if (!dragState || e.pointerId !== dragState.pointerId) return;
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+      // Defer commit until the gesture is clearly a pan — keeps tiny finger
+      // jitters during a tap from sliding the map. 15px matches the tap
+      // tolerance, so taps and pans don't both fire.
+      if (!dragState.active && Math.hypot(dx, dy) < 15) return;
+      dragState.active = true;
+      pan.tx = dragState.baseTx + dx;
+      pan.ty = dragState.baseTy + dy;
+      clampPan(mapEl);
+      applyPan(mapEl);
+    });
+    const end = (e) => {
+      if (!dragState || e.pointerId !== dragState.pointerId) return;
+      dragState = null;
+    };
+    mapEl.addEventListener('pointerup', end);
+    mapEl.addEventListener('pointercancel', end);
+  }
+  // -----------------------------------------------------------------------
+
+  function renderPlacementBar() {
+    const net = state.network;
+    if (!pendingPlacement || !net || net.queued.length === 0) return '';
+    const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
+    if (!ph) return '';
+    if (net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r)) return '';
+    const token = net.queued[0];
+    const sector = SECTORS[ph.sector] || SECTORS.frontier;
+    const tier = TIER_INFO[token.tier] || TIER_INFO.common;
+    const projectedYield = (Number(token.baseYield) || 0) * sector.yieldMul;
+    const ripenSec = tier.ripenSec * sector.ripenMul;
+    return `
+      <div class="net-place-bar" role="dialog" aria-label="Confirm placement">
+        <div class="net-place-head">
+          <span class="net-place-tier rar-${token.tier}">${TIER_LABEL[token.tier] || token.tier} relay</span>
+          <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
+        </div>
+        <div class="net-place-stats">
+          <span>+${formatAbbrev(projectedYield)}/s base</span>
+          <span class="net-place-sep">·</span>
+          <span>ripens in ${fmtMin(ripenSec)}</span>
+        </div>
+        <div class="net-place-hint">Tap another empty hex to move.</div>
+        <div class="net-place-actions">
+          <button class="net-place-btn cancel" type="button" data-act="cancel-placement">Cancel</button>
+          <button class="net-place-btn confirm" type="button" data-act="confirm-placement">Place here</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function ensureSkeleton() {
+    if (bodyEl.querySelector('.net-layout')) return;
+    bodyEl.innerHTML = `
+      <div class="net-layout">
+        <div class="net-map"></div>
+        <div class="net-side"></div>
+      </div>
+    `;
+    const mapEl = bodyEl.querySelector('.net-map');
+    if (mapEl) attachPan(mapEl);
+  }
+
   function render() {
     if (!modalEl.classList.contains('open')) return;
     const now = nowSeconds();
@@ -378,16 +550,29 @@ export function makeNetworkUi(state, opts) {
     if (selectedRelayId && state.network && !state.network.relays.some((r) => r.id === selectedRelayId)) {
       selectedRelayId = null;
     }
+    // Clear stale pending if the queue dried up.
+    if (pendingPlacement && (!state.network || state.network.queued.length === 0)) {
+      pendingPlacement = null;
+    }
     const status = networkStatus(state, now);
     titleEl.textContent = status.online + status.ripening > 0
       ? `Network · ${status.online + status.ripening} relay${status.online + status.ripening === 1 ? '' : 's'}`
       : 'Network';
-    bodyEl.innerHTML = `
-      <div class="net-layout">
-        <div class="net-map">${renderHexSvg(now)}</div>
-        <div class="net-side">${renderSidePanel(now)}</div>
-      </div>
-    `;
+    ensureSkeleton();
+    const mapEl = bodyEl.querySelector('.net-map');
+    const sideEl = bodyEl.querySelector('.net-side');
+    mapEl.innerHTML = renderHexSvg(now) + renderPlacementBar();
+    sideEl.innerHTML = renderSidePanel(now);
+    if (!pan.centered) {
+      requestAnimationFrame(() => {
+        const c = centerPan(mapEl);
+        pan.tx = c.tx; pan.ty = c.ty;
+        pan.centered = true;
+        applyPan(mapEl);
+      });
+    } else {
+      applyPan(mapEl);
+    }
   }
 
   function refresh() {

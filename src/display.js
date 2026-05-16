@@ -672,6 +672,7 @@ class Column {
       }
       let px = p.x, py = p.y, pz = p.z || 0;
       let opacity = p.opacity;
+      let scaleMul = 1;
       let tintR = 1, tintG = 1, tintB = 1;
       if (this._gfx && p._gfxActive) {
         const t = Math.max(0, Math.min(1, (now - this._gfx.startedAt) / this._gfx.durationS));
@@ -701,9 +702,10 @@ class Column {
           px = ax + p._gfxOutX * e;
           py = ay + p._gfxOutY * e;
           pz = az + p._gfxOutZ * e;
-          // Fade fully to 0 over phase 3, weighted so most of the fade lands
-          // in the second half — the particles travel visibly before dissolving.
-          opacity = p.opacity * Math.max(0, 1 - Math.pow(u, 1.6));
+          // Shrink to zero over phase 3 — the geometry visibly collapses
+          // rather than snapping out. Most of the shrink lands in the second
+          // half so the particle still travels before vanishing.
+          scaleMul = Math.max(0, 1 - Math.pow(u, 1.6));
         }
         if (this._gfx.won) {
           // Green tint that grows as we approach centre, then explodes.
@@ -723,7 +725,7 @@ class Column {
       _pos.set(px, py, pz);
       _euler.set(p.rotX, p.rotY, p.rotZ || 0);
       _quat.setFromEuler(_euler);
-      _scl.setScalar(p.scale);
+      _scl.setScalar(p.scale * scaleMul);
       // Streaming stretch reads as motion blur along the column's fall axis;
       // suppress it during the attractor pull so centre-bound particles look
       // like deliberate orbs, not motion-blurred streaks.

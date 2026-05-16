@@ -281,9 +281,12 @@
     }
     .top-hud {
       position: fixed;
-      top: 64px;
-      left: 16px;
-      right: 16px;
+      /* env() clears the iOS notch when installed as a PWA (viewport-fit=cover
+         + black-translucent status bar); the 64px floor keeps the desktop and
+         non-notched-mobile layout untouched. */
+      top: max(64px, calc(env(safe-area-inset-top) + 14px));
+      left: max(16px, env(safe-area-inset-left));
+      right: max(16px, env(safe-area-inset-right));
       z-index: 30;
       pointer-events: none;
       font-variant-numeric: tabular-nums;
@@ -356,6 +359,10 @@
     .th-rate.th-pulse               { animation: th-pulse-soft 0.42s ease-out; }
     @media (max-width: 820px) {
       .top-hud {
+        /* On phones, sit just below the menu / contact-log buttons (40px high
+           anchored at safe-area-inset-top + 8px). 50px clears them with a
+           small breath. */
+        top: calc(env(safe-area-inset-top) + 56px);
         justify-content: space-between;
         gap: 8px;
       }
@@ -1771,7 +1778,11 @@
       background: rgba(6, 6, 14, 0.78);
       backdrop-filter: blur(6px);
       z-index: 200;
-      padding: 20px;
+      padding:
+        max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
       box-sizing: border-box;
     }
     #buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open { display: flex; }
@@ -1789,7 +1800,11 @@
        8px so the body has room and the close button stays in the viewport. */
     @media (max-width: 520px) {
       #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal {
-        padding: 8px;
+        padding:
+          max(8px, env(safe-area-inset-top))
+          max(8px, env(safe-area-inset-right))
+          max(8px, env(safe-area-inset-bottom))
+          max(8px, env(safe-area-inset-left));
       }
       .bm-card {
         max-height: calc(100vh - 16px);
@@ -2312,6 +2327,12 @@
       backdrop-filter: blur(0px);
       transition: background 0.18s ease, backdrop-filter 0.18s ease;
       z-index: 100;
+      padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      box-sizing: border-box;
       cursor: pointer;
       /* Skip iOS's 300ms tap-delay heuristics and tap-highlight flash. */
       touch-action: manipulation;
@@ -2328,14 +2349,42 @@
     .it-card {
       width: 100%;
       max-width: min(960px, calc(100vw - 64px));
-      padding: 36px 40px 64px;
+      /* Cap at the overlay's available height so a tall card never pushes
+         the footer (Prev / Next) off-screen on small phones. The overlay
+         padding already includes safe-area, so 100% of its content box is
+         what we have to work with. */
+      max-height: 100%;
+      padding: 28px 32px 18px;
       text-align: center;
       transform: translateY(8px);
       opacity: 0;
       transition: transform 0.22s ease, opacity 0.22s ease;
       position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-sizing: border-box;
     }
     #interstitial.it-visible .it-card { transform: translateY(0); opacity: 1; }
+    /* Head: holds the contact frame + speaker badge. flex 0 so the body
+       region absorbs vertical slack. */
+    .it-head { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .it-head:empty { display: none; }
+    /* Body: text region with a stable reserved height. Allowed to scroll
+       internally for the rare long step rather than push the footer off.
+       No flex-centering inside — as the typewriter streams characters, a
+       centered text would drift; top-aligned + min-height keeps the visual
+       anchor put. */
+    .it-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      width: 100%;
+    }
+    /* Foot: dots + button row. flex 0 keeps it pinned regardless of body. */
+    .it-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 14px; }
     /* Season finale card. The bg layer holds a full-bleed image; the card
        widens, the type lifts, and the fade is slower so the cinematic beat
        lands. Used by the `season_complete` interstitial; future season
@@ -2343,7 +2392,7 @@
     .it-card.it-season-finale {
       max-width: min(1100px, calc(100vw - 64px));
       min-height: 360px;
-      padding: 60px 56px 84px;
+      padding: 48px 48px 24px;
       transition: transform 0.6s ease, opacity 0.6s ease;
       border-color: rgba(212, 154, 85, 0.55);
       background:
@@ -2381,9 +2430,9 @@
       flex-direction: column;
       align-items: center;
       gap: 14px;
-      margin: 0 auto 22px;
       padding: 0 0 18px;
       border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+      width: 100%;
     }
     .it-card.it-has-contact .it-contact { display: flex; }
     .it-card.it-first-contact .it-contact { gap: 18px; padding-bottom: 22px; }
@@ -2491,7 +2540,6 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin: 0 auto 18px;
       opacity: 0;
       transition: opacity 0.22s ease;
     }
@@ -2545,7 +2593,6 @@
       display: flex;
       gap: 6px;
       justify-content: center;
-      margin-top: 22px;
       min-height: 6px;
     }
     .it-dot {
@@ -2556,65 +2603,66 @@
       transition: background 0.15s;
     }
     .it-dot.on { background: #8aa0ff; }
-    .it-hint {
-      margin-top: 18px;
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: #8a8ac0;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-    .it-hint .hint-tap { display: none; }
-    @media (hover: none), (pointer: coarse) {
-      .it-hint .hint-key { display: none; }
-      .it-hint .hint-tap { display: inline; }
-    }
-    /* Per-step nav (prev / next) and the explicit dismiss. The card sets its
-       own pointer affordances; these buttons sit absolute on the card so they
-       do not push the typewriter line around when they show / hide. */
-    .it-nav {
-      position: absolute;
+    /* Footer button row. Two equal buttons (Previous / Next; Next swaps to
+       Close on the last step). Pinned to the bottom of the card by .it-foot
+       so they're always in reach — no chevrons floating off small screens. */
+    .it-btn-row {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      border: 1px solid rgba(120, 140, 255, 0.22);
+      gap: 10px;
+      width: 100%;
+    }
+    .it-btn {
+      flex: 1 1 0;
+      min-height: 44px;
+      padding: 10px 16px;
+      background: rgba(20, 20, 40, 0.6);
+      border: 1px solid rgba(120, 140, 255, 0.32);
       color: #b9c1ff;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      cursor: pointer;
-      padding: 0;
+      border-radius: 8px;
       font-family: inherit;
-      line-height: 1;
-      transition: opacity 0.18s ease, border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
-      opacity: 0.55;
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.14s, border-color 0.14s, color 0.14s, opacity 0.14s;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .it-nav:hover { opacity: 1; border-color: rgba(138, 160, 255, 0.6); color: #e8e8f0; }
-    .it-nav:disabled { opacity: 0.15; cursor: default; }
-    .it-nav span { font-size: 22px; line-height: 1; display: block; transform: translateY(-1px); }
-    .it-prev { left: 16px;  bottom: 14px; }
-    .it-next { right: 16px; bottom: 14px; }
-    /* Single-step interstitials hide the prev/next pair entirely. */
-    .it-card.it-single .it-prev,
-    .it-card.it-single .it-next { display: none; }
-    /* Season-finale tone — keep nav present, recolour to match the palette. */
-    .it-card.it-season-finale .it-nav {
-      border-color: rgba(212, 154, 85, 0.5);
+    .it-btn:hover { background: rgba(40, 40, 80, 0.85); border-color: rgba(138, 160, 255, 0.6); color: #e8e8f0; }
+    .it-btn:disabled { opacity: 0.28; cursor: default; }
+    /* Close = primary affordance on the last step. Warm tungsten matches the
+       Collect button in welcome-back so the "this dismisses" reading is
+       consistent across modals. */
+    .it-btn.is-close {
+      background: rgba(212, 154, 85, 0.18);
+      border-color: rgba(212, 154, 85, 0.6);
       color: #d49a55;
     }
-    .it-card.it-season-finale .it-nav:hover {
+    .it-btn.is-close:hover {
+      background: rgba(212, 154, 85, 0.28);
+      border-color: #d49a55;
+      color: #f0c080;
+    }
+    /* Single-step interstitials hide Previous — only a Close-style Next remains. */
+    .it-card.it-single .it-btn-prev { display: none; }
+    /* Season-finale tone — match the warm palette across both buttons. */
+    .it-card.it-season-finale .it-btn {
+      border-color: rgba(212, 154, 85, 0.42);
+      color: #d49a55;
+    }
+    .it-card.it-season-finale .it-btn:hover {
       border-color: rgba(212, 154, 85, 0.9);
       color: #f0c080;
     }
     @media (max-width: 520px) {
-      .it-prev { left: 8px; }
-      .it-next { right: 8px; }
-      .it-nav { width: 44px; height: 44px; }
-      .it-text { min-height: 9.5em; }
+      .it-card { padding: 18px 16px 14px; gap: 12px; }
+      .it-text { min-height: 6.5em; font-size: 17px; line-height: 1.45; }
+      .it-card.it-season-finale { padding: 28px 20px 16px; }
+      .it-card.it-season-finale .it-text { font-size: 18px; line-height: 1.5; }
+      .it-portrait { width: min(360px, 76vw); }
+      .it-card.it-first-contact .it-portrait { width: min(420px, 84vw); }
+      .it-btn { font-size: 12px; letter-spacing: 0.12em; padding: 10px 12px; }
     }
 
     @media (max-width: 820px) {
@@ -2625,7 +2673,9 @@
         transform: none;
         width: auto;
         max-width: none;
-        padding: 6px 0 calc(8px + env(safe-area-inset-bottom));
+        /* max() instead of safe-area + 8px so notched phones don't get a
+           doubled-up gap below the shop (home-indicator inset is enough). */
+        padding: 6px 0 max(8px, env(safe-area-inset-bottom));
         gap: 6px;
         background: transparent;
         border: none;
@@ -2695,7 +2745,11 @@
       background: rgba(6, 6, 14, 0.86);
       backdrop-filter: blur(6px);
       z-index: 230;
-      padding: 20px;
+      padding:
+        max(20px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
       box-sizing: border-box;
     }
     #patternModal.open { display: flex; }
@@ -3001,27 +3055,34 @@
 
   <div id="interstitial">
     <div class="it-card">
-      <div class="it-contact" aria-hidden="true">
-        <div class="it-portrait">
-          <img class="it-portrait-img" alt="" />
-          <div class="it-portrait-fallback" aria-hidden="true"></div>
+      <div class="it-head">
+        <div class="it-contact" aria-hidden="true">
+          <div class="it-portrait">
+            <img class="it-portrait-img" alt="" />
+            <div class="it-portrait-fallback" aria-hidden="true"></div>
+          </div>
+          <div class="it-contact-meta">
+            <div class="it-contact-tag">Contact</div>
+            <div class="it-contact-name"></div>
+            <div class="it-contact-status"></div>
+            <div class="it-contact-flavor"></div>
+          </div>
         </div>
-        <div class="it-contact-meta">
-          <div class="it-contact-tag">Contact</div>
-          <div class="it-contact-name"></div>
-          <div class="it-contact-status"></div>
-          <div class="it-contact-flavor"></div>
+        <div class="it-speaker" aria-hidden="true">
+          <img class="it-speaker-img" alt="" />
+          <div class="it-speaker-name"></div>
         </div>
       </div>
-      <div class="it-speaker" aria-hidden="true">
-        <img class="it-speaker-img" alt="" />
-        <div class="it-speaker-name"></div>
+      <div class="it-body">
+        <div class="it-text"></div>
       </div>
-      <div class="it-text"></div>
-      <div class="it-dots"></div>
-      <div class="it-hint"><span class="hint-key">press space</span><span class="hint-tap">tap to continue</span></div>
-      <button class="it-nav it-prev" type="button" aria-label="previous line" data-it-action="prev"><span>&lsaquo;</span></button>
-      <button class="it-nav it-next" type="button" aria-label="next line" data-it-action="next"><span>&rsaquo;</span></button>
+      <div class="it-foot">
+        <div class="it-dots"></div>
+        <div class="it-btn-row">
+          <button class="it-btn it-btn-prev" type="button" data-it-action="prev">Previous</button>
+          <button class="it-btn it-btn-next" type="button" data-it-action="next">Next</button>
+        </div>
+      </div>
     </div>
   </div>
 

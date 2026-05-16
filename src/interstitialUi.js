@@ -22,7 +22,6 @@ export function makeInterstitialUi(state, onShown) {
   const root = document.getElementById('interstitial');
   const card = root.querySelector('.it-card');
   const textEl = root.querySelector('.it-text');
-  const hintEl = root.querySelector('.it-hint');
   const dotsEl = root.querySelector('.it-dots');
   const portraitImgEl = root.querySelector('.it-portrait-img');
   const contactNameEl = root.querySelector('.it-contact-name');
@@ -31,8 +30,8 @@ export function makeInterstitialUi(state, onShown) {
   const contactTagEl = root.querySelector('.it-contact-tag');
   const speakerImgEl = root.querySelector('.it-speaker-img');
   const speakerNameEl = root.querySelector('.it-speaker-name');
-  const prevBtn = root.querySelector('.it-prev');
-  const nextBtn = root.querySelector('.it-next');
+  const prevBtn = root.querySelector('.it-btn-prev');
+  const nextBtn = root.querySelector('.it-btn-next');
 
   const VOICE_CLASSES = ['voice-kalen', 'voice-sera', 'voice-narrator', 'voice-anonymous'];
   const VOICE_CLASS = { K: 'voice-kalen', S: 'voice-sera', N: 'voice-narrator', A: 'voice-anonymous' };
@@ -186,8 +185,16 @@ export function makeInterstitialUi(state, onShown) {
     if (!active) return;
     const n = active.def.steps.length;
     const i = active.stepIdx;
+    const isLast = i >= n - 1;
     if (prevBtn) prevBtn.disabled = i <= 0;
-    if (nextBtn) nextBtn.disabled = i >= n - 1;
+    if (nextBtn) {
+      // On the last step the Next button becomes the explicit Close — the
+      // only dismiss path now that body taps no longer close the card.
+      nextBtn.textContent = isLast ? 'Close' : 'Next';
+      nextBtn.dataset.itAction = isLast ? 'close' : 'next';
+      nextBtn.classList.toggle('is-close', isLast);
+      nextBtn.disabled = false;
+    }
   }
 
   function showStep() {
@@ -197,7 +204,6 @@ export function makeInterstitialUi(state, onShown) {
     applySpeaker();
     waitingInput = false;
     autoTimer = 0;
-    hintEl.style.opacity = '0';
     // Allow dynamic text — a function lets Sera reference past contacts at
     // run-time without baking strings into the static table.
     const full = typeof step.text === 'function' ? step.text(state) : step.text;
@@ -237,7 +243,6 @@ export function makeInterstitialUi(state, onShown) {
     if (!active) return;
     if (active.stepIdx >= active.def.steps.length - 1) {
       waitingInput = true;
-      hintEl.style.opacity = '0.7';
       autoTimer = 0;
       return;
     }
@@ -254,9 +259,8 @@ export function makeInterstitialUi(state, onShown) {
 
   function goNext() {
     if (!active) return;
-    // Don't let the side button close the card — only tap-to-continue or
-    // Escape can do that. This way the player who hits next on the final
-    // step still has a chance to re-read before committing to dismiss.
+    // Next on the last step is now the Close button — handled via the
+    // explicit 'close' action, never this function.
     if (active.stepIdx >= active.def.steps.length - 1) return;
     active.stepIdx++;
     showStep();
@@ -302,6 +306,10 @@ export function makeInterstitialUi(state, onShown) {
       finishStepDwell();
       return;
     }
+    // Body taps no longer dismiss the card — Close button is the only path
+    // out on the last step. On non-last steps we still advance, which
+    // matches the keyboard Space/Enter behaviour.
+    if (active.stepIdx >= active.def.steps.length - 1) return;
     advance();
   }
 
@@ -316,7 +324,6 @@ export function makeInterstitialUi(state, onShown) {
     const isLast = active.stepIdx >= active.def.steps.length - 1;
     if (isLast) {
       waitingInput = true;
-      hintEl.style.opacity = '0.7';
       autoTimer = 0;
       return;
     }
@@ -348,6 +355,7 @@ export function makeInterstitialUi(state, onShown) {
     const action = actionForTarget(downTarget);
     if (action === 'prev') { goPrev(); return; }
     if (action === 'next') { goNext(); return; }
+    if (action === 'close') { close(); return; }
     handleInput();
   });
 

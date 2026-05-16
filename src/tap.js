@@ -17,9 +17,16 @@
 // 4. Android's touch slop (~8px) is *smaller* than our 15px movement
 //    tolerance, so a horizontal pan on `touch-action: pan-x` containers
 //    claims the scroll before pointermove crosses the threshold — we get
-//    pointercancel with `moved` still false and would (wrongly) fire. The
-//    fix: snapshot the nearest scrollable ancestor's scroll position at
-//    pointerdown and treat any change by fire time as movement.
+//    pointercancel with `moved` still false and would (wrongly) fire. Two
+//    guards combine to catch this:
+//      (a) snapshot the nearest scrollable ancestor's scroll position at
+//          pointerdown and treat any change by fire time as movement.
+//      (b) re-check finger displacement at fire time against the cancel/up
+//          event's own clientX/Y — covers the window where the browser
+//          claimed the gesture and skipped pointermove dispatch, but the
+//          scroll position hasn't committed yet either. iOS stationary
+//          pointercancel keeps the finger at the down position, so this
+//          extra check doesn't lose taps the other rules already accept.
 //
 // `handler(event, downTarget)` is invoked once per tap. `downTarget` is the
 // element the finger first landed on — use it for routing because the
@@ -70,6 +77,10 @@ export function installTap(el, handler) {
     if (!tap || e.pointerId !== tap.id) return;
     const s = tap; tap = null;
     if (s.moved) return;
+    // Fire-time displacement check: pointermove may have been swallowed by
+    // the browser when it claimed a scroll. The cancel/up event still
+    // carries the current finger position, which is enough to detect pans.
+    if (!isWithinTapTolerance(e.clientX - s.x, e.clientY - s.y)) return;
     // Android scroll-claim guard: the browser may commit to a pan and fire
     // pointercancel before pointermove crosses our tolerance. A changed
     // scroll position on the nearest scrollable ancestor is unambiguous

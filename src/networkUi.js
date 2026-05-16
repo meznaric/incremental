@@ -94,6 +94,12 @@ export function makeNetworkUi(state, opts) {
   const bounds = computeBounds();
   let selectedRelayId = null;
   let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation
+  // Hover is tracked in JS, not via CSS :hover. The SVG is re-rendered every
+  // 100ms (refresh tick), which destroys and recreates the node the cursor sits
+  // on. :hover flickers off mid-render and the fill transition replays — the
+  // hex appears to blink. Storing the hovered hex by q,r key + re-applying a
+  // .hovered class after each render keeps the visual stable.
+  let hoveredHexKey = null;
   // Mobile-only pan offset on the SVG (in CSS pixels). The map element is kept
   // stable across renders so the drag-in-progress and these listeners survive.
   const pan = { tx: 0, ty: 0, centered: false };
@@ -535,12 +541,92 @@ export function makeNetworkUi(state, opts) {
     if (bodyEl.querySelector('.net-layout')) return;
     bodyEl.innerHTML = `
       <div class="net-layout">
-        <div class="net-map"></div>
+        <div class="net-map">
+          <div class="net-hex-info" aria-hidden="true"></div>
+        </div>
         <div class="net-side"></div>
       </div>
     `;
     const mapEl = bodyEl.querySelector('.net-map');
-    if (mapEl) attachPan(mapEl);
+    if (mapEl) {
+      attachPan(mapEl);
+      attachHover(mapEl);
+    }
+  }
+
+  // Hover tracking: pointer-driven on desktop only. The hover-key state lives
+  // outside the SVG so it survives the 100ms re-render. Touch users get hover
+  // info implicitly via tap → side-panel detail; trying to fake hover on touch
+  // races with the placement tap flow.
+  function attachHover(mapEl) {
+    const update = (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      const el = e.target && e.target.closest ? e.target.closest('[data-hex]') : null;
+      const key = el ? `${el.getAttribute('data-q')},${el.getAttribute('data-r')}` : null;
+      if (key === hoveredHexKey) return;
+      hoveredHexKey = key;
+      applyHover(mapEl);
+    };
+    mapEl.addEventListener('pointermove', update);
+    mapEl.addEventListener('pointerover', update);
+    mapEl.addEventListener('pointerleave', (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      if (hoveredHexKey === null) return;
+      hoveredHexKey = null;
+      applyHover(mapEl);
+    });
+  }
+
+  // Apply the .hovered class to the currently-hovered hex and update the info
+  // panel. Called after every render() (because the SVG was just rebuilt) and
+  // whenever hoveredHexKey changes.
+  function applyHover(mapEl) {
+    if (!mapEl) return;
+    const prev = mapEl.querySelector('.hex-cell.hovered');
+    if (prev) prev.classList.remove('hovered');
+    const info = mapEl.querySelector('.net-hex-info');
+    if (!hoveredHexKey) {
+      if (info) info.classList.remove('visible');
+      return;
+    }
+    const [q, r] = hoveredHexKey.split(',').map(Number);
+    const node = mapEl.querySelector(`[data-hex][data-q="${q}"][data-r="${r}"]`);
+    if (node) node.classList.add('hovered');
+    if (info) {
+      info.innerHTML = renderHoverInfo(q, r);
+      info.classList.add('visible');
+    }
+  }
+
+  function renderHoverInfo(q, r) {
+    const hex = getHexAt(q, r);
+    if (!hex) return '';
+    const sector = SECTORS[hex.sector] || SECTORS.frontier;
+    const net = state.network;
+    const occ = net && net.relays.find((rr) => rr.hex.q === q && rr.hex.r === r);
+    const now = nowSeconds();
+    const lines = [
+      `<div class="net-hex-info-head" style="--sec-color:${sector.color}">
+        <span class="net-hex-info-dot"></span>
+        <span class="net-hex-info-name">${sector.label}</span>
+      </div>`,
+      `<div class="net-hex-info-row"><span>Yield</span><span>×${sector.yieldMul}</span></div>`,
+      `<div class="net-hex-info-row"><span>Discovery</span><span>×${sector.discoveryMul}</span></div>`,
+      `<div class="net-hex-info-row"><span>Ripen</span><span>×${sector.ripenMul}</span></div>`,
+    ];
+    if (occ) {
+      const online = now >= occ.ripensAt;
+      if (online) {
+        const yieldNow = relayYield(net, occ, now);
+        const adj = adjacentOnlineCount(net, occ, now);
+        lines.push(`<div class="net-hex-info-row hot"><span>${TIER_LABEL[occ.tier] || occ.tier}</span><span>+${formatAbbrev(yieldNow)}/s · ${adj} nb</span></div>`);
+      } else {
+        lines.push(`<div class="net-hex-info-row hot"><span>${TIER_LABEL[occ.tier] || occ.tier}</span><span>ripens ${fmtMin(occ.ripensAt - now)}</span></div>`);
+      }
+    } else if (net && net.queued.length > 0) {
+      lines.push(`<div class="net-hex-info-row hint">Click to stage placement</div>`);
+    }
+    return lines.join('');
   }
 
   function render() {
@@ -561,8 +647,13 @@ export function makeNetworkUi(state, opts) {
     ensureSkeleton();
     const mapEl = bodyEl.querySelector('.net-map');
     const sideEl = bodyEl.querySelector('.net-side');
+    // The hover-info node lives outside the SVG so its content survives the
+    // re-render. Keep a handle and restore it after innerHTML swap.
+    const infoEl = mapEl.querySelector('.net-hex-info');
     mapEl.innerHTML = renderHexSvg(now) + renderPlacementBar();
+    if (infoEl) mapEl.appendChild(infoEl);
     sideEl.innerHTML = renderSidePanel(now);
+    applyHover(mapEl);
     if (!pan.centered) {
       requestAnimationFrame(() => {
         const c = centerPan(mapEl);

@@ -84,7 +84,9 @@
   transition: fill 140ms ease, stroke 140ms ease, filter 140ms ease;
   cursor: pointer;
 }
-.hex-cell.empty:hover polygon {
+/* Hover state is applied as a JS class (not :hover) because the SVG is
+   rebuilt every refresh tick — :hover would flicker as the node is replaced. */
+.hex-cell.hovered polygon {
   fill: color-mix(in srgb, var(--sec-color) 32%, transparent);
   stroke: var(--sec-color);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--sec-color) 60%, transparent));
@@ -459,6 +461,69 @@
 }
 .net-place-btn.confirm:hover {
   background: linear-gradient(180deg, rgba(255, 224, 130, 0.35), rgba(255, 224, 130, 0.18));
+}
+
+/* Hover info panel — small fixed-corner readout for the hex under the cursor.
+   Pointer-events disabled so it never intercepts the hover or tap. */
+.net-hex-info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: rgba(8, 10, 22, 0.88);
+  border: 1px solid rgba(45, 212, 255, 0.25);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #c4c4d8;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.net-hex-info.visible { opacity: 1; }
+.net-hex-info-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.net-hex-info-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--sec-color);
+  box-shadow: 0 0 4px var(--sec-color);
+}
+.net-hex-info-name {
+  color: #e8e8f0;
+  font-size: 12px;
+  font-weight: 500;
+}
+.net-hex-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+.net-hex-info-row.hot {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e8e8f0;
+}
+.net-hex-info-row.hint {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #8a8ac0;
+  font-style: italic;
+  justify-content: flex-start;
 }
 
 @media (max-width: 640px) {

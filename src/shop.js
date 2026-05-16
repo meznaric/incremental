@@ -55,7 +55,7 @@ export const PIN_UNLOCK_AT = PIN_TIER_COSTS[0];
 // single-cost constant. Map it to tier-1 so nothing breaks during the rename.
 export const PIN_UNLOCK_COST = PIN_TIER_COSTS[0];
 export const REROLL_PCT_PER_SLOT = 0.015;
-export const REROLL_FLOOR_SECONDS = 15;
+export const REROLL_FLOOR_SECONDS = 3;
 
 // Reroll cost is based on the rate captured at the time the slate was rolled
 // (state.shop.offeredRate), not the live rate. This keeps the displayed price

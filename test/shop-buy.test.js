@@ -4,7 +4,7 @@ import {
   makeShopState, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll,
   tryUnlockPinTier, tryTogglePin, isSlotPinned, nextPinTierCost,
   SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST, PIN_TIER_COSTS, MAX_PIN_SLOTS,
-  REROLL_PCT_PER_SLOT, DEFAULT_SLOTS,
+  REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS, DEFAULT_SLOTS,
 } from '../src/shop.js';
 import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS } from '../src/upgrades.js';
 
@@ -249,31 +249,39 @@ test('tryReroll: pinned slot is preserved and not charged', () => {
   assert.equal(s.shop.slots[0], before);
 });
 
-test('tryReroll: cost floor is 15s of offered rate per non-pinned slot', () => {
-  // offeredRate frozen at 100/s: 15s × 100/s × 2 slots = 3000 > 1.5% × 2 × 1000 = 30
-  const s = freshState({ amount: 1000, basePerSecond: 100 });
+test('tryReroll: cost floor is REROLL_FLOOR_SECONDS of offered rate per non-pinned slot', () => {
+  // Floor must dominate the pct term. Pick a rate big enough that the floor
+  // also exceeds the balance, so the reroll is refused.
+  const rate = 10000;
+  const balance = 1000;
+  const s = freshState({ amount: balance, basePerSecond: rate });
   s.shop.rerollUnlocked = true;
-  s.shop.offeredRate = 100;
+  s.shop.offeredRate = rate;
   installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
-  // Cost would be 3000 but balance is 1000 — reroll refused.
+  // floor = REROLL_FLOOR_SECONDS × rate × 2 ≫ balance → refused.
   const res = tryReroll(s, 0);
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'broke');
 });
 
 test('tryReroll: cost uses offered rate, not live rate', () => {
-  // Live rate explodes (basePerSecond=10000) but offeredRate was frozen at 10/s.
-  // Floor = 15s × 10/s × 2 = 300, pct = 1.5% × 2 × 1000 = 30 → cost 300.
-  const s = freshState({ amount: 1000, basePerSecond: 10000 });
+  // Live rate explodes but offeredRate was frozen low. Cost should reflect
+  // the frozen rate via the floor term.
+  const offered = 1000;
+  const balance = 100000;
+  const s = freshState({ amount: balance, basePerSecond: 1000000 });
   s.shop.rerollUnlocked = true;
-  s.shop.offeredRate = 10;
+  s.shop.offeredRate = offered;
   installSlot(s, 0, 'mult5', 50);
   installSlot(s, 1, 'coin_flip', 100);
+  const expectedFloor = REROLL_FLOOR_SECONDS * offered * 2;
+  const expectedPct = REROLL_PCT_PER_SLOT * 2 * balance;
+  const expected = Math.max(expectedFloor, expectedPct);
   const res = tryReroll(s, 0);
   assert.ok(res.ok);
-  assert.equal(res.cost, 300);
-  assert.equal(s.amount, 700);
+  assert.equal(res.cost, expected);
+  assert.equal(s.amount, balance - expected);
 });
 
 test('tryUnlockSlot: deducts cost and grows the slate', () => {

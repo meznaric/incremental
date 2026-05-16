@@ -315,6 +315,10 @@ export function initBreakdownUi(state) {
         <div class="faq-head"><i class="ri ri-gift-fill"></i>Bleed <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(gift)</span></div>
         <div class="faq-body">A one-shot Echo payout, free. Adds the listed Echoes to your balance.</div>
       </div>
+      <div class="faq-block">
+        <div class="faq-head"><i class="ri ri-moon-line"></i>Drift <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(offline multiplier)</span></div>
+        <div class="faq-body">A permanent multiplier that only fires while you are away. Lifts the foreground integral on welcomeBack; never touches live Echoes/s. Stacks multiplicatively with itself — buy more, the away window pays harder. Lost on cycle close, same as other permanents.</div>
+      </div>
       <div class="faq-block kind-mass">
         <div class="faq-head"><i class="ri ri-scales-3-line"></i>Engraving</div>
         <div class="faq-body">A permanent cut to the rig, bought with Carrier Mass. Survives every cycle close. Open the Contact Log → Rig tab.</div>

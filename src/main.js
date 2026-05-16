@@ -122,6 +122,8 @@ const KIND_EXPLAIN = {
     'Seed Relay = a placement token. The burn queues a relay; drop it on a hex in the Network map. It ripens (20m–2h), then carries Echoes until ComDef finds it. Sector picks risk vs reward; clustering pays more but is easier to triangulate.',
   gift:
     'Bleed = a one-shot Echo payout. Adds the listed Echoes to your balance. No ongoing effect.',
+  drift:
+    'Drift = permanent offline multiplier. Only fires while you are away — when you come back, the integrated rate is multiplied by your stacked Drift. Foreground Echoes/s is unchanged.',
 };
 function permExplain(u) {
   if (u.permType === 'mul') {
@@ -168,6 +170,13 @@ function openSlotModal(idx) {
     );
   } else if (u.kind === 'buff') {
     rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
+  } else if (u.kind === 'drift') {
+    const newMul = (state.offlineMul || 1) * u.value;
+    rows.push(
+      `<div class="slot-modal-row"><span>Multiplier</span><span>×${u.value}</span></div>`,
+      `<div class="slot-modal-row"><span>Total offline mul (after buy)</span><span>×${newMul.toFixed(2)}</span></div>`,
+      `<div class="slot-modal-row"><span>Effect</span><span>Applies only to offline earnings.</span></div>`,
+    );
   } else if (u.kind === 'gift') {
     rows.push(`<div class="slot-modal-row"><span>Returns</span><span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`);
   }
@@ -238,13 +247,14 @@ if (loaded) {
     state,
     offline: loaded.offline,
     // Headline number = everything that landed during the away window —
-    // integrated foreground rate plus ambient mesh bleed. The breakdown
-    // row "Mesh bleed" tells the player how much of that came from drips.
+    // integrated foreground rate (already Drift-multiplied) plus ambient
+    // mesh bleed. The breakdown rows explain where each part came from.
     earnings: (loaded.earnings || 0) + (loaded.networkBleed || 0),
     savedAt: loaded.savedAt,
     networkBleed: loaded.networkBleed || 0,
     networkLosses: loaded.networkLosses || 0,
     networkLossDetails: loaded.networkLossDetails || [],
+    offlineMul: loaded.offlineMul || 1,
   });
 }
 
@@ -815,6 +825,11 @@ function renderShop() {
     } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
       const eff = marginalRateForPurchase(state, slot, now);
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
+    } else if (u.kind === 'drift') {
+      // Drift previews the offline-only multiplier — never lies about a
+      // foreground /s gain (it doesn't move foreground rate).
+      const pct = Math.round((u.value - 1) * 100);
+      outcomes = `<div class="outcome win"><i class="ri ri-moon-line"></i> +${pct}% offline gain</div>`;
     } else if (u.kind === 'gift') {
       outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
     }

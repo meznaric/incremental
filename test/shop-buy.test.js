@@ -358,3 +358,39 @@ test('gift: reward roughly equals rate × GIFT_SECONDS by rarity', () => {
       `${rarity} reward ${upgrade.reward} far from target ${target}`);
   }
 });
+
+test('drift: buy multiplies offlineMul and increments owned count', () => {
+  const drift = ['drift_starter', 'drift_band', 'drift_lock']
+    .map((id) => getUpgrade(id))
+    .filter(Boolean)[0];
+  const s = freshState({ amount: 100_000 });
+  installSlot(s, 5, drift.id, 1000);
+  const before = s.offlineMul;
+  const res = tryBuy(s, 5, 0);
+  assert.ok(res.ok);
+  assert.equal(s.amount, 99_000);
+  assert.ok(Math.abs(s.offlineMul - before * drift.value) < 1e-9,
+    `offlineMul ${s.offlineMul} should be ${before * drift.value}`);
+  assert.equal(s.owned[drift.id], 1);
+});
+
+test('drift: two buys stack multiplicatively', () => {
+  const drift = getUpgrade('drift_starter');
+  const s = freshState({ amount: 1e9 });
+  installSlot(s, 5, drift.id, 100);
+  tryBuy(s, 5, 0);
+  installSlot(s, 5, drift.id, 100);
+  tryBuy(s, 5, 0);
+  // value² since two purchases.
+  assert.ok(Math.abs(s.offlineMul - drift.value * drift.value) < 1e-9);
+});
+
+test('drift: never touches foreground rate', () => {
+  const drift = getUpgrade('drift_band');
+  const s = freshState({ amount: 1e7, basePerSecond: 10 });
+  const rateBefore = (s.basePerSecond + s.flatBonus) * s.permMul;
+  installSlot(s, 5, drift.id, 100);
+  tryBuy(s, 5, 0);
+  const rateAfter = (s.basePerSecond + s.flatBonus) * s.permMul;
+  assert.equal(rateBefore, rateAfter);
+});

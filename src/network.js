@@ -21,14 +21,15 @@ export const BLEED_YIELD_SECONDS = 30;
 
 // Six sectors. yieldMul scales placed-relay yield; discoveryMul scales the
 // per-minute discovery roll; ripenMul stretches/shrinks the tier's ripen time.
-// One sector (dark) is mythic-only; the others accept any tier.
+// Colours are saturated neons — the map reads as a synth-grade comms console,
+// not a topo map. Each sector has identity at low fill + glowing stroke.
 export const SECTORS = {
-  core:     { label: 'Union Core',     color: '#5fb0e8', yieldMul: 1.4, discoveryMul: 5.0, ripenMul: 0.5 },
-  frontier: { label: 'Union Frontier', color: '#6fa56b', yieldMul: 1.0, discoveryMul: 1.0, ripenMul: 1.0 },
-  edge:     { label: 'Quiet Edge',     color: '#b59550', yieldMul: 1.0, discoveryMul: 0.7, ripenMul: 1.0 },
-  silent:   { label: 'Silent Worlds',  color: '#8a7fb0', yieldMul: 0.7, discoveryMul: 0.2, ripenMul: 2.0 },
-  watch:    { label: 'Listener Watch', color: '#c05a78', yieldMul: 2.0, discoveryMul: 4.0, ripenMul: 0.8 },
-  dark:     { label: 'Pre-Union Dark', color: '#4a5a78', yieldMul: 1.0, discoveryMul: 0.3, ripenMul: 2.5 },
+  core:     { label: 'Union Core',     color: '#2dd4ff', yieldMul: 1.4, discoveryMul: 5.0, ripenMul: 0.5 },
+  frontier: { label: 'Union Frontier', color: '#4ade80', yieldMul: 1.0, discoveryMul: 1.0, ripenMul: 1.0 },
+  edge:     { label: 'Quiet Edge',     color: '#fbbf24', yieldMul: 1.0, discoveryMul: 0.7, ripenMul: 1.0 },
+  silent:   { label: 'Silent Worlds',  color: '#c084fc', yieldMul: 0.7, discoveryMul: 0.2, ripenMul: 2.0 },
+  watch:    { label: 'Listener Watch', color: '#f43f5e', yieldMul: 2.0, discoveryMul: 4.0, ripenMul: 0.8 },
+  dark:     { label: 'Pre-Union Dark', color: '#818cf8', yieldMul: 1.0, discoveryMul: 0.3, ripenMul: 2.5 },
 };
 
 // Tier descriptors map convert-upgrade rarity → ripen time, discovery rate,

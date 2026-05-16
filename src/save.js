@@ -1,7 +1,7 @@
 import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 import { ensureNetwork, reconcileOffline, reconcileOfflineBleeds, getHexAt } from './network.js';
 
-export const SAVE_KEY = 'incremental.save.v13';
+export const SAVE_KEY = 'incremental.save.v14';
 
 export function nowSeconds() {
   return Date.now() / 1000;
@@ -17,6 +17,7 @@ export function saveState(state) {
     basePerSecond: state.basePerSecond,
     flatBonus: state.flatBonus,
     permMul: state.permMul,
+    offlineMul: state.offlineMul || 1,
     freeRerolls: state.freeRerolls || 0,
     patternFreeLeft: state.patternFreeLeft || 0,
     owned: state.owned,
@@ -61,6 +62,8 @@ export function loadState(state) {
   state.basePerSecond = Number(s.basePerSecond) || 0;
   state.flatBonus = Number(s.flatBonus) || 0;
   state.permMul = Number(s.permMul) || 1;
+  const om = Number(s.offlineMul);
+  state.offlineMul = Number.isFinite(om) && om > 0 ? om : 1;
   const fr = Number(s.freeRerolls);
   state.freeRerolls = Number.isFinite(fr) && fr > 0 ? Math.floor(fr) : 0;
   const pfl = Number(s.patternFreeLeft);
@@ -146,7 +149,11 @@ export function loadState(state) {
   // the rate — the integral samples networkContribution at t1, so anything
   // lost while away should already be gone by then.
   const offlineLosses = offline > 0 ? reconcileOffline(state, offline, now) : [];
-  const earnings = offline > 0 ? integrateRate(state, savedAt, now) : 0;
+  const rawEarnings = offline > 0 ? integrateRate(state, savedAt, now) : 0;
+  // Drift multiplier — offline-only. Lifts foreground earnings but not the
+  // ambient Bleed (Bleeds are unique drops, not /s integral, by design).
+  const offlineMul = Math.max(1, Number(state.offlineMul) || 1);
+  const earnings = rawEarnings * offlineMul;
   // Bleed drips are isolated-relay ambient gifts. Closed-form expectation over
   // the offline window — see reconcileOfflineBleeds. Credited as a flat sum.
   const offlineBleed = offline > 0 ? reconcileOfflineBleeds(state, offline, now) : 0;
@@ -154,6 +161,8 @@ export function loadState(state) {
   validateSlate(state, now);
   return {
     offline, earnings, savedAt, now,
+    rawEarnings,
+    offlineMul,
     networkLosses: offlineLosses.length,
     networkLossDetails: offlineLosses.map((r) => ({ tier: r.tier, sector: r.sector })),
     networkBleed: offlineBleed,

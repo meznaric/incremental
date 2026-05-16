@@ -60,6 +60,10 @@ export function makeShopState() {
   return {
     flatBonus: 0,
     permMul: 1,
+    // Multiplier applied only to offline accrual at load time — see save.js.
+    // Drifts ("while-you-are-away") fold into this. Default 1 means a clean
+    // boot offers no offline bonus until the player buys some.
+    offlineMul: 1,
     owned: {},
     buffs: {
       rateMul:       [], // { value, duration, expiresAt }
@@ -362,6 +366,22 @@ export function tryBuy(state, slotIdx, now) {
     replaceSlot(state, slotIdx, now);
     return { ok: true };
   }
+
+  if (u.kind === 'drift') {
+    // Drift = offline-only permanent multiplier. Stacks into state.offlineMul
+    // and is applied to earnings at welcomeBack time. Foreground rate is
+    // untouched on purpose — the player pays for absence-efficiency, not
+    // active rate.
+    if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
+    state.offlineMul = (state.offlineMul || 1) * u.value;
+    state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    checkPurchase(state, u);
+    replaceSlot(state, slotIdx, now);
+    return { ok: true };
+  }
+
   return { ok: false, reason: 'unknown' };
 }
 

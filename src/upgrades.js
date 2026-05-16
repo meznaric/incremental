@@ -308,6 +308,28 @@ export const UPGRADES = [
   { id: 'conglomerate', kind: 'convert', rarity: 'rare',
     name: 'Distributed Mesh', desc: 'Redundant phased mesh. Burn ~7% to queue placement.',
     pctCost: 0.5 / 7,  ratio: 0.0075 },
+
+  // Drift — "while-you-are-away" multipliers. Only apply over the offline
+  // integral (see save.js); foreground rate is unchanged. Cheap early, costly
+  // late — these compound multiplicatively into state.offlineMul.
+  { id: 'drift_starter', kind: 'drift', rarity: 'common',
+    name: 'Quiet Hours',  desc: 'The rig listens cleaner while you are not at it. ×1.10 to offline gain.',
+    value: 1.10, baseCost: 800,    growth: 3,   maxRate: 20000 },
+  { id: 'drift_band',    kind: 'drift', rarity: 'common',
+    name: 'Night Band',   desc: 'A cleaner carrier when the city sleeps. ×1.15 to offline gain.',
+    value: 1.15, baseCost: 5000,   growth: 3.5, maxRate: 100000 },
+  { id: 'drift_lock',    kind: 'drift', rarity: 'uncommon',
+    name: 'Drift Lock',   desc: 'Lock the carrier on the band you left tuned. ×1.25 to offline gain.',
+    value: 1.25, baseCost: 50000,  growth: 4,   minRate: 5000 },
+  { id: 'drift_vigil',   kind: 'drift', rarity: 'rare',
+    name: 'Patient Listener', desc: 'You return to numbers you did not earn awake. ×1.50 to offline gain.',
+    value: 1.50, baseCost: 1.5e6,  growth: 5,   minRate: 5e4 },
+  { id: 'drift_codec',   kind: 'drift', rarity: 'legendary',
+    name: 'Vigil Codec',  desc: 'A codec tuned for absence. ×2.0 to offline gain.',
+    value: 2.0,  baseCost: 5e8,    growth: 7,   minRate: 1e6 },
+  { id: 'drift_sieve',   kind: 'drift', rarity: 'mythic',
+    name: 'Pre-Echo Sieve', desc: 'Whoever wrote this filter was not Union. ×3.0 to offline gain.',
+    value: 3.0,  baseCost: 5e11,   growth: 10,  minRate: 1e9 },
 ];
 
 const BY_ID = new Map(UPGRADES.filter((u) => u.id).map((u) => [u.id, u]));
@@ -339,7 +361,7 @@ export const SLOT_FILTERS = [
 ];
 
 // Per-kind theming used by the shop UI. Labels follow lore archetypes
-// (Relay/Decode, Window, Seed Relay, Hail, Bleed) — see docs/lore/game-mapping.md.
+// (Relay/Decode, Window, Seed Relay, Hail, Bleed, Drift) — see docs/lore/game-mapping.md.
 // `permLabel` is the alt label used when a permanent's permType is 'mul'.
 export const KIND_THEME = {
   permanent: { icon: 'ri-radar-line',         color: '#4cd07d', label: 'Relay', permLabel: 'Decode' },
@@ -347,6 +369,7 @@ export const KIND_THEME = {
   convert:   { icon: 'ri-exchange-funds-fill',color: '#f5d34a', label: 'Seed Relay' },
   gamble:    { icon: 'ri-broadcast-line',     color: '#ff5a6e', label: 'Hail' },
   gift:      { icon: 'ri-gift-fill',          color: '#ffb84a', label: 'Bleed' },
+  drift:     { icon: 'ri-moon-line',          color: '#5fc0e8', label: 'Drift' },
 };
 
 export function kindLabel(u) {
@@ -582,6 +605,14 @@ export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
     case 'buff':      return Math.max(1, ctx.rate * upgrade.costSec);
+    case 'drift': {
+      // Drifts follow the permanent baseCost/growth ladder but skip the
+      // mul-category ramp — they live in their own bucket and pay on per-id
+      // own-count only. Keeps early picks cheap so the line of progression is
+      // legible: buy one, see the offline mul move on the next welcomeBack.
+      const n = ctx.owned[upgrade.id] || 0;
+      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
+    }
     case 'permanent': {
       const n = ctx.owned[upgrade.id] || 0;
       let c = upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);

@@ -74,6 +74,13 @@ function buildBreakdown(state, savedAt, offline, extras) {
     rows.push({ label: 'Ascent', value: `rate^(1 + ${exp.toFixed(2)})` });
   }
 
+  // Drift — offline-only multiplier on the foreground integral. Only show if
+  // it actually moved the number.
+  const offMul = Number(extras && extras.offlineMul) || 1;
+  if (offMul > 1.0001) {
+    rows.push({ label: 'Drift', value: `×${offMul.toFixed(2)} offline gain` });
+  }
+
   // Seed-Relay network outcomes. Only surface rows that actually have value
   // — empty mesh means no extra noise on the panel.
   const bleed = Number(extras && extras.networkBleed) || 0;
@@ -108,7 +115,7 @@ function copyLines(offline) {
 
 export function showWelcomeBack({
   state, offline, earnings, savedAt, onDismiss,
-  networkBleed = 0, networkLosses = 0,
+  networkBleed = 0, networkLosses = 0, offlineMul = 1,
 }) {
   if (!Number.isFinite(offline) || offline < MIN_OFFLINE_S) return false;
   // The mesh can carry a session even when foreground earnings are zero —
@@ -131,7 +138,7 @@ export function showWelcomeBack({
   const lines = copyLines(offline);
   linesEl.innerHTML = lines.map((l) => `<div class="wb-line">${l}</div>`).join('');
 
-  const rows = buildBreakdown(state, savedAt, offline, { networkBleed, networkLosses });
+  const rows = buildBreakdown(state, savedAt, offline, { networkBleed, networkLosses, offlineMul });
   breakdownEl.innerHTML = rows
     .map((r) => `<div class="wb-row"><span class="wb-row-label">${r.label}</span><span class="wb-row-value">${r.value}</span></div>`)
     .join('');

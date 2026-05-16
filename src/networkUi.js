@@ -53,6 +53,36 @@ function hexPolygonPoints(cx, cy) {
   return pts.join(' ');
 }
 
+// Pointy-top hex corners at an arbitrary radius (used for the relay frame).
+function hexCornerPointsFlat(cx, cy, r) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 2;
+    pts.push(`${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`);
+  }
+  return pts.join(' ');
+}
+
+// Four L-bracket strokes one per quadrant, sized to wrap a square of side
+// 2 × r around (cx, cy). Each bracket is an open polyline of three points
+// (a short horizontal + a short vertical leg meeting at the corner).
+function bracketCorners(cx, cy, r) {
+  const leg = r * 0.42; // length of each leg
+  const off = r * 0.92; // distance from center to corner
+  const corners = [
+    [-1, -1], [ 1, -1], [ 1,  1], [-1,  1],
+  ];
+  return corners.map(([sx, sy]) => {
+    const ax = (cx + sx * off).toFixed(2);
+    const ay = (cy + sy * off).toFixed(2);
+    const hx = (cx + sx * off - sx * leg).toFixed(2);
+    const hy = ay;
+    const vx = ax;
+    const vy = (cy + sy * off - sy * leg).toFixed(2);
+    return `${hx},${hy} ${ax},${ay} ${vx},${vy}`;
+  });
+}
+
 export function makeNetworkUi(state, opts) {
   const modalEl = document.getElementById('networkModal');
   const bodyEl = document.getElementById('networkModalBody');
@@ -127,13 +157,14 @@ export function makeNetworkUi(state, opts) {
       const occ = occupiedByHex.get(`${h.q},${h.r}`);
       const isSelected = occ && occ.id === selectedRelayId;
       const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : ''].filter(Boolean).join(' ');
-      // Sector label as a native browser tooltip — works without JS, fine
-      // on desktop hover; mobile has the legend below the map for the same info.
       const tip = `${sector.label} · ×${sector.yieldMul} yield · ×${sector.discoveryMul} discovery risk · ×${sector.ripenMul} ripen time`;
+      // Sector colour bound as a CSS variable so the stylesheet can mix fills
+      // and strokes from one source. Cyberpunk treatment is in the CSS — low
+      // alpha fill, full alpha stroke, occasional glow.
       hexNodes.push(`
-        <g class="${cls}" data-hex="1" data-q="${h.q}" data-r="${h.r}">
+        <g class="${cls}" data-hex="1" data-q="${h.q}" data-r="${h.r}" style="--sec-color:${sector.color}">
           <title>${tip}</title>
-          <polygon points="${hexPolygonPoints(x, y)}" fill="${sector.color}" />
+          <polygon points="${hexPolygonPoints(x, y)}" />
         </g>
       `);
     }
@@ -158,47 +189,56 @@ export function makeNetworkUi(state, opts) {
       }
     }
 
+    // Reticle: small hex frame around the relay + four corner brackets.
+    // Renders as a "tracked target" rather than a painted dot.
+    const reticle = (cx, cy, scale) => {
+      const r = HEX_SIZE * 0.48 * scale;
+      const framePts = hexCornerPointsFlat(cx, cy, r);
+      const brackets = bracketCorners(cx, cy, r * 1.32);
+      return { framePts, brackets, coreR: r * 0.36 };
+    };
+
     const relayNodes = [];
     for (const r of relays) {
       const { x, y } = hexCenterFromBounds(r.hex.q, r.hex.r, bounds);
       const online = now >= r.ripensAt;
       const sel = r.id === selectedRelayId;
-      const radius = HEX_SIZE * 0.42;
-      const labelY = y + HEX_SIZE * 0.78;
+      const labelY = y + HEX_SIZE * 0.85;
       const sector = SECTORS[r.sector] || SECTORS.frontier;
-      // Ripening: progress arc around a faded core, ETA label below.
-      // Online: solid dot — isolated relays carry a brighter mantle to cue
-      // mechanic E (drip + shield); clustered relays read as gold-warm.
       if (online) {
         const adj = adjacentOnlineCount(net, r, now);
         const isolated = adj === 0;
         const yieldNow = relayYield(net, r, now);
         const yLabel = `+${formatAbbrev(yieldNow)}`;
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\n${yLabel}/s${isolated ? ' · isolated' : ` · ${adj} neighbour${adj === 1 ? '' : 's'}`}`;
+        const ret = reticle(x, y, 1);
         relayNodes.push(`
           <g class="relay-mark ${isolated ? 'isolated' : 'clustered'} ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
-            <circle cx="${x}" cy="${y}" r="${radius}" />
-            <circle cx="${x}" cy="${y}" r="${radius * 0.45}" class="relay-core" />
+            <polygon class="r-frame" points="${ret.framePts}" />
+            ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
+            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
             <text class="relay-label online-label" x="${x}" y="${labelY}">${yLabel}</text>
           </g>
         `);
       } else {
         const total = r.ripensAt - r.plantedAt;
         const pct = total > 0 ? Math.min(1, Math.max(0, (now - r.plantedAt) / total)) : 0;
-        const ringR = radius;
+        const ringR = HEX_SIZE * 0.46;
         const ringC = 2 * Math.PI * ringR;
         const remain = Math.max(0, r.ripensAt - now);
         const tLabel = fmtMin(remain);
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\nRipens in ${tLabel}`;
+        const ret = reticle(x, y, 1);
         relayNodes.push(`
           <g class="relay-mark ripening ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
-            <circle cx="${x}" cy="${y}" r="${ringR}" class="ripe-base" />
-            <circle cx="${x}" cy="${y}" r="${ringR}" class="ripe-fill"
+            <polygon class="r-frame" points="${ret.framePts}" />
+            <circle class="ripe-base" cx="${x}" cy="${y}" r="${ringR}" />
+            <circle class="ripe-fill" cx="${x}" cy="${y}" r="${ringR}"
               stroke-dasharray="${(ringC * pct).toFixed(2)} ${ringC.toFixed(2)}"
               transform="rotate(-90 ${x} ${y})" />
-            <circle cx="${x}" cy="${y}" r="${ringR * 0.32}" class="relay-core" />
+            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
             <text class="relay-label ripen-label" x="${x}" y="${labelY}">${tLabel}</text>
           </g>
         `);

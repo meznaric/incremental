@@ -566,7 +566,7 @@
   }
   .bm-card {
     max-height: calc(100vh - 16px);
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }
 .diag-tabs {
@@ -782,9 +782,11 @@
   width: 100%;
   /* 100dvh tracks the actually-visible viewport on iOS Chrome,
      where 100vh otherwise leaks behind the URL bar and pushes the
-     close button above the fold. 100vh kept as a fallback. */
+     close button above the fold. 100vh kept as a fallback. The
+     safe-area subtractions keep tall cards (Network) from
+     overflowing through the overlay's notch padding on iPhones. */
   max-height: calc(100vh - 40px);
-  max-height: calc(100dvh - 40px);
+  max-height: calc(100dvh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   overflow: hidden;

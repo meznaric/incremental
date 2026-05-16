@@ -775,7 +775,7 @@ const BUFF_TYPE_THEME = {
   rateMul:       { icon: 'ri-flashlight-fill',  color: '#9d6ee0' },
   gambleLuck:    { icon: 'ri-sparkling-2-fill', color: '#ff5a6e' },
   gambleCushion: { icon: 'ri-shield-fill',      color: '#ff8a8a' },
-  compound:      { icon: 'ri-stack-fill',       color: '#f5d34a' },
+  compound:      { icon: 'ri-stack-fill',       color: '#7c5ad4' },
   metaStrength:  { icon: 'ri-flashlight-line',  color: '#c084ff' },
   metaDuration:  { icon: 'ri-time-line',        color: '#9d6ee0' },
   metaLuck:      { icon: 'ri-sparkling-2-line', color: '#d8a5f0' },
@@ -803,6 +803,12 @@ function renderShop() {
     const theme = KIND_THEME[u.kind] || {};
     const buffTheme = u.kind === 'buff' ? BUFF_TYPE_THEME[u.buffType] : null;
     el.dataset.kind = u.kind;
+    // Tint the whole slot (icon + border + glow) per buffType. The
+    // data-kind="buff" CSS rule derives --kind-border/--kind-glow from
+    // --kind-color via color-mix, so overriding the colour alone shifts
+    // border + buy-pulse to match.
+    if (buffTheme) el.style.setProperty('--kind-color', buffTheme.color);
+    else el.style.removeProperty('--kind-color');
     const iconEl = el.querySelector('.kind-icon');
     iconEl.className = `kind-icon ri ${(buffTheme || theme).icon || ''}`;
     iconEl.style.color = buffTheme ? buffTheme.color : '';

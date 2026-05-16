@@ -1330,12 +1330,19 @@
     }
 
     .slot[data-kind="permanent"] { --kind-color: #4cd07d; --kind-border: rgba(76, 208, 125, 0.45); --kind-glow: rgba(76, 208, 125, 0.55); border-color: var(--kind-border); }
-    .slot[data-kind="buff"]      { --kind-color: #9d6ee0; --kind-border: rgba(157, 110, 224, 0.45); --kind-glow: rgba(157, 110, 224, 0.6); border-color: var(--kind-border); }
+    /* Buff slot derives its border + glow from --kind-color so a per-buffType
+       inline override (set in renderShop) carries through to the chrome. */
+    .slot[data-kind="buff"]      {
+      --kind-color: #9d6ee0;
+      --kind-border: color-mix(in srgb, var(--kind-color) 45%, transparent);
+      --kind-glow:   color-mix(in srgb, var(--kind-color) 60%, transparent);
+      border-color: var(--kind-border);
+    }
     .slot[data-kind="convert"]   { --kind-color: #f5d34a; --kind-border: rgba(245, 211, 74, 0.45);  --kind-glow: rgba(245, 211, 74, 0.55); border-color: var(--kind-border); }
     .slot[data-kind="gamble"]    { --kind-color: #ff5a6e; --kind-border: rgba(255, 90, 110, 0.45);  --kind-glow: rgba(255, 90, 110, 0.6); border-color: var(--kind-border); }
     @media (hover: hover) and (pointer: fine) {
       .slot[data-kind="permanent"]:hover { border-color: #4cd07d; }
-      .slot[data-kind="buff"]:hover      { border-color: #9d6ee0; }
+      .slot[data-kind="buff"]:hover      { border-color: var(--kind-color); }
       .slot[data-kind="convert"]:hover   { border-color: #f5d34a; }
       .slot[data-kind="gamble"]:hover    { border-color: #ff5a6e; }
     }
@@ -1505,16 +1512,23 @@
       height: 100%;
       transition: width 0.1s linear;
     }
-    /* Active effects inherit the colour of the card kind that spawned them:
-       rate ← Window (purple), luck/cushion ← Hail (red family), compound ← Token (yellow). */
+    /* Active effects inherit the colour of the upgrade that spawned them.
+       rate / compound are the rate-multiplier family (purple shades); luck /
+       cushion are the gamble family (red shades). The shop card border, the
+       icon, the time-bar fill, and the value text all share one swatch so
+       a buff reads the same from purchase to expiry. */
+    .buff-card.kind-rate          { border-color: rgba(157, 110, 224, 0.4); }
+    .buff-card.kind-luck          { border-color: rgba(255, 90, 110, 0.4); }
+    .buff-card.kind-cushion       { border-color: rgba(255, 138, 138, 0.4); }
+    .buff-card.kind-compound      { border-color: rgba(124, 90, 212, 0.4); }
     .kind-rate     .buff-bar-fill { background: #9d6ee0; }
     .kind-rate     .buff-val      { color: #9d6ee0; }
     .kind-luck     .buff-bar-fill { background: #ff5a6e; }
     .kind-luck     .buff-val      { color: #ff5a6e; }
     .kind-cushion  .buff-bar-fill { background: #ff8a8a; }
     .kind-cushion  .buff-val      { color: #ff8a8a; }
-    .kind-compound .buff-bar-fill { background: #f5d34a; }
-    .kind-compound .buff-val      { color: #f5d34a; }
+    .kind-compound .buff-bar-fill { background: #7c5ad4; }
+    .kind-compound .buff-val      { color: #7c5ad4; }
 
     /* Collapsed mobile-only tile. The progress bar fills the tile background
        left-to-right; glyph + multiplier overlay it. Visible only below 640px —
@@ -1567,14 +1581,18 @@
       font-size: 14px;
       font-weight: 600;
     }
+    .buff-tile.kind-rate     { border-color: rgba(157, 110, 224, 0.4); }
     .buff-tile.kind-rate     .buff-tile-bar { background: #9d6ee0; }
     .buff-tile.kind-rate     .buff-tile-glyph, .buff-tile.kind-rate     .buff-tile-val { color: #9d6ee0; }
+    .buff-tile.kind-luck     { border-color: rgba(255, 90, 110, 0.4); }
     .buff-tile.kind-luck     .buff-tile-bar { background: #ff5a6e; }
     .buff-tile.kind-luck     .buff-tile-glyph, .buff-tile.kind-luck     .buff-tile-val { color: #ff5a6e; }
+    .buff-tile.kind-cushion  { border-color: rgba(255, 138, 138, 0.4); }
     .buff-tile.kind-cushion  .buff-tile-bar { background: #ff8a8a; }
     .buff-tile.kind-cushion  .buff-tile-glyph, .buff-tile.kind-cushion  .buff-tile-val { color: #ff8a8a; }
-    .buff-tile.kind-compound .buff-tile-bar { background: #f5d34a; }
-    .buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #f5d34a; }
+    .buff-tile.kind-compound { border-color: rgba(124, 90, 212, 0.4); }
+    .buff-tile.kind-compound .buff-tile-bar { background: #7c5ad4; }
+    .buff-tile.kind-compound .buff-tile-glyph, .buff-tile.kind-compound .buff-tile-val { color: #7c5ad4; }
     .buff-tile:active { transform: scale(0.97); }
 
     /* Meta-buff minibar — smaller, dimmer pills than .buff-tile. Sits just
@@ -1948,7 +1966,7 @@
     .faq-block.kind-rate     { border-left-color: #9d6ee0; }
     .faq-block.kind-luck     { border-left-color: #ff5a6e; }
     .faq-block.kind-cushion  { border-left-color: #ff8a8a; }
-    .faq-block.kind-compound { border-left-color: #f5d34a; }
+    .faq-block.kind-compound { border-left-color: #7c5ad4; }
     .faq-block.kind-mass     { border-left-color: #d49a55; }
     .faq-block.kind-memory   { border-left-color: #4cd07d; }
     .faq-block.kind-hail     { border-left-color: #ff5a6e; }
@@ -2175,7 +2193,7 @@
     .bm-section.kind-rate     .ri, .bm-section.kind-rate     .bm-section-name { color: #9d6ee0; }
     .bm-section.kind-luck     .ri, .bm-section.kind-luck     .bm-section-name { color: #ff5a6e; }
     .bm-section.kind-cushion  .ri, .bm-section.kind-cushion  .bm-section-name { color: #ff8a8a; }
-    .bm-section.kind-compound .ri, .bm-section.kind-compound .bm-section-name { color: #f5d34a; }
+    .bm-section.kind-compound .ri, .bm-section.kind-compound .bm-section-name { color: #7c5ad4; }
 
     /* --- Signal Lock (welcome-back) --- */
     #welcomeBack {

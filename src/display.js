@@ -904,12 +904,12 @@ class Column {
         const dx = worldX - (this._rippleCx || 0);
         const dy = worldY - (this._rippleCy || 0);
         const d = Math.hypot(dx, dy);
-        // freq = temporal rate (rad/s), waveK = spatial frequency (rad/unit).
-        // Wave speed = freq/waveK. Bigger and faster with more buffs.
-        const freq = 4 + boost * 14;
+        // waveK = spatial frequency (rad/unit). The temporal phase is
+        // accumulated globally on MagnitudeDisplay so it stays continuous
+        // even while the boost (and hence ripple frequency) is lerping.
         const waveK = 1.3;
         const amp = 0.07 + boost * 0.45;
-        const wave = Math.sin(now * freq - d * waveK);
+        const wave = Math.sin((this._wavePhase || 0) - d * waveK);
         // Brightness pulse at the wavefront crests — particles at the peak
         // glow brighter, so the ring is visible as it moves outward.
         const crest = Math.max(0, wave);
@@ -965,6 +965,11 @@ export class MagnitudeDisplay {
     // same boost and the ripple wavefront stays coherent across them.
     this._boost = 0;
     this._boostPulse = 0;
+    // Integrated wave phase (rad). MUST use an accumulator: the ripple
+    // frequency varies with boost as it lerps, and computing phase as
+    // `now * freq` would jump by `now * Δfreq` (now ≈ 1.7e9) on each freq
+    // change, scrambling particle positions every frame the boost is moving.
+    this._wavePhase = 0;
   }
 
   setVisibleColumns(n) {
@@ -992,6 +997,10 @@ export class MagnitudeDisplay {
     this._boost = this._boost + (boostTarget - this._boost) * boostK;
     const pulse = this._boost > 0.01 ? 0.5 + 0.5 * Math.sin(now * 2.4) : 0;
     this._boostPulse = this._boost * (0.55 + 0.45 * pulse);
+    // Advance the ripple's phase by current frequency × dt. Keeps the phase
+    // continuous across boost lerps. Modulo 2π so it doesn't drift in float.
+    const rippleFreq = 4 + this._boost * 14;
+    this._wavePhase = (this._wavePhase + dt * rippleFreq) % (Math.PI * 2);
     const rcx = rippleCenter ? rippleCenter.x : 0;
     const rcy = rippleCenter ? rippleCenter.y : 0;
 
@@ -1044,6 +1053,7 @@ export class MagnitudeDisplay {
       col._boostPulse = this._boostPulse;
       col._rippleCx = rcx;
       col._rippleCy = rcy;
+      col._wavePhase = this._wavePhase;
       if (col.m100 >= 0) col.update(now, dt, amount, rate);
       col.animate(dt);
       if (!col.assigned && col.root.scale.x < 0.02 && col.m100 >= 0) {

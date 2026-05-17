@@ -708,6 +708,15 @@
 }
 .diag-row.diag-base { border-color: rgba(76, 208, 125, 0.4); }
 .diag-row.diag-base .diag-row-factor { color: #4cd07d; }
+.diag-row.diag-add { border-color: rgba(76, 208, 125, 0.4); }
+.diag-row.diag-add .diag-row-factor { color: #4cd07d; }
+.diag-row.diag-info {
+  border-color: rgba(120, 140, 255, 0.08);
+  background: rgba(20, 20, 40, 0.3);
+}
+.diag-row.diag-info .diag-row-label,
+.diag-row.diag-info .diag-row-factor { color: #aab0d0; }
+.diag-row.diag-info .diag-row-factor { font-weight: 500; }
 .diag-row.diag-mul .diag-row-factor { color: #8aa0ff; }
 .diag-row.diag-exp { border-color: rgba(245, 211, 74, 0.4); }
 .diag-row.diag-exp .diag-row-factor { color: #f5d34a; }

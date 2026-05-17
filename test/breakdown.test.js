@@ -107,7 +107,7 @@ test('breakdown omits dampening row below threshold', () => {
   assert.equal(rows.find((r) => r.label === 'Log dampening'), undefined);
 });
 
-test('breakdown folds online seed-mesh contribution into the base and matches effectiveRate', () => {
+test('breakdown emits a Seed mesh row when relays are online and total matches effectiveRate', () => {
   const s = makeState({ basePerSecond: 10, permMul: 2, network: makeNetworkState() });
   queueToken(s, 'common', 100);
   // Place at origin (Core), then advance past the ripen window so the relay is online.
@@ -116,9 +116,14 @@ test('breakdown folds online seed-mesh contribution into the base and matches ef
   const now = placed.ripensAt + 1;
   const rows = breakdownRate(s, now);
   const base = rows.find((r) => r.kind === 'base');
-  // base.factor includes core + flatBonus + mesh; with a single Core relay,
-  // mesh = baseYield × sector.yieldMul × (1 + 0·cluster) × coverageMul.
-  assert.ok(base.factor > 10, `base ${base.factor} should be lifted by mesh contribution`);
-  assert.ok(base.note && base.note.includes('seed mesh'), 'note should mention seed mesh');
+  // Base row is just core + flat now; mesh is its own row.
+  assert.equal(base.factor, 10, 'base stays at core + flat');
+  const mesh = rows.find((r) => r.kind === 'add' && r.label === 'Seed mesh');
+  assert.ok(mesh, 'a Seed mesh row should appear when a relay is online');
+  assert.ok(mesh.factor > 0, 'mesh row carries a positive contribution');
+  assert.ok(mesh.note && /\d+ online relay/.test(mesh.note), 'note should mention online relay count');
+  // An isolated Core relay also drips Echo Bleed — should appear as an info row (display-only).
+  const bleed = rows.find((r) => r.kind === 'info');
+  assert.ok(bleed, 'isolated relay should add an Echo Bleed info row');
   assert.equal(rows[rows.length - 1].factor, effectiveRate(s, now));
 });

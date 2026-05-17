@@ -19,7 +19,9 @@
 
 import { patternBaseRateMul, getActivePattern } from './cyclePatterns.js';
 import { applyDampening, DAMPEN_AT } from './shop.js';
-import { networkContribution } from './network.js';
+import {
+  networkContribution, coverageMultiplier, adjacentOnlineCount, bleedValue, TIER_INFO,
+} from './network.js';
 
 const MEMORY_PER_SHARD = 0.10; // mirror of contactLog.ECHO_MEMORY_PER_SHARD
 
@@ -48,18 +50,45 @@ export function breakdownRate(state, now) {
   const rows = [];
   const core = state.basePerSecond || 0;
   const flat = state.flatBonus || 0;
-  const mesh = networkContribution(state, now);
-  const base = core + flat + mesh;
-  const parts = [];
-  if (flat > 0) parts.push(`+${flat} patched relays`);
-  if (mesh > 0) parts.push(`+${mesh < 100 ? mesh.toFixed(1) : Math.round(mesh)} seed mesh`);
   rows.push({
     kind: 'base',
     label: 'Base listening yield',
     op: '+ /s',
-    factor: base,
-    note: parts.length ? `${core} core · ${parts.join(' · ')}` : null,
+    factor: core + flat,
+    note: flat > 0 ? `${core} core · +${flat} from patched relays` : null,
   });
+
+  const mesh = networkContribution(state, now);
+  if (mesh > 0) {
+    const net = state.network;
+    let online = 0;
+    let bleedPerMin = 0;
+    for (const r of net.relays || []) {
+      if (now < r.ripensAt) continue;
+      online++;
+      if (adjacentOnlineCount(net, r, now) === 0) {
+        const tier = TIER_INFO[r.tier] || TIER_INFO.common;
+        if (tier.bleedPeriodSec > 0) bleedPerMin += bleedValue(r) * (60 / tier.bleedPeriodSec);
+      }
+    }
+    const cov = coverageMultiplier(net, now);
+    rows.push({
+      kind: 'add',
+      label: 'Seed mesh',
+      op: '+ /s',
+      factor: mesh,
+      note: `${online} online relay${online === 1 ? '' : 's'}${cov > 1 ? ` · ×${cov.toFixed(2)} coverage` : ''}`,
+    });
+    if (bleedPerMin > 0) {
+      rows.push({
+        kind: 'info',
+        label: 'Echo Bleed drip',
+        op: '+ /min',
+        factor: bleedPerMin,
+        note: 'Direct to balance — bypasses multipliers below',
+      });
+    }
+  }
 
   const permMul = state.permMul || 1;
   if (permMul !== 1) {
@@ -118,9 +147,13 @@ export function breakdownRate(state, now) {
     });
   }
 
-  // Pre-exponent product — the rate before dampening compresses it.
+  // Pre-exponent product — the rate before dampening compresses it. 'base'
+  // sets the starting additive value, 'add' rows lift it, 'mul' rows multiply
+  // it, 'info' rows are display-only (Echo Bleed drips raw to balance, not
+  // through the rate pipeline).
   const linear = rows.reduce((acc, r) => {
     if (r.kind === 'base') return r.factor;
+    if (r.kind === 'add') return acc + r.factor;
     if (r.kind === 'mul') return acc * r.factor;
     return acc;
   }, 0);

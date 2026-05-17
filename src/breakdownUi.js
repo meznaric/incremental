@@ -7,8 +7,6 @@ import {
   SECTORS, TIER_INFO, COVERAGE_BONUS_PER_SECTOR,
   CLUSTER_YIELD_PER_NEIGHBOR, CLUSTER_DISCOVERY_PER_NEIGHBOR,
   ISOLATED_DISCOVERY_FACTOR, BLEED_YIELD_SECONDS,
-  networkContribution, coverageMultiplier, relayYield,
-  adjacentOnlineCount, bleedValue,
 } from './network.js';
 import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS } from './shop.js';
 
@@ -32,68 +30,12 @@ export function initBreakdownUi(state) {
   let timer = null;
 
   function fmtFactor(row) {
-    if (row.kind === 'base') return `+${formatAbbrev(row.factor)} /s`;
+    if (row.kind === 'base' || row.kind === 'add') return `+${formatAbbrev(row.factor)} /s`;
+    if (row.kind === 'info') return `+${formatAbbrev(row.factor)} /min`;
     if (row.kind === 'mul') return `×${row.factor < 100 ? row.factor.toFixed(2) : formatAbbrev(row.factor)}`;
     if (row.kind === 'exp') return `^${row.factor.toFixed(2)}`;
     if (row.kind === 'total') return `${formatAbbrev(row.factor)} /s`;
     return '';
-  }
-
-  function renderMeshBlock(now) {
-    const net = state.network;
-    if (!net || !net.relays || !net.relays.length) return '';
-    const online = net.relays.filter((r) => now >= r.ripensAt);
-    if (!online.length) return '';
-    const cov = coverageMultiplier(net, now);
-    const meshTotal = networkContribution(state, now);
-    const coveredSectors = new Set();
-    for (const r of online) coveredSectors.add(r.sector);
-    let bleedPerMin = 0;
-    let isolatedCount = 0;
-    const relayRows = online
-      .slice()
-      .sort((a, b) => relayYield(net, b, now) - relayYield(net, a, now))
-      .map((r) => {
-        const sec = SECTORS[r.sector] || SECTORS.frontier;
-        const adj = adjacentOnlineCount(net, r, now);
-        const yieldVal = relayYield(net, r, now);
-        let clusterCell;
-        if (adj === 0) {
-          isolatedCount++;
-          const tier = TIER_INFO[r.tier] || TIER_INFO.common;
-          if (tier.bleedPeriodSec > 0) bleedPerMin += bleedValue(r) * (60 / tier.bleedPeriodSec);
-          clusterCell = `<span style="color:#c084fc">isolated</span>`;
-        } else {
-          clusterCell = `+${(adj * CLUSTER_YIELD_PER_NEIGHBOR * 100).toFixed(0)}%`;
-        }
-        return `
-          <tr>
-            <td><span class="net-legend-sw" style="background:${sec.color}"></span>${sec.label}</td>
-            <td class="rarity rarity-${r.tier}" style="text-transform:capitalize;">${r.tier}</td>
-            <td>+${formatAbbrev(r.baseYield || 0)}</td>
-            <td>×${sec.yieldMul}</td>
-            <td>${clusterCell}</td>
-            <td><strong>+${formatAbbrev(yieldVal)}</strong></td>
-          </tr>
-        `;
-      }).join('');
-    const bleedLine = isolatedCount > 0
-      ? `<p style="margin-top:8px;"><strong>Echo Bleed.</strong> ${isolatedCount} isolated relay${isolatedCount === 1 ? '' : 's'} drip${isolatedCount === 1 ? 's' : ''} about <strong>+${formatAbbrev(bleedPerMin)} /min</strong> on average — straight to your balance, uncoupled from the multiplier stack above.</p>`
-      : `<p style="margin-top:8px;color:#6a6a90;">No isolated relays — no Echo Bleed drip right now. Plant one in Silent Worlds or Pre-Union Dark to open it.</p>`;
-    return `
-      <div class="faq-block" style="margin-top:14px;">
-        <div class="faq-head"><i class="ri ri-base-station-line"></i>Seed mesh — live contribution</div>
-        <div class="faq-body">
-          <p>Each online relay below is folded into the Base listening yield above; coverage rides as a global multiplier across the lot, then everything downstream stacks on top.</p>
-          <table class="diag-table">
-            <thead><tr><th>Sector</th><th>Tier</th><th>Base</th><th>×Sec</th><th>±Cluster</th><th>Pre-cov /s</th></tr></thead>
-            <tbody>${relayRows}</tbody>
-          </table>
-          <p style="margin-top:8px;"><strong>Coverage ×${cov.toFixed(2)}</strong> from ${coveredSectors.size} / ${Object.keys(SECTORS).length} sector${coveredSectors.size === 1 ? '' : 's'} → mesh total <strong>+${formatAbbrev(meshTotal)} /s</strong>.</p>
-          ${bleedLine}
-        </div>
-      </div>
-    `;
   }
 
   function renderPulse() {
@@ -114,7 +56,6 @@ export function initBreakdownUi(state) {
     p.innerHTML = `
       <p class="diag-intro">You're looking at the carrier diagnostic. Each row is a term in the equation that produces your current pulse. Read top to bottom.</p>
       <ul class="diag-list">${factorRows}</ul>
-      ${renderMeshBlock(now)}
       <p class="diag-foot">Pulse re-reads once a second. Close the panel to free the channel.</p>
     `;
     if (Math.abs(live - rows[rows.length - 1].factor) / Math.max(live, 1) > 0.001) {

@@ -457,6 +457,17 @@ export function initBreakdownUi(state) {
     const tab = target.closest('.diag-tab');
     if (tab && tab.dataset.tab) setActiveTab(tab.dataset.tab);
   });
+  // Desktop only: translate vertical wheel into horizontal scroll on the tab
+  // strip. Touch devices already pan natively; trackpad horizontal deltas
+  // pass through untouched.
+  const tabsEl = modal.querySelector('.diag-tabs');
+  if (tabsEl && !window.matchMedia('(pointer: coarse)').matches) {
+    tabsEl.addEventListener('wheel', (e) => {
+      if (e.deltaY === 0 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      tabsEl.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
+  }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();
   });

@@ -181,6 +181,96 @@
 .kind-compound .buff-bar-fill { background: #7c5ad4; }
 .kind-compound .buff-val      { color: #7c5ad4; }
 
+/* Desktop buff-group: one stack per kind, combined card on top with
+   dashed border, individuals peeking underneath. Hover opens a row to
+   the right. Mobile hides groups and shows .buff-tile strip instead.
+   padding-bottom reserves space for the peek so the next sibling group
+   in the column doesn't paint over it. */
+.buff-group {
+  position: relative;
+  width: 190px;
+  padding-bottom: 24px;
+  pointer-events: auto;
+  transition: width 0.18s ease, padding-bottom 0.18s ease;
+}
+.buff-group[data-count="1"] { padding-bottom: 0; }
+.buff-group[data-count="2"] { padding-bottom: 6px; }
+.buff-group[data-count="3"] { padding-bottom: 12px; }
+.buff-group[data-count="4"] { padding-bottom: 18px; }
+.buff-group[data-count="1"] .buff-stack { display: none; }
+.buff-group .buff-card { box-sizing: border-box; }
+.buff-group .buff-combined {
+  position: relative;
+  z-index: 10;
+  width: 190px;
+  border-style: dashed;
+  pointer-events: auto;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.buff-group .buff-stack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 190px;
+  height: 100%;
+  pointer-events: none;
+}
+.buff-group .buff-stack-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: top 0.18s ease, left 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+}
+.buff-group .buff-stack-card:nth-child(1) { top: 6px;  z-index: 4; }
+.buff-group .buff-stack-card:nth-child(2) { top: 12px; z-index: 3; }
+.buff-group .buff-stack-card:nth-child(3) { top: 18px; z-index: 2; }
+.buff-group .buff-stack-card:nth-child(n+4) { top: 24px; z-index: 1; }
+
+/* Expanded layout — desktop only. .is-expanded is toggled by mainUi.js
+   via mouseover/mouseout delegation rather than :hover, so the hit area
+   stays stable across the width transition (cursor can't fall off a
+   shrinking box mid-animate and re-trigger a flicker loop). Combined card
+   fades out and the stack lays out 3 per row from left:0 to use the
+   freed space. min-height grows per row count. */
+@media (min-width: 641px) {
+  .buff-group.is-expanded { width: 560px; z-index: 30; min-height: 57px; padding-bottom: 0; }
+  .buff-group[data-count="4"].is-expanded,
+  .buff-group[data-count="5"].is-expanded,
+  .buff-group[data-count="6"].is-expanded { min-height: 127px; }
+  .buff-group[data-count="7"].is-expanded,
+  .buff-group[data-count="8"].is-expanded,
+  .buff-group[data-count="9"].is-expanded { min-height: 197px; }
+  .buff-group[data-count="10"].is-expanded,
+  .buff-group[data-count="11"].is-expanded,
+  .buff-group[data-count="12"].is-expanded { min-height: 267px; }
+  .buff-group.is-expanded .buff-combined { opacity: 0; pointer-events: none; }
+  .buff-group.is-expanded .buff-stack { pointer-events: auto; width: 100%; }
+  .buff-group.is-expanded .buff-stack-card {
+    top: 0;
+    width: 168px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(1) { left: 0;     top: 0;     }
+  .buff-group.is-expanded .buff-stack-card:nth-child(2) { left: 186px; top: 0;     }
+  .buff-group.is-expanded .buff-stack-card:nth-child(3) { left: 372px; top: 0;     }
+  .buff-group.is-expanded .buff-stack-card:nth-child(4) { left: 0;     top: 70px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(5) { left: 186px; top: 70px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(6) { left: 372px; top: 70px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(7) { left: 0;     top: 140px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(8) { left: 186px; top: 140px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(9) { left: 372px; top: 140px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(10) { left: 0;     top: 210px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(11) { left: 186px; top: 210px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(n+12) { left: 372px; top: 210px; }
+}
+
+@media (max-width: 640px) {
+  .buff-group { display: none; }
+}
+
 /* Collapsed mobile-only tile. The progress bar fills the tile background
    left-to-right; glyph + multiplier overlay it. Visible only below 640px —
    the desktop card markup above stays the source of truth on wider HUDs. */

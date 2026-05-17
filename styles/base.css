@@ -824,10 +824,20 @@ input[type="text"]:focus { border-color: #6688ff; }
   margin-left: -16px;
   margin-right: -16px;
   padding: 0 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Lock the strip to horizontal pans only — vertical swipes fall through to
+     .bm-body so the panel content keeps scrolling normally when the user
+     drags down on the tab row. */
+  touch-action: pan-x;
   /* Cover the 14px margin-bottom gap so panel content scrolling up doesn't
      show through underneath the sticky strip. */
   box-shadow: 0 14px 0 0 rgba(20, 20, 40, 0.95);
 }
+.cl-tabs::-webkit-scrollbar { display: none; }
 .cl-tab {
   background: transparent;
   border: 0;
@@ -840,6 +850,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  white-space: nowrap;
   transition: color 0.12s ease, border-color 0.12s ease;
 }
 .cl-tab:hover { color: #d49a55; }
@@ -1081,12 +1092,14 @@ input[type="text"]:focus { border-color: #6688ff; }
 }
 .reset-actions button.danger:hover { border-color: #ff5a6e; color: #ff5a6e; }
 #shop {
-  bottom: 16px;
+  bottom: 0;
   left: 50%;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
   transform: translateX(-50%);
   width: min(1232px, calc(100vw - 32px));
   box-sizing: border-box;
-  padding: 8px 10px 10px;
+  padding: 8px 0 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1121,6 +1134,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   display: flex;
   flex-wrap: nowrap;
   gap: 6px;
+  padding: 0 10px;
   justify-content: flex-start;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1196,6 +1210,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   flex-wrap: nowrap;
   justify-content: flex-start;
   gap: 10px;
+  padding: 0 10px 10px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;

@@ -12,7 +12,7 @@
 // free of three.js so the test suite never has to touch it.
 
 import { formatAbbrev, parseAmount } from './bignum.js';
-import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade } from './upgrades.js';
+import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade, convertYieldFor } from './upgrades.js';
 import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX } from './network.js';
 import {
   effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
@@ -93,6 +93,15 @@ export function initMainUi(state, deps) {
     return `${d.toFixed(1)} day${d >= 2 ? 's' : ''}`;
   }
 
+  // Render a buff multiplier without float artefacts. Pattern/meta scaling
+  // produces values like 1.0500000000000003 or 2.1000000000000005 — capping
+  // at three decimals and casting back through Number drops the trailing
+  // garbage and any redundant zeros (1.7 stays "1.7", 70 stays "70").
+  function fmtMult(v) {
+    if (!Number.isFinite(v)) return '0';
+    return Number(v.toFixed(3)).toString();
+  }
+
   function openSlotModal(idx) {
     const slot = state.shop.slots[idx];
     const u = slot ? resolveUpgrade(slot) : null;
@@ -110,7 +119,8 @@ export function initMainUi(state, deps) {
     } else if (u.kind === 'convert') {
       // Token-style preview: this purchase queues a placement, not a /s bump.
       // Show what the token carries; sector and clustering multipliers land later.
-      const tokenYield = slot.cost * u.ratio;
+      const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
+      const tokenYield = convertYieldFor(u, slot.cost, baseAdd);
       rows.push(
         `<div class="slot-modal-row"><span>Token tier</span><span>${u.rarity}</span></div>`,
         `<div class="slot-modal-row"><span>Base yield</span><span>+${formatAbbrev(tokenYield)}/s (before sector × cluster)</span></div>`,
@@ -627,8 +637,9 @@ export function initMainUi(state, deps) {
       } else if (u.kind === 'convert') {
         // Convert no longer credits flatBonus on purchase — the burn buys a
         // placement token. Preview what the token will be worth before sector
-        // and clustering multipliers.
-        const tokenYield = cost * u.ratio;
+        // and clustering multipliers. Yield is capped (see convertYieldFor).
+        const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
+        const tokenYield = convertYieldFor(u, cost, baseAdd);
         outcomes = `<div class="outcome win"><i class="ri ri-add-circle-line"></i> Queue token · +${formatAbbrev(tokenYield)}/s base</div>`;
       } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
         const eff = marginalRateForPurchase(state, slot, now);
@@ -762,41 +773,53 @@ export function initMainUi(state, deps) {
     buffDetailModalEl.classList.add('open');
   }
 
-  // Tap-stable: buff-tile and buff-info both live inside #buffs and get their
-  // innerHTML rewritten by renderBuffs on each 100ms tick.
+  // Tap-stable: buff-tile, buff-stack-card, and buff-info all live inside
+  // #buffs and get their innerHTML rewritten by renderBuffs on each 100ms tick.
   installTap(buffsEl, (_e, target) => {
     if (target.closest('.buff-info')) { openBuffModal(); return; }
-    const tile = target.closest('.buff-tile');
-    if (!tile) return;
-    const idx = Number(tile.dataset.idx);
+    if (target.closest('.buff-combined')) { openBuffModal(); return; }
+    const hit = target.closest('.buff-tile, .buff-stack-card');
+    if (!hit) return;
+    const idx = Number(hit.dataset.idx);
     if (Number.isInteger(idx)) openBuffDetail(idx);
+  });
+
+  // Expansion via JS class instead of :hover. :hover hit-tests against the
+  // group's current bounding box, which shrinks mid-transition — cursor falls
+  // off, hover toggles, layout flickers. mouseover/mouseout fire only on real
+  // cursor crossings, and we persist expandedBuffKind across the 100ms
+  // re-render so the class survives innerHTML rewrites.
+  let expandedBuffKind = null;
+  buffsEl.addEventListener('mouseover', (e) => {
+    const group = e.target.closest('.buff-group');
+    if (!group) return;
+    if (group.contains(e.relatedTarget)) return;
+    for (const g of buffsEl.querySelectorAll('.buff-group.is-expanded')) g.classList.remove('is-expanded');
+    group.classList.add('is-expanded');
+    expandedBuffKind = group.dataset.kind;
+  });
+  buffsEl.addEventListener('mouseout', (e) => {
+    const group = e.target.closest('.buff-group');
+    if (!group) return;
+    if (group.contains(e.relatedTarget)) return;
+    group.classList.remove('is-expanded');
+    if (expandedBuffKind === group.dataset.kind) expandedBuffKind = null;
   });
 
   function renderBuffs(now) {
     const items = [];
-    const cards = [];
     const tiles = [];
+    // groups[kind] collects every active buff per kind so each stack
+    // renders as one combined card + N individuals peeking underneath.
+    const groups = { rate: [], luck: [], cushion: [], compound: [] };
     const b = state.buffs;
-    const push = (kind, value, remain, duration, sourceId) => {
+    const push = (kind, value, numeric, remain, duration, sourceId) => {
       const pct = Math.max(0, Math.min(1, remain / duration));
       const icon = BUFF_ICONS[kind] || '';
       const { name, desc } = buffDescriptor(kind, sourceId);
       const idx = items.length;
       items.push({ kind, value, duration, expiresAt: now + remain, title: name, desc });
-      cards.push(`
-        <div class="buff-card kind-${kind}">
-          <div class="buff-head">
-            <span class="buff-name"><i class="ri ri-fw ${icon}"></i>${name}</span>
-            <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
-            <span class="buff-val">${value}</span>
-          </div>
-          <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(remain)}</div>
-          <div class="buff-bar"><div class="buff-bar-fill" style="width:${pct * 100}%"></div></div>
-        </div>
-      `);
-      // Collapsed tile: background bar uses transform: scaleX so the fill is the
-      // tile background itself, not a stacked element. Glyph + multiplier overlay.
-      // The whole tile is the touch target.
+      groups[kind].push({ idx, value, numeric, remain, duration, pct, icon, name });
       tiles.push(`
         <button type="button" class="buff-tile kind-${kind}" data-idx="${idx}" aria-label="${name} ${value}">
           <div class="buff-tile-bar" style="transform: scaleX(${pct});"></div>
@@ -808,18 +831,65 @@ export function initMainUi(state, deps) {
       `);
     };
     const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
-    for (const x of active(b.rateMul))       push('rate',     `×${x.value}`,                                          x.expiresAt - now, x.duration, x.sourceId);
-    for (const x of active(b.gambleLuck))    push('luck',     `+${Math.round(x.value * 100)}%`,                       x.expiresAt - now, x.duration, x.sourceId);
-    for (const x of active(b.gambleCushion)) push('cushion',  `${Math.round(x.value * 100)}%`,                        x.expiresAt - now, x.duration, x.sourceId);
-    for (const x of active(b.compound))      push('compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.rateMul))       push('rate',     `×${fmtMult(x.value)}`,                                  x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.gambleLuck))    push('luck',     `+${Math.round(x.value * 100)}%`,                       x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.gambleCushion)) push('cushion',  `${Math.round(x.value * 100)}%`,                        x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.compound))      push('compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, Math.pow(1 + x.rate, now - x.startedAt),     x.expiresAt - now, x.duration, x.sourceId);
+
+    const cardHtml = (g, extraClass = '', extraAttrs = '') => `
+      <div class="buff-card kind-${g.kind || ''} ${extraClass}" ${extraAttrs}>
+        <div class="buff-head">
+          <span class="buff-name"><i class="ri ri-fw ${g.icon}"></i>${g.name}</span>
+          <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
+          <span class="buff-val">${g.value}</span>
+        </div>
+        <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(g.remain)}</div>
+        <div class="buff-bar"><div class="buff-bar-fill" style="width:${g.pct * 100}%"></div></div>
+      </div>
+    `;
+    const combine = (kind, list) => {
+      // rate + compound are multiplicative; luck + cushion are additive percents.
+      let value, numeric;
+      if (kind === 'rate' || kind === 'compound') {
+        numeric = list.reduce((acc, x) => acc * x.numeric, 1);
+        value = `×${numeric.toFixed(2)}`;
+      } else {
+        numeric = list.reduce((acc, x) => acc + x.numeric, 0);
+        const pct = Math.round(numeric * 100);
+        value = kind === 'luck' ? `+${pct}%` : `${pct}%`;
+      }
+      // Soonest-expiring drives the visible time bar — that's the buff
+      // about to drop, so the player sees the countdown they care about.
+      const soon = list.reduce((a, x) => (x.remain < a.remain ? x : a), list[0]);
+      return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct };
+    };
+
+    const groupHtml = [];
+    for (const kind of ['rate', 'luck', 'cushion', 'compound']) {
+      const list = groups[kind];
+      if (!list.length) continue;
+      const combined = combine(kind, list);
+      const inner = list.map((g) => cardHtml({ ...g, kind }, 'buff-stack-card', `data-idx="${g.idx}"`)).join('');
+      groupHtml.push(`
+        <div class="buff-group kind-${kind}" data-kind="${kind}" data-count="${list.length}">
+          ${cardHtml(combined, 'buff-combined')}
+          <div class="buff-stack">${inner}</div>
+        </div>
+      `);
+    }
     renderedBuffs = items;
     buffsEl.style.display = items.length ? 'flex' : 'none';
-    buffsEl.innerHTML = cards.join('') + tiles.join('');
+    buffsEl.innerHTML = groupHtml.join('') + tiles.join('');
+    if (expandedBuffKind) {
+      const g = buffsEl.querySelector(`.buff-group[data-kind="${expandedBuffKind}"]`);
+      if (g) g.classList.add('is-expanded');
+      else expandedBuffKind = null;
+    }
   }
 
   const META_DEFS = {
-    metaStrength: { kind: 'strength', icon: 'ri-flashlight-line',    fmt: (v) => `×${v}` },
-    metaDuration: { kind: 'duration', icon: 'ri-time-line',          fmt: (v) => `×${v}` },
+    metaStrength: { kind: 'strength', icon: 'ri-flashlight-line',    fmt: (v) => `×${fmtMult(v)}` },
+    metaDuration: { kind: 'duration', icon: 'ri-time-line',          fmt: (v) => `×${fmtMult(v)}` },
     metaLuck:     { kind: 'luck',     icon: 'ri-sparkling-2-line',   fmt: (v) => `+${Math.round(v * 100)}%` },
   };
 

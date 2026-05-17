@@ -93,13 +93,6 @@
   transition: fill 140ms ease, stroke 140ms ease, filter 140ms ease;
   cursor: pointer;
 }
-/* Hover state is applied as a JS class (not :hover) because the SVG is
-   rebuilt every refresh tick — :hover would flicker as the node is replaced. */
-.hex-cell.hovered polygon {
-  fill: color-mix(in srgb, var(--sec-color) 32%, transparent);
-  stroke: var(--sec-color);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--sec-color) 60%, transparent));
-}
 .hex-cell.has-relay polygon {
   fill: color-mix(in srgb, var(--sec-color) 24%, transparent);
   stroke: var(--sec-color);
@@ -108,6 +101,14 @@
   stroke: #ffe082;
   stroke-width: 2.2;
   filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
+}
+/* Empty hex selected (no token queued) — cyan accent so it reads as
+   "inspecting" rather than "staged" (which uses the warm gold ghost). */
+.hex-cell.picked polygon {
+  fill: color-mix(in srgb, var(--sec-color) 28%, transparent);
+  stroke: #2dd4ff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 5px rgba(45, 212, 255, 0.6));
 }
 
 /* Cluster edges — glowing cyan trace, mechanic A's visual cue. */
@@ -402,7 +403,11 @@
 .net-legend-name { color: #e8e8f0; }
 .net-legend-mults { color: #8a8ac0; font-size: 10px; font-variant-numeric: tabular-nums; }
 
-/* Placement confirmation bar — overlay docked to the bottom of the map. */
+/* Bottom dock bar — shows hex / relay / staged-placement detail. Variant
+   modifier classes shift the accent color so the player can tell at a glance
+   whether they're confirming a placement (gold), inspecting an existing
+   relay (cyan / red / purple depending on status), or just peeking at an
+   empty hex (cyan). */
 .net-place-bar {
   position: absolute;
   left: 12px; right: 12px; bottom: 12px;
@@ -418,6 +423,25 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
+.net-place-bar.relay.status-clustered {
+  border-color: rgba(255, 216, 107, 0.5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 216, 107, 0.2);
+}
+.net-place-bar.relay.status-isolated {
+  border-color: rgba(45, 212, 255, 0.5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(45, 212, 255, 0.2);
+}
+.net-place-bar.relay.status-ripening {
+  border-color: rgba(192, 132, 252, 0.5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(192, 132, 252, 0.2);
+}
+.net-place-bar.empty {
+  border-color: rgba(45, 212, 255, 0.4);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(45, 212, 255, 0.15);
+}
+.net-place-status { color: #8a8ac0; font-weight: 400; font-size: 11px; letter-spacing: 0.04em; }
+.net-place-bar .net-detail-row { color: #c4c4d8; }
+.net-place-bar .net-detail-row.warn { color: #ffadcc; }
 .net-place-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
@@ -470,69 +494,6 @@
 }
 .net-place-btn.confirm:hover {
   background: linear-gradient(180deg, rgba(255, 224, 130, 0.35), rgba(255, 224, 130, 0.18));
-}
-
-/* Hover info panel — small fixed-corner readout for the hex under the cursor.
-   Pointer-events disabled so it never intercepts the hover or tap. */
-.net-hex-info {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  min-width: 150px;
-  max-width: 220px;
-  padding: 8px 10px;
-  background: rgba(8, 10, 22, 0.88);
-  border: 1px solid rgba(45, 212, 255, 0.25);
-  border-radius: 6px;
-  font-size: 11px;
-  color: #c4c4d8;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease;
-  z-index: 9;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-}
-.net-hex-info.visible { opacity: 1; }
-.net-hex-info-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-.net-hex-info-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: var(--sec-color);
-  box-shadow: 0 0 4px var(--sec-color);
-}
-.net-hex-info-name {
-  color: #e8e8f0;
-  font-size: 12px;
-  font-weight: 500;
-}
-.net-hex-info-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 1px 0;
-}
-.net-hex-info-row.hot {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  color: #e8e8f0;
-}
-.net-hex-info-row.hint {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  color: #8a8ac0;
-  font-style: italic;
-  justify-content: flex-start;
 }
 
 @media (max-width: 640px) {

@@ -93,13 +93,8 @@ export function makeNetworkUi(state, opts) {
 
   const bounds = computeBounds();
   let selectedRelayId = null;
-  let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation
-  // Hover is tracked in JS, not via CSS :hover. The SVG is re-rendered every
-  // 100ms (refresh tick), which destroys and recreates the node the cursor sits
-  // on. :hover flickers off mid-render and the fill transition replays — the
-  // hex appears to blink. Storing the hovered hex by q,r key + re-applying a
-  // .hovered class after each render keeps the visual stable.
-  let hoveredHexKey = null;
+  let selectedEmptyHex = null; // {q, r} — tapped empty hex with no queued token
+  let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation (queue present)
   // Mobile-only view transform applied to the SVG (in CSS pixels for tx/ty,
   // unitless for scale). The map element is kept stable across renders so the
   // drag-in-progress, pinch state and these listeners survive.
@@ -119,6 +114,13 @@ export function makeNetworkUi(state, opts) {
   const close = () => {
     modalEl.classList.remove('open');
     pendingPlacement = null;
+    selectedEmptyHex = null;
+    selectedRelayId = null;
+  };
+  const clearSelection = () => {
+    selectedRelayId = null;
+    selectedEmptyHex = null;
+    pendingPlacement = null;
   };
   // On viewport resize the container dimensions change, so the existing pan
   // offset may now be out of bounds. clampView (in render) snaps it back into
@@ -133,7 +135,14 @@ export function makeNetworkUi(state, opts) {
     if (e.target === modalEl || e.target.closest('.bm-close')) { close(); return; }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modalEl.classList.contains('open')) close();
+    if (e.key !== 'Escape' || !modalEl.classList.contains('open')) return;
+    // First Esc clears any open hex/relay selection; second Esc closes the modal.
+    if (selectedRelayId || selectedEmptyHex || pendingPlacement) {
+      clearSelection();
+      render();
+      return;
+    }
+    close();
   });
 
   // Delegated tap handler on the modal body. Listens for hex / relay / queue
@@ -154,38 +163,63 @@ export function makeNetworkUi(state, opts) {
       }
       return;
     }
-    if (target.closest('[data-act="cancel-placement"]')) {
-      pendingPlacement = null;
+    if (target.closest('[data-act="cancel-placement"]') || target.closest('[data-act="clear-selection"]')) {
+      clearSelection();
       render();
       return;
     }
-    // Taps that landed on the placement bar (but not a button) shouldn't
-    // bleed through to the hex underneath.
+    // Taps that land inside the bar (but not on a button) shouldn't bleed
+    // through to the hex underneath.
     if (target.closest('.net-place-bar')) return;
     const hexEl = target.closest('[data-hex]');
     const relayEl = target.closest('[data-relay]');
     if (relayEl) {
-      selectedRelayId = relayEl.getAttribute('data-relay');
-      pendingPlacement = null;
+      const id = relayEl.getAttribute('data-relay');
+      // Re-tap on the already-selected relay clears the bar.
+      if (id === selectedRelayId) clearSelection();
+      else { selectedRelayId = id; selectedEmptyHex = null; pendingPlacement = null; }
       render();
       return;
     }
     if (hexEl) {
       const q = Number(hexEl.getAttribute('data-q'));
       const r = Number(hexEl.getAttribute('data-r'));
-      if (Number.isFinite(q) && Number.isFinite(r)) {
-        const net = state.network;
-        const occupied = net && net.relays.some((rr) => rr.hex.q === q && rr.hex.r === r);
-        if (occupied) {
-          const rr = net.relays.find((x) => x.hex.q === q && x.hex.r === r);
-          if (rr) { selectedRelayId = rr.id; pendingPlacement = null; render(); }
-          return;
-        }
-        if (net && net.queued.length > 0) {
+      if (!Number.isFinite(q) || !Number.isFinite(r)) return;
+      const net = state.network;
+      const occupiedRelay = net && net.relays.find((rr) => rr.hex.q === q && rr.hex.r === r);
+      if (occupiedRelay) {
+        if (occupiedRelay.id === selectedRelayId) clearSelection();
+        else { selectedRelayId = occupiedRelay.id; selectedEmptyHex = null; pendingPlacement = null; }
+        render();
+        return;
+      }
+      // Empty hex: stage placement if a token is queued, otherwise just
+      // surface its sector info in the bar. Either way a re-tap on the same
+      // hex clears.
+      if (net && net.queued.length > 0) {
+        if (pendingPlacement && pendingPlacement.q === q && pendingPlacement.r === r) {
+          clearSelection();
+        } else {
           pendingPlacement = { q, r };
           selectedRelayId = null;
-          render();
+          selectedEmptyHex = null;
         }
+      } else if (selectedEmptyHex && selectedEmptyHex.q === q && selectedEmptyHex.r === r) {
+        clearSelection();
+      } else {
+        selectedEmptyHex = { q, r };
+        selectedRelayId = null;
+        pendingPlacement = null;
+      }
+      render();
+      return;
+    }
+    // Tap landed somewhere inside the map but not on a hex (e.g. outside the
+    // hex cluster on a panned view). Clear any current selection.
+    if (target.closest('.net-map')) {
+      if (selectedRelayId || selectedEmptyHex || pendingPlacement) {
+        clearSelection();
+        render();
       }
     }
   });
@@ -204,7 +238,8 @@ export function makeNetworkUi(state, opts) {
       const occ = occupiedByHex.get(`${h.q},${h.r}`);
       const isSelected = occ && occ.id === selectedRelayId;
       const isStaged = !occ && pendingPlacement && pendingPlacement.q === h.q && pendingPlacement.r === h.r;
-      const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : '', isStaged ? 'staged' : ''].filter(Boolean).join(' ');
+      const isEmptySelected = !occ && !isStaged && selectedEmptyHex && selectedEmptyHex.q === h.q && selectedEmptyHex.r === h.r;
+      const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : '', isStaged ? 'staged' : '', isEmptySelected ? 'picked' : ''].filter(Boolean).join(' ');
       const tip = `${sector.label} · ×${sector.yieldMul} yield · ×${sector.discoveryMul} discovery risk · ×${sector.ripenMul} ripen time`;
       // Sector colour bound as a CSS variable so the stylesheet can mix fills
       // and strokes from one source. Cyberpunk treatment is in the CSS — low
@@ -340,42 +375,6 @@ export function makeNetworkUi(state, opts) {
           </div>
         `).join('');
 
-    let detailHtml = '';
-    const selected = selectedRelayId
-      ? net.relays.find((r) => r.id === selectedRelayId)
-      : null;
-    if (selected) {
-      const online = now >= selected.ripensAt;
-      const sector = SECTORS[selected.sector] || SECTORS.frontier;
-      const adj = adjacentOnlineCount(net, selected, now);
-      const isolated = online && adj === 0;
-      const yieldNow = relayYield(net, selected, now);
-      const discPerMin = discoveryRatePerMin(net, selected, now);
-      const halfLifeMin = discPerMin > 0 ? Math.log(2) / discPerMin : Infinity;
-      const halfLifeStr = isFinite(halfLifeMin) ? fmtMin(halfLifeMin * 60) : '—';
-      const tier = TIER_INFO[selected.tier] || TIER_INFO.common;
-      const dripRow = (online && isolated && tier.bleedPeriodSec > 0)
-        ? `<div class="net-detail-row"><span>Mesh bleed</span><span>+${formatAbbrev(bleedValue(selected))} every ${fmtMin(tier.bleedPeriodSec)}</span></div>`
-        : '';
-      detailHtml = `
-        <div class="net-detail">
-          <div class="net-detail-head">
-            <span class="net-detail-name">${TIER_LABEL[selected.tier]} relay</span>
-            <span class="net-detail-sec sec-tag-${selected.sector}">${sector.label}</span>
-          </div>
-          ${online
-            ? `<div class="net-detail-row"><span>Live yield</span><span>+${formatAbbrev(yieldNow)}/s</span></div>`
-            : `<div class="net-detail-row"><span>Ripens in</span><span>${fmtMin(selected.ripensAt - now)}</span></div>`}
-          <div class="net-detail-row"><span>Base / hex mul</span><span>+${formatAbbrev(selected.baseYield)} × ${sector.yieldMul}</span></div>
-          <div class="net-detail-row"><span>Neighbours online</span><span>${adj}${isolated ? ' · isolated shield' : ''}</span></div>
-          ${dripRow}
-          ${online
-            ? `<div class="net-detail-row"><span>Half-life to discovery</span><span>${halfLifeStr}</span></div>`
-            : ''}
-        </div>
-      `;
-    }
-
     // Coverage details: which sectors currently host at least one online
     // relay. The summary panel shows the count, the bonus, and a row of
     // swatches with covered ones glowing — a direct nudge to spread.
@@ -422,7 +421,6 @@ export function makeNetworkUi(state, opts) {
         ${queuedRows}
         ${queued.length > 0 ? `<div class="net-hint">Tap an empty hex to choose where to place the next token.</div>` : ''}
       </div>
-      ${detailHtml}
       <div class="net-legend">
         <div class="net-section-head">
           Sectors
@@ -614,28 +612,54 @@ export function makeNetworkUi(state, opts) {
   }
   // -----------------------------------------------------------------------
 
-  function renderPlacementBar() {
+  // Bottom bar: unified surface for "what did I just tap on?". Lives in the
+  // same docked slot for all three modes — relay detail, staged placement,
+  // empty-hex sector info — so the player's eye doesn't have to hunt between
+  // a sidebar block and a separate placement bar.
+  function renderHexBar(now) {
     const net = state.network;
-    if (!pendingPlacement || !net || net.queued.length === 0) return '';
-    const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
-    if (!ph) return '';
-    if (net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r)) return '';
+    // 1) Staged placement (queue + chosen hex). Highest priority.
+    if (pendingPlacement && net && net.queued.length > 0) {
+      const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
+      if (ph && !net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r)) {
+        return renderStagedBar(ph, net, now);
+      }
+    }
+    // 2) Selected relay.
+    if (selectedRelayId && net) {
+      const relay = net.relays.find((r) => r.id === selectedRelayId);
+      if (relay) return renderRelayBar(relay, net, now);
+    }
+    // 3) Selected empty hex (no queue).
+    if (selectedEmptyHex) {
+      const ph = getHexAt(selectedEmptyHex.q, selectedEmptyHex.r);
+      if (ph && !(net && net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r))) {
+        return renderEmptyHexBar(ph, net);
+      }
+    }
+    return '';
+  }
+
+  function renderStagedBar(ph, net, now) {
     const token = net.queued[0];
     const sector = SECTORS[ph.sector] || SECTORS.frontier;
     const tier = TIER_INFO[token.tier] || TIER_INFO.common;
     const projectedYield = (Number(token.baseYield) || 0) * sector.yieldMul;
     const ripenSec = tier.ripenSec * sector.ripenMul;
+    const queueTail = net.queued.length > 1 ? ` <span class="net-place-sep">·</span> <span>${net.queued.length - 1} more queued</span>` : '';
+    // Online neighbours at the picked hex hint at the cluster yield boost.
+    const adjOnline = countAdjacentOnline(net, ph, now);
+    const clusterHint = adjOnline > 0
+      ? `<span>${adjOnline} online neighbour${adjOnline === 1 ? '' : 's'} → +${(adjOnline * 25)}% cluster</span>`
+      : `<span>isolated · mesh bleed enabled</span>`;
     return `
-      <div class="net-place-bar" role="dialog" aria-label="Confirm placement">
+      <div class="net-place-bar staged" role="dialog" aria-label="Confirm placement">
         <div class="net-place-head">
           <span class="net-place-tier rar-${token.tier}">${TIER_LABEL[token.tier] || token.tier} relay</span>
           <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
         </div>
-        <div class="net-place-stats">
-          <span>+${formatAbbrev(projectedYield)}/s base</span>
-          <span class="net-place-sep">·</span>
-          <span>ripens in ${fmtMin(ripenSec)}</span>
-        </div>
+        <div class="net-detail-row"><span>+${formatAbbrev(projectedYield)}/s when ripe</span><span>ripens in ${fmtMin(ripenSec)}</span></div>
+        <div class="net-place-stats">${clusterHint}${queueTail}</div>
         <div class="net-place-hint">Tap another empty hex to move.</div>
         <div class="net-place-actions">
           <button class="net-place-btn cancel" type="button" data-act="cancel-placement">Cancel</button>
@@ -645,96 +669,109 @@ export function makeNetworkUi(state, opts) {
     `;
   }
 
+  function renderRelayBar(relay, net, now) {
+    const online = now >= relay.ripensAt;
+    const sector = SECTORS[relay.sector] || SECTORS.frontier;
+    const adj = adjacentOnlineCount(net, relay, now);
+    const isolated = online && adj === 0;
+    const tier = TIER_INFO[relay.tier] || TIER_INFO.common;
+    const neighbourTiers = listAdjacentOnlineTiers(net, relay, now);
+    const status = online ? (isolated ? 'isolated' : 'clustered') : 'ripening';
+    const yieldNow = relayYield(net, relay, now);
+    const headStat = online
+      ? `<div class="net-detail-row"><span>Live yield</span><span>+${formatAbbrev(yieldNow)}/s</span></div>`
+      : `<div class="net-detail-row"><span>Ripens in</span><span>${fmtMin(relay.ripensAt - now)}</span></div>`;
+    const baseRow = `<div class="net-detail-row"><span>Base × sector</span><span>+${formatAbbrev(relay.baseYield)} × ${sector.yieldMul}</span></div>`;
+    const neighbourLine = online
+      ? `<div class="net-detail-row"><span>Neighbours online</span><span>${adj}${neighbourTiers ? ` · ${neighbourTiers}` : ''}</span></div>`
+      : '';
+    const bleedLine = (online && isolated && tier.bleedPeriodSec > 0)
+      ? `<div class="net-detail-row warn"><span>Isolated · mesh bleed</span><span>+${formatAbbrev(bleedValue(relay))} every ${fmtMin(tier.bleedPeriodSec)}</span></div>`
+      : '';
+    let halfLifeLine = '';
+    if (online) {
+      const discPerMin = discoveryRatePerMin(net, relay, now);
+      const halfLifeMin = discPerMin > 0 ? Math.log(2) / discPerMin : Infinity;
+      const halfLifeStr = isFinite(halfLifeMin) ? fmtMin(halfLifeMin * 60) : '—';
+      halfLifeLine = `<div class="net-detail-row"><span>Half-life to discovery</span><span>${halfLifeStr}</span></div>`;
+    }
+    return `
+      <div class="net-place-bar relay status-${status}" role="dialog" aria-label="Relay detail">
+        <div class="net-place-head">
+          <span class="net-place-tier rar-${relay.tier}">${TIER_LABEL[relay.tier] || relay.tier} relay <span class="net-place-status">· ${status}</span></span>
+          <span class="net-detail-sec sec-tag-${relay.sector}">${sector.label}</span>
+        </div>
+        ${headStat}
+        ${baseRow}
+        ${neighbourLine}
+        ${bleedLine}
+        ${halfLifeLine}
+        <div class="net-place-actions">
+          <button class="net-place-btn cancel" type="button" data-act="clear-selection">Done</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderEmptyHexBar(ph, net) {
+    const sector = SECTORS[ph.sector] || SECTORS.frontier;
+    const hasQueue = net && net.queued.length > 0;
+    const hint = hasQueue
+      ? `<div class="net-place-hint">Tap an empty hex to stage the next token.</div>`
+      : `<div class="net-place-hint">No relays queued — buy a Seed Relay slot in the shop.</div>`;
+    return `
+      <div class="net-place-bar empty" role="dialog" aria-label="Empty hex detail">
+        <div class="net-place-head">
+          <span class="net-place-tier">Empty hex</span>
+          <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
+        </div>
+        <div class="net-detail-row"><span>Yield</span><span>×${sector.yieldMul}</span></div>
+        <div class="net-detail-row"><span>Discovery</span><span>×${sector.discoveryMul}</span></div>
+        <div class="net-detail-row"><span>Ripen</span><span>×${sector.ripenMul}</span></div>
+        ${hint}
+        <div class="net-place-actions">
+          <button class="net-place-btn cancel" type="button" data-act="clear-selection">Done</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Count online relays adjacent to a hex (used for the staged-bar cluster hint).
+  function countAdjacentOnline(net, hex, now) {
+    if (!net) return 0;
+    let n = 0;
+    for (const rr of net.relays) {
+      if (now < rr.ripensAt) continue;
+      if (hexDistance(rr.hex, hex) === 1) n++;
+    }
+    return n;
+  }
+
+  // List the tiers of the online relays adjacent to `relay`, e.g. "rare, common".
+  function listAdjacentOnlineTiers(net, relay, now) {
+    if (!net) return '';
+    const tiers = [];
+    for (const rr of net.relays) {
+      if (rr.id === relay.id) continue;
+      if (now < rr.ripensAt) continue;
+      if (hexDistance(rr.hex, relay.hex) === 1) tiers.push(rr.tier);
+    }
+    if (!tiers.length) return '';
+    // Order by rarity ascending so heaviest hitters show first.
+    tiers.sort((a, b) => TIER_ORDER.indexOf(b) - TIER_ORDER.indexOf(a));
+    return tiers.map((t) => TIER_LABEL[t] || t).join(', ');
+  }
+
   function ensureSkeleton() {
     if (bodyEl.querySelector('.net-layout')) return;
     bodyEl.innerHTML = `
       <div class="net-layout">
-        <div class="net-map">
-          <div class="net-hex-info" aria-hidden="true"></div>
-        </div>
+        <div class="net-map"></div>
         <div class="net-side"></div>
       </div>
     `;
     const mapEl = bodyEl.querySelector('.net-map');
-    if (mapEl) {
-      attachInteractions(mapEl);
-      attachHover(mapEl);
-    }
-  }
-
-  // Hover tracking: pointer-driven on desktop only. The hover-key state lives
-  // outside the SVG so it survives the 100ms re-render. Touch users get hover
-  // info implicitly via tap → side-panel detail; trying to fake hover on touch
-  // races with the placement tap flow.
-  function attachHover(mapEl) {
-    const update = (e) => {
-      if (e.pointerType && e.pointerType !== 'mouse') return;
-      const el = e.target && e.target.closest ? e.target.closest('[data-hex]') : null;
-      const key = el ? `${el.getAttribute('data-q')},${el.getAttribute('data-r')}` : null;
-      if (key === hoveredHexKey) return;
-      hoveredHexKey = key;
-      applyHover(mapEl);
-    };
-    mapEl.addEventListener('pointermove', update);
-    mapEl.addEventListener('pointerover', update);
-    mapEl.addEventListener('pointerleave', (e) => {
-      if (e.pointerType && e.pointerType !== 'mouse') return;
-      if (hoveredHexKey === null) return;
-      hoveredHexKey = null;
-      applyHover(mapEl);
-    });
-  }
-
-  // Apply the .hovered class to the currently-hovered hex and update the info
-  // panel. Called after every render() (because the SVG was just rebuilt) and
-  // whenever hoveredHexKey changes.
-  function applyHover(mapEl) {
-    if (!mapEl) return;
-    const prev = mapEl.querySelector('.hex-cell.hovered');
-    if (prev) prev.classList.remove('hovered');
-    const info = mapEl.querySelector('.net-hex-info');
-    if (!hoveredHexKey) {
-      if (info) info.classList.remove('visible');
-      return;
-    }
-    const [q, r] = hoveredHexKey.split(',').map(Number);
-    const node = mapEl.querySelector(`[data-hex][data-q="${q}"][data-r="${r}"]`);
-    if (node) node.classList.add('hovered');
-    if (info) {
-      info.innerHTML = renderHoverInfo(q, r);
-      info.classList.add('visible');
-    }
-  }
-
-  function renderHoverInfo(q, r) {
-    const hex = getHexAt(q, r);
-    if (!hex) return '';
-    const sector = SECTORS[hex.sector] || SECTORS.frontier;
-    const net = state.network;
-    const occ = net && net.relays.find((rr) => rr.hex.q === q && rr.hex.r === r);
-    const now = nowSeconds();
-    const lines = [
-      `<div class="net-hex-info-head" style="--sec-color:${sector.color}">
-        <span class="net-hex-info-dot"></span>
-        <span class="net-hex-info-name">${sector.label}</span>
-      </div>`,
-      `<div class="net-hex-info-row"><span>Yield</span><span>×${sector.yieldMul}</span></div>`,
-      `<div class="net-hex-info-row"><span>Discovery</span><span>×${sector.discoveryMul}</span></div>`,
-      `<div class="net-hex-info-row"><span>Ripen</span><span>×${sector.ripenMul}</span></div>`,
-    ];
-    if (occ) {
-      const online = now >= occ.ripensAt;
-      if (online) {
-        const yieldNow = relayYield(net, occ, now);
-        const adj = adjacentOnlineCount(net, occ, now);
-        lines.push(`<div class="net-hex-info-row hot"><span>${TIER_LABEL[occ.tier] || occ.tier}</span><span>+${formatAbbrev(yieldNow)}/s · ${adj} nb</span></div>`);
-      } else {
-        lines.push(`<div class="net-hex-info-row hot"><span>${TIER_LABEL[occ.tier] || occ.tier}</span><span>ripens ${fmtMin(occ.ripensAt - now)}</span></div>`);
-      }
-    } else if (net && net.queued.length > 0) {
-      lines.push(`<div class="net-hex-info-row hint">Click to stage placement</div>`);
-    }
-    return lines.join('');
+    if (mapEl) attachInteractions(mapEl);
   }
 
   function render() {
@@ -743,6 +780,10 @@ export function makeNetworkUi(state, opts) {
     // Drop a stale selection if the relay was lost between renders.
     if (selectedRelayId && state.network && !state.network.relays.some((r) => r.id === selectedRelayId)) {
       selectedRelayId = null;
+    }
+    // Empty-hex selection: clear if a relay landed there since the tap.
+    if (selectedEmptyHex && state.network && state.network.relays.some((r) => r.hex.q === selectedEmptyHex.q && r.hex.r === selectedEmptyHex.r)) {
+      selectedEmptyHex = null;
     }
     // Clear stale pending if the queue dried up.
     if (pendingPlacement && (!state.network || state.network.queued.length === 0)) {
@@ -755,13 +796,8 @@ export function makeNetworkUi(state, opts) {
     ensureSkeleton();
     const mapEl = bodyEl.querySelector('.net-map');
     const sideEl = bodyEl.querySelector('.net-side');
-    // The hover-info node lives outside the SVG so its content survives the
-    // re-render. Keep a handle and restore it after innerHTML swap.
-    const infoEl = mapEl.querySelector('.net-hex-info');
-    mapEl.innerHTML = renderHexSvg(now) + renderPlacementBar();
-    if (infoEl) mapEl.appendChild(infoEl);
+    mapEl.innerHTML = renderHexSvg(now) + renderHexBar(now);
     sideEl.innerHTML = renderSidePanel(now);
-    applyHover(mapEl);
     if (!view.initialized) {
       requestAnimationFrame(() => {
         view.scale = isMobileView() ? MOBILE_INITIAL_SCALE : 1;

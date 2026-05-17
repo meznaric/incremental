@@ -13,6 +13,7 @@
 
 import { formatAbbrev, parseAmount } from './bignum.js';
 import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade } from './upgrades.js';
+import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX } from './network.js';
 import {
   effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
@@ -637,6 +638,14 @@ export function initMainUi(state, deps) {
         // foreground /s gain (it doesn't move foreground rate).
         const pct = Math.round((u.value - 1) * 100);
         outcomes = `<div class="outcome win"><i class="ri ri-moon-line"></i> +${pct}% offline gain</div>`;
+      } else if (u.kind === 'coil') {
+        // Show the current → post-purchase Mesh-Bleed drop chance for a sweep
+        // token. Cap announced inline so the player sees the ceiling.
+        const ownedN = state.owned[COIL_ID] || 0;
+        const curr = ownedN <= 0 ? 0 : Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(1 + ownedN));
+        const next = Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(2 + ownedN));
+        const fmt = (x) => `${(x * 100).toFixed(1)}%`;
+        outcomes = `<div class="outcome win"><i class="ri ri-shuffle-line"></i> ${fmt(curr)} → ${fmt(next)} sweep-drop per Mesh Bleed</div>`;
       } else if (u.kind === 'gift') {
         outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
       }
@@ -644,7 +653,7 @@ export function initMainUi(state, deps) {
 
       let meta = '';
       if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
-      else if (u.kind === 'permanent' && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
+      else if ((u.kind === 'permanent' || u.kind === 'drift' || u.kind === 'coil') && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
       el.querySelector('.meta').textContent = meta;
       const pinEl = el.querySelector('.pin');
       pinEl.style.display = (state.shop.pinSlots || 0) > 0 ? '' : 'none';

@@ -7,6 +7,7 @@ import {
   SECTORS, TIER_INFO, COVERAGE_BONUS_PER_SECTOR,
   CLUSTER_YIELD_PER_NEIGHBOR, CLUSTER_DISCOVERY_PER_NEIGHBOR,
   ISOLATED_DISCOVERY_FACTOR, BLEED_YIELD_SECONDS,
+  COIL_DROP_K, COIL_DROP_PMAX,
 } from './network.js';
 import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS } from './shop.js';
 
@@ -272,6 +273,22 @@ export function initBreakdownUi(state) {
         </div>
       </div>
 
+      <div class="faq-block kind-coil">
+        <div class="faq-head"><i class="ri ri-shuffle-line"></i>Patient Coil — sweep tokens in the bleed</div>
+        <div class="faq-body">
+          <p>The <strong>Patient Coil</strong> upgrade appears in the console once you have a Seed Relay online. Each coil you splice in raises the chance that an isolated relay's next bleed will also drop a <strong>free re-roll</strong> alongside the Echoes.</p>
+          <p>The chance climbs softly — every new coil helps less than the last:</p>
+          <ul class="diag-bullets">
+            <li>1 coil → ~${((COIL_DROP_K * Math.log(2)) * 100).toFixed(1)}% per bleed</li>
+            <li>5 coils → ~${((COIL_DROP_K * Math.log(6)) * 100).toFixed(1)}% per bleed</li>
+            <li>10 coils → ~${((COIL_DROP_K * Math.log(11)) * 100).toFixed(1)}% per bleed</li>
+            <li>20 coils → ~${((COIL_DROP_K * Math.log(21)) * 100).toFixed(1)}% per bleed</li>
+            <li>asymptote → ${(COIL_DROP_PMAX * 100).toFixed(0)}%, never higher</li>
+          </ul>
+          <p>The cap is the thing: stack coils as deep as you can, the sweep-drop chance still won't run away. It rewards <em>more isolated relays</em> rather than more coils alone — the chance only fires when a bleed fires, and only isolated relays bleed.</p>
+        </div>
+      </div>
+
       <div class="faq-block">
         <div class="faq-head"><i class="ri ri-broadcast-line"></i>Coverage — the global multiplier</div>
         <div class="faq-body">
@@ -365,6 +382,10 @@ export function initBreakdownUi(state) {
       <div class="faq-block">
         <div class="faq-head"><i class="ri ri-exchange-funds-fill"></i>Seed Relay <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(convert · placement)</span></div>
         <div class="faq-body">Burns the listed % of balance to queue a placement token. Drop it on a hex in the Network screen; it ripens, then carries Echoes until ComDef finds it. Unlocks at 1 000 /s. See the <strong>Network</strong> tab for the full system.</div>
+      </div>
+      <div class="faq-block kind-coil">
+        <div class="faq-head"><i class="ri ri-shuffle-line"></i>Coil <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(mesh modifier)</span></div>
+        <div class="faq-body">A coil spliced into your isolated antennas. Each one raises the chance that the next Mesh Bleed drops a free re-roll alongside the Echoes — logarithmic climb, hard cap. Only appears once a Seed Relay is online. See the <strong>Network</strong> tab.</div>
       </div>
       <div class="faq-block">
         <div class="faq-head"><i class="ri ri-gift-fill"></i>Bleed <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(gift)</span></div>

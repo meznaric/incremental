@@ -8,6 +8,7 @@ import {
   SECTORS, TIER_INFO, BLEED_YIELD_SECONDS, bleedValue,
   reconcileOffline, tickNetwork, reconcileOfflineBleeds, tickBleedDrip,
   MAP_RADIUS, COVERAGE_BONUS_PER_SECTOR, CLUSTER_YIELD_PER_NEIGHBOR,
+  coilDropChance, countOnlineRelays, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX,
 } from '../src/network.js';
 
 function s() {
@@ -256,4 +257,85 @@ test('tickBleedDrip: ripening relay never drips', () => {
   } finally {
     Math.random = orig;
   }
+});
+
+test('coilDropChance: 0 with no coils, log-curve up to PMAX', () => {
+  const st = { owned: {} };
+  assert.equal(coilDropChance(st), 0);
+  st.owned[COIL_ID] = 1;
+  assert.ok(Math.abs(coilDropChance(st) - COIL_DROP_K * Math.log(2)) < 1e-9);
+  st.owned[COIL_ID] = 10;
+  assert.ok(Math.abs(coilDropChance(st) - COIL_DROP_K * Math.log(11)) < 1e-9);
+  // Hard cap at PMAX
+  st.owned[COIL_ID] = 1e6;
+  assert.equal(coilDropChance(st), COIL_DROP_PMAX);
+});
+
+test('tickBleedDrip: with coils, a drip can also grant a free re-roll', () => {
+  const st = s();
+  st.owned = { [COIL_ID]: 10 }; // ~12% chance per drip
+  st.freeRerolls = 0;
+  const silent = getHexes().find((h) => h.sector === 'silent');
+  queueToken(st, 'common', 100);
+  placeRelay(st, silent, 0);
+  st.network.relays[0].ripensAt = 0;
+  const orig = Math.random;
+  try {
+    Math.random = () => 0; // both drip-roll and coil-roll succeed
+    tickBleedDrip(st, 1, 1);
+    assert.equal(st.freeRerolls, 1);
+  } finally {
+    Math.random = orig;
+  }
+});
+
+test('tickBleedDrip: no coils, no re-rolls even on drip', () => {
+  const st = s();
+  st.owned = {};
+  st.freeRerolls = 0;
+  const silent = getHexes().find((h) => h.sector === 'silent');
+  queueToken(st, 'common', 100);
+  placeRelay(st, silent, 0);
+  st.network.relays[0].ripensAt = 0;
+  const orig = Math.random;
+  try {
+    Math.random = () => 0;
+    tickBleedDrip(st, 1, 1);
+    assert.equal(st.freeRerolls, 0);
+  } finally {
+    Math.random = orig;
+  }
+});
+
+test('reconcileOfflineBleeds: with coils, grants expected re-rolls', () => {
+  const st = s();
+  st.owned = { [COIL_ID]: 1e6 }; // chance pinned at PMAX
+  st.freeRerolls = 0;
+  const silent = getHexes().find((h) => h.sector === 'silent');
+  queueToken(st, 'common', 100);
+  placeRelay(st, silent, 0);
+  st.network.relays[0].ripensAt = 0;
+  // Big offline window: 100 drops expected, 22 re-rolls expected.
+  // The free-reroll bank caps at 9, so we expect to land on the cap.
+  const offline = 100 * TIER_INFO.common.bleedPeriodSec;
+  const orig = Math.random;
+  try {
+    Math.random = () => 0.5; // does not affect floor portion
+    reconcileOfflineBleeds(st, offline, 1);
+    assert.equal(st.freeRerolls, 9);
+  } finally {
+    Math.random = orig;
+  }
+});
+
+test('countOnlineRelays: counts only ripened relays', () => {
+  const st = s();
+  queueToken(st, 'common', 100);
+  queueToken(st, 'common', 100);
+  placeRelay(st, { q: 0, r: 0 }, 0);
+  placeRelay(st, { q: 3, r: 0 }, 0);
+  // Force one online, leave the other ripening
+  st.network.relays[0].ripensAt = 0;
+  st.network.relays[1].ripensAt = 1e9;
+  assert.equal(countOnlineRelays(st, 1), 1);
 });

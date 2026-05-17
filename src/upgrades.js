@@ -48,6 +48,9 @@ export const KIND_THEME = {
   gamble:    { icon: 'ri-broadcast-line',     color: '#ff5a6e', label: 'Hail' },
   gift:      { icon: 'ri-gift-fill',          color: '#ffb84a', label: 'Bleed' },
   drift:     { icon: 'ri-moon-line',          color: '#5fc0e8', label: 'Drift' },
+  // Coil sits next to Seed Relay in lore — also yellow-family — but reads as
+  // a warmer amber so the player never confuses the two on the slate.
+  coil:      { icon: 'ri-shuffle-line',       color: '#e8a85a', label: 'Coil' },
 };
 
 export function kindLabel(u) {
@@ -61,6 +64,10 @@ export function isEligible(u, ctx) {
   const r = ctx?.rate || 0;
   if (u._dyn) return true; // virtual generators are always eligible
   if (u.kind === 'convert' && r <= CONVERT_MIN_RATE) return false;
+  // Coils only show up once at least one Seed Relay is online — until then the
+  // mechanic has nothing to attach to and the chip would just confuse new
+  // players. ctx.meshOnline is populated by rollContext.
+  if (u.kind === 'coil' && (ctx?.meshOnline || 0) < 1) return false;
   if (u.minRate != null && r < u.minRate) return false;
   // maxRate phases the upgrade out once production climbs past its band. Weak
   // mul commons used to linger past their band on a rate-aware cost, but the
@@ -297,6 +304,13 @@ export function costFor(upgrade, ctx) {
       const cap = (CONVERT_BOOST_CAP[upgrade.rarity] ?? 0.1) * baseAdd
         / Math.max(upgrade.ratio, 1e-12);
       return Math.min(balanceSpend, cap);
+    }
+    case 'coil': {
+      // Same own-count exponential as drift — no category ramp, the cap on
+      // payoff is enforced by the log/pMax curve in coilDropChance, not by
+      // cost growth.
+      const n = ctx.owned[upgrade.id] || 0;
+      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
     }
   }
   return 0;

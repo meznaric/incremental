@@ -26,6 +26,42 @@ export const ISOLATED_DISCOVERY_FACTOR = 0.1;
 // so it has to be generous in raw seconds to compete with multiplied rate.
 export const BLEED_YIELD_SECONDS = 150;
 
+// Patient Coil — every isolated bleed drip rolls for a free re-roll on top
+// of the Echoes. Chance climbs as log(1 + n) so each new coil helps less
+// than the last, asymptoting at COIL_DROP_PMAX. n=1 ≈ 3.5%, n=5 ≈ 9%, n=10
+// ≈ 12%, n=20 ≈ 15%, n=∞ → 22%. The hard cap is what stops late-cycle
+// players from spamming free re-rolls.
+export const COIL_ID = 'patient_coil';
+export const COIL_DROP_K = 0.05;
+export const COIL_DROP_PMAX = 0.22;
+// Mirrors MAX_FREE_REROLLS in shop.js. Duplicated here to avoid a circular
+// import (shop.js already imports from network.js). If you change one, change
+// both — the test in test/free-reroll.test.js pins the value to 9.
+const REROLL_BANK_CAP = 9;
+
+export function coilDropChance(state) {
+  const n = (state && state.owned && state.owned[COIL_ID]) || 0;
+  if (n <= 0) return 0;
+  return Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(1 + n));
+}
+
+function grantRerolls(state, n) {
+  if (!(n > 0)) return 0;
+  const before = state.freeRerolls || 0;
+  const next = Math.min(REROLL_BANK_CAP, before + Math.floor(n));
+  state.freeRerolls = next;
+  return next - before;
+}
+
+// Count online relays. Used by rollContext (shop.js) to gate the Coil chip.
+export function countOnlineRelays(state, now) {
+  const network = state && state.network;
+  if (!network || !network.relays) return 0;
+  let n = 0;
+  for (const r of network.relays) if (now >= r.ripensAt) n++;
+  return n;
+}
+
 // Six sectors. yieldMul scales placed-relay yield; discoveryMul scales the
 // per-minute discovery roll; ripenMul stretches/shrinks the tier's ripen time.
 // Colours are saturated neons — the map reads as a synth-grade comms console,
@@ -236,9 +272,14 @@ export function bleedValue(relay) {
 // Per-tick Bleed drip — only isolated online relays drop. Probabilistic per
 // tick; on average each relay drops once per its tier's bleedPeriodSec. The
 // caller credits the returned Echoes to state.amount.
+//
+// Side effect: each drop also rolls against coilDropChance(state) for a free
+// re-roll, capped by REROLL_BANK_CAP. Caller can detect a grant by diffing
+// state.freeRerolls before/after.
 export function tickBleedDrip(state, dt, now) {
   const network = state.network;
   if (!network || !network.relays.length || dt <= 0) return 0;
+  const coilP = coilDropChance(state);
   let total = 0;
   for (const r of network.relays) {
     if (!isOnline(r, now)) continue;
@@ -246,7 +287,10 @@ export function tickBleedDrip(state, dt, now) {
     const tier = TIER_INFO[r.tier] || TIER_INFO.common;
     if (!(tier.bleedPeriodSec > 0)) continue;
     const p = dt / tier.bleedPeriodSec;
-    if (Math.random() < p) total += bleedValue(r);
+    if (Math.random() < p) {
+      total += bleedValue(r);
+      if (coilP > 0 && Math.random() < coilP) grantRerolls(state, 1);
+    }
   }
   return total;
 }
@@ -254,16 +298,32 @@ export function tickBleedDrip(state, dt, now) {
 // Offline Bleed reconciliation. Foreground uses probabilistic rolls; offline
 // integrates the expected value directly — over a long window the law of
 // large numbers makes the expectation the right thing to credit.
+//
+// Side effect: also mutates state.freeRerolls by expected Coil drops over the
+// window. Floor + probabilistic remainder so short offline windows still have
+// a chance to grant. Capped by REROLL_BANK_CAP.
 export function reconcileOfflineBleeds(state, offlineSeconds, now) {
   const network = state.network;
   if (!network || !network.relays.length || offlineSeconds <= 0) return 0;
+  const coilP = coilDropChance(state);
   let total = 0;
+  let expectedDrops = 0;
   for (const r of network.relays) {
     if (!isOnline(r, now)) continue;
     if (adjacentOnlineCount(network, r, now) > 0) continue;
     const tier = TIER_INFO[r.tier] || TIER_INFO.common;
     if (!(tier.bleedPeriodSec > 0)) continue;
-    total += bleedValue(r) * (offlineSeconds / tier.bleedPeriodSec);
+    const drops = offlineSeconds / tier.bleedPeriodSec;
+    total += bleedValue(r) * drops;
+    expectedDrops += drops;
+  }
+  if (coilP > 0 && expectedDrops > 0) {
+    const expectedRerolls = expectedDrops * coilP;
+    const whole = Math.floor(expectedRerolls);
+    const frac = expectedRerolls - whole;
+    let grant = whole;
+    if (frac > 0 && Math.random() < frac) grant += 1;
+    if (grant > 0) grantRerolls(state, grant);
   }
   return total;
 }

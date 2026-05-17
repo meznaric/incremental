@@ -5,7 +5,7 @@ import {
   patternBuffRateMulStrength, patternGambleLuckBonus,
   patternFreeLeft, consumePatternFreePurchase,
 } from './cyclePatterns.js';
-import { networkContribution, queueToken } from './network.js';
+import { networkContribution, queueToken, countOnlineRelays } from './network.js';
 
 export const DEFAULT_SLOTS = 2;
 export const MAX_SLOTS = 10;
@@ -305,6 +305,9 @@ export function rollContext(state, now) {
     baseAdditive: (state.basePerSecond || 0) + state.flatBonus,
     permMul: state.permMul || 1,
     owned: state.owned,
+    // Number of currently-online Seed Relays. Used by isEligible to gate
+    // mesh-aware upgrades (Patient Coil) until the mesh actually exists.
+    meshOnline: countOnlineRelays(state, now),
   };
 }
 
@@ -436,6 +439,19 @@ export function tryBuy(state, slotIdx, now) {
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
     state.offlineMul = (state.offlineMul || 1) * u.value;
+    state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    checkPurchase(state, u);
+    replaceSlot(state, slotIdx, now);
+    return { ok: true };
+  }
+
+  if (u.kind === 'coil') {
+    // Coil = mesh-bleed modifier. Buying it doesn't change rate or balance
+    // directly — the payoff is the chance a Mesh Bleed drop also carries a
+    // free sweep token (see coilDropChance + tickBleedDrip in network.js).
+    if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);

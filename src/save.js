@@ -180,7 +180,11 @@ export function loadState(state) {
   const earnings = rawEarnings * offlineMul;
   // Bleed drips are isolated-relay ambient gifts. Closed-form expectation over
   // the offline window — see reconcileOfflineBleeds. Credited as a flat sum.
+  // Also side-effects state.freeRerolls if any Patient Coils are owned, so
+  // capture the pre-call value to surface the gain on the welcomeBack screen.
+  const rerollsBefore = state.freeRerolls || 0;
   const offlineBleed = offline > 0 ? reconcileOfflineBleeds(state, offline, now) : 0;
+  const rerollsGained = Math.max(0, (state.freeRerolls || 0) - rerollsBefore);
   state.amount += earnings + offlineBleed;
   validateSlate(state, now);
   return {
@@ -190,6 +194,7 @@ export function loadState(state) {
     networkLosses: offlineLosses.length,
     networkLossDetails: offlineLosses.map((r) => ({ tier: r.tier, sector: r.sector })),
     networkBleed: offlineBleed,
+    networkRerollsGained: rerollsGained,
   };
 }
 

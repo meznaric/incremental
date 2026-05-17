@@ -87,6 +87,10 @@ function buildBreakdown(state, savedAt, offline, extras) {
   if (bleed > 0) {
     rows.push({ label: 'Mesh bleed', value: `+${formatAbbrev(bleed)} Echoes` });
   }
+  const sweep = Number(extras && extras.networkRerollsGained) || 0;
+  if (sweep > 0) {
+    rows.push({ label: 'Sweep tokens', value: `+${sweep} re-roll${sweep === 1 ? '' : 's'}` });
+  }
   const losses = Number(extras && extras.networkLosses) || 0;
   if (losses > 0) {
     rows.push({ label: 'Relays pulled', value: `${losses} compromised` });
@@ -115,12 +119,12 @@ function copyLines(offline) {
 
 export function showWelcomeBack({
   state, offline, earnings, savedAt, onDismiss,
-  networkBleed = 0, networkLosses = 0, offlineMul = 1,
+  networkBleed = 0, networkLosses = 0, offlineMul = 1, networkRerollsGained = 0,
 }) {
   if (!Number.isFinite(offline) || offline < MIN_OFFLINE_S) return false;
   // The mesh can carry a session even when foreground earnings are zero —
   // pure-bleed sessions and pure-loss sessions both deserve the screen.
-  const meshPositive = networkBleed > 0;
+  const meshPositive = networkBleed > 0 || networkRerollsGained > 0;
   const meshSignal = meshPositive || networkLosses > 0;
   if ((!Number.isFinite(earnings) || earnings <= 0) && !meshSignal) return false;
 
@@ -138,7 +142,7 @@ export function showWelcomeBack({
   const lines = copyLines(offline);
   linesEl.innerHTML = lines.map((l) => `<div class="wb-line">${l}</div>`).join('');
 
-  const rows = buildBreakdown(state, savedAt, offline, { networkBleed, networkLosses, offlineMul });
+  const rows = buildBreakdown(state, savedAt, offline, { networkBleed, networkLosses, offlineMul, networkRerollsGained });
   breakdownEl.innerHTML = rows
     .map((r) => `<div class="wb-row"><span class="wb-row-label">${r.label}</span><span class="wb-row-value">${r.value}</span></div>`)
     .join('');

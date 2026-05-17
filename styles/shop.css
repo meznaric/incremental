@@ -630,6 +630,7 @@
 .faq-block.kind-mass     { border-left-color: #d49a55; }
 .faq-block.kind-memory   { border-left-color: #4cd07d; }
 .faq-block.kind-hail     { border-left-color: #ff5a6e; }
+.faq-block.kind-coil     { border-left-color: #e8a85a; }
 .faq-head {
   display: flex;
   align-items: center;

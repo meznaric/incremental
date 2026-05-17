@@ -241,6 +241,7 @@ if (loaded) {
     networkBleed: loaded.networkBleed || 0,
     networkLosses: loaded.networkLosses || 0,
     networkLossDetails: loaded.networkLossDetails || [],
+    networkRerollsGained: loaded.networkRerollsGained || 0,
     offlineMul: loaded.offlineMul || 1,
   });
 }
@@ -347,6 +348,9 @@ function tick(raf) {
   // Sparse-only Bleed drip — isolated relays drop ambient Echoes per their
   // tier's period. Credited directly to balance, no permMul. Visual feedback
   // through the chip so the player sees the sparse-only payoff land.
+  // Patient Coils side-effect state.freeRerolls inside tickBleedDrip — diff
+  // before/after to surface the grant as a separate toast.
+  const rerollsBeforeDrip = state.freeRerolls || 0;
   const drip = tickBleedDrip(state, wallDt, t);
   if (drip > 0) {
     state.amount += drip;
@@ -355,6 +359,12 @@ function tick(raf) {
     // across cycles in the achievements stats bag, so a later cycle can't
     // re-earn it but a new player will earn it the moment the first drip lands.
     if (markStat(state.achievements, 'bleedDripsSeen')) saveAchievements(state.achievements);
+  }
+  const rerollsGained = (state.freeRerolls || 0) - rerollsBeforeDrip;
+  if (rerollsGained > 0) {
+    ui.showToast(rerollsGained === 1
+      ? 'A sweep token was riding the bleed.'
+      : `${rerollsGained} sweep tokens were riding the bleed.`);
   }
 
   const rate = effectiveRate(state, t);

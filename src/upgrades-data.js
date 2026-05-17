@@ -273,15 +273,10 @@ export const UPGRADES = [
     name: 'Forbidden Codec',     desc: 'Whoever wrote this codec was not Union. ×2.5 rate.',
     value: 2.5,  baseCost: 1e13,   growth: 12,     minRate: 1e11 },
 
-  // Seed Relays were overshadowing every other lever past trillions — one
-  // conglomerate or empire could leapfrog a full slate of additive permanents.
-  // pctCost is 1/7 of the prior values (cheaper to invoke) and the per-rarity
-  // CONVERT_BOOST_CAP below is 1/10, so the ceiling on what a single convert
-  // can add to the rate is correspondingly tighter.
-  // Convert tokens are placement-only now — the burn-cost queues a Seed Relay
-  // you drop on a hex in the Network screen. Yield = cost × ratio at buy
-  // time, captured on the token. The relay ripens, then carries until ComDef
-  // finds it. Sector you place into decides yield/discovery/ripen multipliers.
+  // Convert tokens are placement-only — the burn-cost queues a Seed Relay you
+  // drop on a hex in the Network screen. Yield = cost × ratio at buy time,
+  // captured on the token. The relay ripens, then carries until ComDef finds
+  // it. Sector you place into decides yield/discovery/ripen multipliers.
   { id: 'tip_jar',   kind: 'convert', rarity: 'common',
     name: 'Loose Cable', desc: 'Field antenna kit. Burn ~0.7% balance to queue placement.',
     pctCost: 0.05 / 7, ratio: 0.0002 },
@@ -303,6 +298,17 @@ export const UPGRADES = [
   { id: 'conglomerate', kind: 'convert', rarity: 'rare',
     name: 'Distributed Mesh', desc: 'Redundant phased mesh. Burn ~7% to queue placement.',
     pctCost: 0.5 / 7,  ratio: 0.0075 },
+
+  // Patient Coil — a coil you splice into an isolated relay so its Mesh Bleed
+  // sometimes carries a re-tune signature on top of the Echoes. Each owned
+  // coil widens the chance a drip also drops a free sweep, logarithmically
+  // — see network.js coilDropChance for the curve and the hard cap.
+  // Eligibility: appears once the player has at least one online Seed Relay.
+  // The kind has its own theme/color in upgrades.js KIND_THEME.
+  { id: 'patient_coil', kind: 'coil', rarity: 'uncommon',
+    name: 'Patient Coil',
+    desc: 'Splice a tuned coil into the isolated antennas. Sometimes a Mesh Bleed drips a sweep token alongside the Echoes. Chance climbs with every coil — softly, never past a hard cap.',
+    baseCost: 4000, growth: 2.4 },
 
   // Drift — "while-you-are-away" multipliers. Only apply over the offline
   // integral (see save.js); foreground rate is unchanged. Cheap early, costly

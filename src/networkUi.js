@@ -509,6 +509,15 @@ export function makeNetworkUi(state, opts) {
       // because the SVG already fits its container on wide viewports.
       if (e.pointerType !== 'touch') return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // Take explicit pointer capture on the (stable) mapEl. Without this,
+      // the browser's implicit capture is bound to the touched <polygon>,
+      // which the 100ms refresh tick rebuilds via innerHTML. That destroys
+      // the capture target → pointercancel → dragState cleared → the pan
+      // freezes mid-stroke with the finger still down (the "stuck touch"
+      // bug). It also let the same pointercancel bubble to the body-level
+      // installTap and stage a placement on the hex the user was panning
+      // past. mapEl never re-renders, so capture lives for the whole gesture.
+      try { mapEl.setPointerCapture(e.pointerId); } catch {}
       if (pointers.size >= 2) {
         const [a, b] = [...pointers.values()];
         const dist = Math.hypot(b.x - a.x, b.y - a.y);

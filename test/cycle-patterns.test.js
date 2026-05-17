@@ -131,7 +131,7 @@ test('surge_tide: combined first-5-min rate equals 2.5x base', () => {
   assert.ok(Math.abs(r - 250) < 0.5, `expected ~250, got ${r}`);
 });
 
-test('cold_sky: rateMul buff value is doubled and duration halved at apply time', () => {
+test('cold_sky: rateMul bonus doubled (additive) and duration halved at apply time', () => {
   const s = freshState({ amount: 10_000 });
   setActivePattern(s.contactLog, 'cold_sky');
   const u = getUpgrade('espresso'); // rateMul buff; exact mult retunes over time
@@ -139,8 +139,9 @@ test('cold_sky: rateMul buff value is doubled and duration halved at apply time'
   const ok = tryBuy(s, 1, 1000);
   assert.ok(ok.ok);
   assert.equal(s.buffs.rateMul.length, 1);
-  // cold_sky doubles strength, halves duration at apply time.
-  assert.equal(s.buffs.rateMul[0].value, u.mult * 2);
+  // cold_sky doubles the *bonus* (mult - 1), so 2.4 → 1 + 1.4×2 = 3.8.
+  // Multiplying the raw mult instead would yield 4.8 — by design, no.
+  assert.equal(s.buffs.rateMul[0].value, 1 + (u.mult - 1) * 2);
   assert.equal(s.buffs.rateMul[0].duration, u.duration * 0.5);
 });
 

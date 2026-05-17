@@ -266,12 +266,52 @@ export function totalMulOwned(owned) {
   return n;
 }
 
-// Convert cap: caps a single convert's *yield* (and matching spend) so its
-// raw baseYield never exceeds CAP × baseAdditive. Once sector × cluster ×
-// coverage land on top, a well-placed legendary can roughly match its raw
-// cap × ~4, so the late-cycle network can plausibly overtake base rate when
-// you stack several alive across spread sectors.
+// Convert cap: caps a single convert's *yield* so its raw baseYield never
+// exceeds CAP × baseAdditive. Once sector × cluster × coverage land on top, a
+// well-placed legendary can roughly match its raw cap × ~4, so the late-cycle
+// network can plausibly overtake base rate when you stack several alive
+// across spread sectors. Cost is decoupled from this cap (see costFor): the
+// player can overpay relative to the yield, which is intentional now that
+// yellow uses gambling-style pricing.
 export const CONVERT_BOOST_CAP = { common: 0.04, uncommon: 0.15, rare: 0.45, legendary: 1.3 };
+
+// Per-rarity wager multiplier on convert cost. Common is the floor; each
+// higher rarity multiplies cost by 1.33 (compounding). Picked over a linear
+// step because the same compounding sits under decode and the rarity weights
+// — a rare card already shows up 6× less often than a common; paying ~1.77×
+// more on top reads as "rarer = more committed", not "rarer = punitive".
+export const CONVERT_RARITY_STEP = {
+  common:    1,
+  uncommon:  1.33,
+  rare:      1.33 * 1.33,
+  legendary: 1.33 * 1.33 * 1.33,
+  mythic:    1.33 * 1.33 * 1.33 * 1.33,
+};
+
+// Yield credited to the queued Seed Relay token. Caps at CONVERT_BOOST_CAP ×
+// baseAdditive so a single placement can't blanket the entire base rate.
+// Cost can exceed this without raising the yield — see costFor.
+export function convertYieldFor(upgrade, cost, baseAdditive) {
+  const baseAdd = Math.max(baseAdditive || 0, 1);
+  const yieldCap = (CONVERT_BOOST_CAP[upgrade.rarity] ?? 0.1) * baseAdd;
+  return Math.min(cost * upgrade.ratio, yieldCap);
+}
+
+// Per-rarity own-count growth for the gamble-affecting buffs (Carry / Buffer
+// windows). They price like decode permanents — a flat-ish base that climbs
+// per purchase — instead of the rate × costSec model the rate/compound buffs
+// still use, which used to make the *first* Hail-helper cruelly expensive in
+// early cycles and only modestly painful late.
+const GAMBLE_BUFF_GROWTH = {
+  common:    1.5,
+  uncommon:  1.7,
+  rare:      2.0,
+  legendary: 2.5,
+  mythic:    3.0,
+};
+function isGambleBuff(u) {
+  return u.kind === 'buff' && (u.buffType === 'gambleLuck' || u.buffType === 'gambleCushion');
+}
 
 // Permanent cost: super-exponential in own count (growth^(n+n²/25)) so the Nth
 // purchase costs visibly more than the (N-1)th. Mul permanents additionally
@@ -280,7 +320,18 @@ export const CONVERT_BOOST_CAP = { common: 0.04, uncommon: 0.15, rare: 0.45, leg
 export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
-    case 'buff':      return Math.max(1, ctx.rate * upgrade.costSec);
+    case 'buff': {
+      // Gamble-helper buffs: decode-style. costSec doubles as a flat baseCost
+      // (still respects the per-buff intent in upgrades-data.js — bigger
+      // costSec = bigger initial outlay). Carrier/Resonance buffs keep the
+      // rate-scaled model.
+      if (isGambleBuff(upgrade)) {
+        const n = ctx.owned[upgrade.id] || 0;
+        const growth = GAMBLE_BUFF_GROWTH[upgrade.rarity] || 1.6;
+        return Math.max(1, upgrade.costSec * Math.pow(growth, n + (n * n) / 25));
+      }
+      return Math.max(1, ctx.rate * upgrade.costSec);
+    }
     case 'drift': {
       // Drifts follow the permanent baseCost/growth ladder but skip the
       // mul-category ramp — they live in their own bucket and pay on per-id
@@ -299,11 +350,12 @@ export function costFor(upgrade, ctx) {
       return c;
     }
     case 'convert': {
-      const balanceSpend = ctx.balance * upgrade.pctCost;
-      const baseAdd = Math.max(ctx.baseAdditive || 1, 1);
-      const cap = (CONVERT_BOOST_CAP[upgrade.rarity] ?? 0.1) * baseAdd
-        / Math.max(upgrade.ratio, 1e-12);
-      return Math.min(balanceSpend, cap);
+      // Gambling-style: a percentage of balance, scaled up per rarity tier.
+      // The old cap-on-cost made yellow feel free in the late game (a 14%-
+      // balance legendary capped at a fraction of baseAdd was usually a tiny
+      // fraction of balance). Yield is still capped — see convertYieldFor.
+      const tier = CONVERT_RARITY_STEP[upgrade.rarity] ?? 1;
+      return ctx.balance * upgrade.pctCost * tier;
     }
     case 'coil': {
       // Same own-count exponential as drift — no category ramp, the cap on

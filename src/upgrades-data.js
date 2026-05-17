@@ -313,22 +313,24 @@ export const UPGRADES = [
   // Drift — "while-you-are-away" multipliers. Only apply over the offline
   // integral (see save.js); foreground rate is unchanged. Cheap early, costly
   // late — these compound multiplicatively into state.offlineMul.
+  // Bonus halved from the first pass: stacking three or four drifts was making
+  // away returns dominate active play. Each value below is (originalBonus / 2).
   { id: 'drift_starter', kind: 'drift', rarity: 'common',
-    name: 'Quiet Hours',  desc: 'The rig listens cleaner while you are not at it. ×1.10 to offline gain.',
-    value: 1.10, baseCost: 800,    growth: 3,   maxRate: 20000 },
+    name: 'Quiet Hours',  desc: 'The rig listens cleaner while you are not at it. ×1.05 to offline gain.',
+    value: 1.05,  baseCost: 800,    growth: 3,   maxRate: 20000 },
   { id: 'drift_band',    kind: 'drift', rarity: 'common',
-    name: 'Night Band',   desc: 'A cleaner carrier when the city sleeps. ×1.15 to offline gain.',
-    value: 1.15, baseCost: 5000,   growth: 3.5, maxRate: 100000 },
+    name: 'Night Band',   desc: 'A cleaner carrier when the city sleeps. ×1.075 to offline gain.',
+    value: 1.075, baseCost: 5000,   growth: 3.5, maxRate: 100000 },
   { id: 'drift_lock',    kind: 'drift', rarity: 'uncommon',
-    name: 'Drift Lock',   desc: 'Lock the carrier on the band you left tuned. ×1.25 to offline gain.',
-    value: 1.25, baseCost: 50000,  growth: 4,   minRate: 5000 },
+    name: 'Drift Lock',   desc: 'Lock the carrier on the band you left tuned. ×1.125 to offline gain.',
+    value: 1.125, baseCost: 50000,  growth: 4,   minRate: 5000 },
   { id: 'drift_vigil',   kind: 'drift', rarity: 'rare',
-    name: 'Patient Listener', desc: 'You return to numbers you did not earn awake. ×1.50 to offline gain.',
-    value: 1.50, baseCost: 1.5e6,  growth: 5,   minRate: 5e4 },
+    name: 'Patient Listener', desc: 'You return to numbers you did not earn awake. ×1.25 to offline gain.',
+    value: 1.25,  baseCost: 1.5e6,  growth: 5,   minRate: 5e4 },
   { id: 'drift_codec',   kind: 'drift', rarity: 'legendary',
-    name: 'Vigil Codec',  desc: 'A codec tuned for absence. ×2.0 to offline gain.',
-    value: 2.0,  baseCost: 5e8,    growth: 7,   minRate: 1e6 },
+    name: 'Vigil Codec',  desc: 'A codec tuned for absence. ×1.50 to offline gain.',
+    value: 1.50,  baseCost: 5e8,    growth: 7,   minRate: 1e6 },
   { id: 'drift_sieve',   kind: 'drift', rarity: 'mythic',
-    name: 'Pre-Echo Sieve', desc: 'Whoever wrote this filter was not Union. ×3.0 to offline gain.',
-    value: 3.0,  baseCost: 5e11,   growth: 10,  minRate: 1e9 },
+    name: 'Pre-Echo Sieve', desc: 'Whoever wrote this filter was not Union. ×2.0 to offline gain.',
+    value: 2.0,   baseCost: 5e11,   growth: 10,  minRate: 1e9 },
 ];

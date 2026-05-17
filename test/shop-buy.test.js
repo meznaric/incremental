@@ -6,7 +6,7 @@ import {
   SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST, PIN_TIER_COSTS, MAX_PIN_SLOTS,
   REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS, DEFAULT_SLOTS,
 } from '../src/shop.js';
-import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS } from '../src/upgrades.js';
+import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS, convertYieldFor } from '../src/upgrades.js';
 
 function freshState(over = {}) {
   return { amount: 0, basePerSecond: 0, ...makeShopState(), ...over };
@@ -125,7 +125,11 @@ test('convert: deducts cost and queues a placement token (no flatBonus delta)', 
   assert.ok(s.network, 'convert should ensure network state exists');
   assert.equal(s.network.queued.length, 1);
   assert.equal(s.network.queued[0].tier, conv.rarity);
-  assert.equal(s.network.queued[0].baseYield, 1000 * conv.ratio);
+  // Yield is capped at CONVERT_BOOST_CAP[tier] × baseAdditive (see
+  // convertYieldFor). basePerSecond defaults to 0; the cap floors at the
+  // minimum baseAdd of 1, so for low rarities the cap usually bites here.
+  const baseAdd = (s.basePerSecond || 0) + (s.flatBonus || 0);
+  assert.equal(s.network.queued[0].baseYield, convertYieldFor(conv, 1000, baseAdd));
 });
 
 test('gamble: cooldown blocks repeat buys', () => {

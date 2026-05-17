@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   UPGRADES, getUpgrade, costFor, totalMulOwned, isEligible,
   ADD_VALUE_MULT, GIFT_SECONDS, MUL_CATEGORY_GROWTH, CONVERT_BOOST_CAP,
+  CONVERT_RARITY_STEP, convertYieldFor,
   genBaseAdd, genGift,
 } from '../src/upgrades.js';
 
@@ -116,24 +117,32 @@ test('mul cost no longer depends on rate (no rate-aware floor)', () => {
   assert.equal(highRate, 50);
 });
 
-test('convert cost is capped by baseAdditive × CONVERT_BOOST_CAP', () => {
-  // Late-game pattern: balance is many orders of magnitude bigger than
-  // baseAdditive. Without the cap, empire would convert into a 100× rate jump.
-  const empire = getUpgrade('empire'); // legendary, pctCost 1.0, ratio 0.01
+test('convert cost scales linearly with balance × pctCost × rarity tier', () => {
+  // Cost decoupled from the yield cap (see convertYieldFor): the player can
+  // overpay relative to what the placement is worth. Empire is legendary, so
+  // its cost is multiplied by CONVERT_RARITY_STEP.legendary (1.33^3).
+  const empire = getUpgrade('empire'); // legendary, pctCost 1.0/7, ratio 0.01
   const ctx = { balance: 1e15, rate: 1e9, baseAdditive: 1e6, owned: {} };
   const cost = costFor(empire, ctx);
-  const uncappedSpend = ctx.balance * empire.pctCost; // 1e15
-  const expectedCap = CONVERT_BOOST_CAP.legendary * ctx.baseAdditive / empire.ratio;
-  assert.ok(cost < uncappedSpend, 'cap should kick in when balance >> baseAdditive');
-  assert.equal(cost, expectedCap);
-  // The yield (cost × ratio) is the flatBonus delta — bounded at CAP × baseAdditive.
-  assert.equal(cost * empire.ratio, CONVERT_BOOST_CAP.legendary * ctx.baseAdditive);
+  const expected = ctx.balance * empire.pctCost * CONVERT_RARITY_STEP.legendary;
+  assert.equal(cost, expected);
 });
 
-test('convert cost stays at balance × pctCost when below the cap', () => {
-  // Early/mid game: balance is small relative to baseAdditive, so the cap
-  // shouldn't bite — the convert keeps its "burn X% of balance" identity.
-  const tipJar = getUpgrade('tip_jar'); // common, pctCost 0.05, ratio 0.0002
+test('convertYieldFor caps yield at baseAdditive × CONVERT_BOOST_CAP', () => {
+  // Late-game pattern: balance is many orders of magnitude bigger than
+  // baseAdditive. The cost is uncapped, but the *yield* still floors at
+  // CAP × baseAdditive so a single placement can't blanket the entire rate.
+  const empire = getUpgrade('empire');
+  const baseAdd = 1e6;
+  const huge = 1e20; // would dwarf the cap
+  const yieldVal = convertYieldFor(empire, huge, baseAdd);
+  assert.equal(yieldVal, CONVERT_BOOST_CAP.legendary * baseAdd);
+});
+
+test('convert cost = balance × pctCost × 1 for common rarity', () => {
+  // Common rarity tier is 1, so cost matches the original gambling-style
+  // spend with no rarity multiplier on top.
+  const tipJar = getUpgrade('tip_jar'); // common, pctCost 0.05/7, ratio 0.0002
   const ctx = { balance: 1000, rate: 10, baseAdditive: 10, owned: {} };
-  assert.equal(costFor(tipJar, ctx), ctx.balance * tipJar.pctCost);
+  assert.equal(costFor(tipJar, ctx), ctx.balance * tipJar.pctCost * CONVERT_RARITY_STEP.common);
 });

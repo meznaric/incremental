@@ -1,4 +1,4 @@
-import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade, SLOT_FILTERS } from './upgrades.js';
+import { rollSlate, rerollSlot, isEligible, slotMatches, resolveUpgrade, SLOT_FILTERS, convertYieldFor } from './upgrades.js';
 import { checkGamble, checkPurchase } from './interstitial.js';
 import {
   patternBaseRateMul, patternRerollCostMul, patternBuffDurationMul,
@@ -57,12 +57,16 @@ export const PIN_UNLOCK_COST = PIN_TIER_COSTS[0];
 export const REROLL_PCT_PER_SLOT = 0.015;
 export const REROLL_FLOOR_SECONDS = 3;
 
-// Reroll cost is based on the rate captured at the time the slate was rolled
-// (state.shop.offeredRate), not the live rate. This keeps the displayed price
-// stable as production grows. Fall back to live rate if no offered rate is set.
+// Reroll cost is based on the rate captured at roll time (state.shop.offeredRate)
+// so the displayed price stays stable as production grows — but capped by the
+// live effective rate so an expiring buff *drops* the floor. Without the cap,
+// a Carrier window rolled while running ×7 keeps the reroll price 7× too high
+// for the rest of the slate, well after the buff is gone.
 export function computeRerollCost(state, now, nonPinnedCount) {
   const pct = REROLL_PCT_PER_SLOT * nonPinnedCount * state.amount;
-  const rate = state.shop.offeredRate != null ? state.shop.offeredRate : effectiveRate(state, now);
+  const live = effectiveRate(state, now);
+  const offered = state.shop.offeredRate;
+  const rate = offered != null ? Math.min(offered, live) : live;
   const floor = REROLL_FLOOR_SECONDS * rate * nonPinnedCount;
   return Math.max(pct, floor) * patternRerollCostMul(state);
 }
@@ -341,7 +345,7 @@ export function marginalRateForPurchase(state, slot, now) {
     // matches what the buff will actually contribute.
     const sMul = patternBuffRateMulStrength(state);
     const metaStr = metaMulAt(state.buffs.metaStrength, now);
-    const entry = { value: u.mult * sMul * metaStr, duration: u.duration, expiresAt: now + u.duration };
+    const entry = { value: scaleBuffMult(u.mult, sMul, metaStr), duration: u.duration, expiresAt: now + u.duration };
     state.buffs.rateMul.push(entry);
     after = effectiveRate(state, now);
     state.buffs.rateMul.pop();
@@ -392,6 +396,12 @@ export function tryBuy(state, slotIdx, now) {
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
     applyBuff(state, u, now);
+    // Gamble-helper buffs are decode-priced (costFor → upgrades.js), so the
+    // own-count drives the per-cycle escalation. Carrier/Resonance buffs stay
+    // priced off live rate and don't need ownership tracking.
+    if (u.buffType === 'gambleLuck' || u.buffType === 'gambleCushion') {
+      state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    }
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
@@ -417,7 +427,8 @@ export function tryBuy(state, slotIdx, now) {
     if (!usePatternFree && (cost <= 0 || state.amount < cost)) return { ok: false, reason: 'broke' };
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
-    queueToken(state, u.rarity, cost * u.ratio);
+    const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
+    queueToken(state, u.rarity, convertYieldFor(u, cost, baseAdd));
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };
@@ -476,6 +487,18 @@ export function pruneBuffs(state, now) {
   }
 }
 
+// Scale a rateMul buff's headline multiplier by pattern + meta strength.
+// IMPORTANT: bonus is additive, not multiplicative — a ×1.05 buff under a ×2
+// strength frame lands at ×1.10 (+5% × 2 = +10%), not ×2.10. Multiplying the
+// raw mult would turn modest ramps into game-breakers and stack absurdly with
+// any future strength source. Each strength factor scales the bonus
+// independently and they compose multiplicatively: strength S then meta M
+// yields 1 + (mult - 1) × S × M.
+export function scaleBuffMult(mult, patternStrength, metaStrength) {
+  const bonus = mult - 1;
+  return 1 + bonus * patternStrength * metaStrength;
+}
+
 // Combined live multiplier from a list of meta-buffs. Each active entry's
 // value compounds (so two ×1.5 strength frames give ×2.25); inactives return 1.
 function metaMulAt(list, now) {
@@ -510,7 +533,7 @@ function applyBuff(state, u, now) {
   const metaLuck = metaSumAt(b.metaLuck, now);
   const duration = u.duration * dMul * metaDur;
   if (u.buffType === 'rateMul') {
-    b.rateMul.push({ value: u.mult * sMul * metaStr, duration, expiresAt: now + duration });
+    b.rateMul.push({ value: scaleBuffMult(u.mult, sMul, metaStr), duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleLuck') {
     b.gambleLuck.push({ value: u.bonus + metaLuck, duration, expiresAt: now + duration });
   } else if (u.buffType === 'gambleCushion') {

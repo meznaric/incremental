@@ -1,5 +1,6 @@
 import { clearSave } from './save.js';
 import { clearContactLog } from './contactLog.js';
+import { clearAchievements } from './achievements.js';
 import { installTap } from './tap.js';
 
 const PIN = '0011';
@@ -62,6 +63,7 @@ export function initMenu() {
       // preserves the log and banks Echo Memory.
       clearSave();
       clearContactLog();
+      clearAchievements();
       location.reload();
     }
   });

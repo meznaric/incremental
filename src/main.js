@@ -27,6 +27,10 @@ import { showPatternSelect } from './patternUi.js';
 import { ensureNetwork, tickNetwork, tickBleedDrip, SECTORS } from './network.js';
 import { makeNetworkUi } from './networkUi.js';
 import { initMainUi } from './mainUi.js';
+import {
+  loadAchievements, saveAchievements, evaluateAchievements, markStat,
+} from './achievements.js';
+import { initAchievementsUi } from './achievementsUi.js';
 
 const state = {
   amount: 0,
@@ -41,6 +45,9 @@ const state = {
   // The Contact Log persists across save resets — it is the run-accumulating
   // narrative state, separate from the gameplay save.
   contactLog: loadContactLog(),
+  // Achievements — under its own localStorage key so unlocks survive every
+  // cycle close and every gameplay-save wipe. See achievements.js header.
+  achievements: loadAchievements(),
 };
 // Derived each session from the log. Drives Echo Memory in the rate math.
 state.memoryMul = memoryMul(state.contactLog);
@@ -94,6 +101,7 @@ const contactLogUi = initContactLogUi(state, {
   },
 });
 const breakdownUi = initBreakdownUi(state);
+const achievementsUi = initAchievementsUi(state);
 ensureNetwork(state);
 const networkUi = makeNetworkUi(state, {
   openDiagnostic: (tab) => breakdownUi && breakdownUi.open && breakdownUi.open(tab),
@@ -273,6 +281,24 @@ if (hasPendingPatternChoice(state.contactLog)) {
 
 ui.renderShop();
 
+// Bootstrap pass — catch any achievements that should already be unlocked
+// based on persisted log + save state (re-runs are cheap; idempotent). On the
+// very first install these are no-ops; for returning players they backfill.
+{
+  const newly = evaluateAchievements(state.achievements, {
+    state, buffCount: 0,
+    peakAmount: (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0,
+  });
+  if (newly.length > 0) {
+    // First boot after a feature ship may unlock several at once. Treat them
+    // as seen — the player did the work before achievements existed; the
+    // pulse would be misleading.
+    for (const id of newly) state.achievements.seen[id] = true;
+    saveAchievements(state.achievements);
+  }
+  achievementsUi.updateAffordance();
+}
+
 const interstitialUi = makeInterstitialUi(state, (id) => {
   // After the welcome set closes, schedule the in-theme tutorial. Also fires
   // on every other close — but scheduleTutorialIfEligible is idempotent and
@@ -313,6 +339,10 @@ function tick(raf) {
   if (drip > 0) {
     state.amount += drip;
     networkUi.flashBleed(drip);
+    // First isolated-relay drip is an Achievement trigger. The flag persists
+    // across cycles in the achievements stats bag, so a later cycle can't
+    // re-earn it but a new player will earn it the moment the first drip lands.
+    if (markStat(state.achievements, 'bleedDripsSeen')) saveAchievements(state.achievements);
   }
 
   const rate = effectiveRate(state, t);
@@ -354,6 +384,40 @@ function tick(raf) {
   if (raf - lastHud > 100) {
     ui.renderHud(t);
     networkUi.refresh();
+    // Mythic detection — any slot currently advertising a mythic-rarity band
+    // counts. Cheap: ≤10 slots, plain field read. Bleed and engraving flips
+    // happen at the event source, but mythic surfaces from rolls too (not just
+    // buys), so it's polled here.
+    let mythicDirty = false;
+    const slots = state.shop && state.shop.slots;
+    if (slots) {
+      for (const s of slots) {
+        if (s && s.rarity === 'mythic') {
+          if (markStat(state.achievements, 'mythicSeen')) mythicDirty = true;
+          break;
+        }
+      }
+    }
+    // Pattern-ever-chosen flag — promote contactLog.pattern (set/cleared per
+    // cycle) into a sticky log flag so the achievement triggers exactly once
+    // per player history and survives the next cycle's pattern wipe.
+    if (state.contactLog && typeof state.contactLog.pattern === 'string'
+        && state.contactLog.pattern.length > 0
+        && !state.contactLog.patternEverChosen) {
+      state.contactLog.patternEverChosen = true;
+      saveContactLog(state.contactLog);
+    }
+    // Evaluate every HUD tick. evaluateAchievements is O(N defs) and only
+    // checks delta — already-unlocked ids are skipped. New unlocks → toast.
+    const newly = evaluateAchievements(state.achievements, {
+      state, buffCount, peakAmount: (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount,
+    });
+    if (newly.length > 0 || mythicDirty) saveAchievements(state.achievements);
+    if (newly.length) {
+      achievementsUi.showUnlocks(newly);
+      achievementsUi.refresh();
+      achievementsUi.updateAffordance();
+    }
     lastHud = raf;
   }
   if (raf - lastSave > SAVE_INTERVAL_MS) {

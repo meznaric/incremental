@@ -82,6 +82,7 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Patched Frame** | A Cycle Pattern. Three bands ride free at cycle open; every re-tune after that bills double. |
 | **Bare Wire** | A Cycle Pattern. Base listening runs half-strength, but windows hold twice as long and hail carry-chance climbs five points. |
 | **Past Cycles** | The retrospective log of every cycle the player has closed. Opened from the hamburger menu. Read-only — duration, end balance, peak, contacts, mass banked, memory shards. Lives in its own localStorage key so it survives Cycle close. |
+| **Achievements** | The persistent record of milestones Kalen has crossed: cycles closed, episodes cleared, magnitudes reached, rig-shape choices made. Opened from the hamburger menu. Each unlock pops a toast and a pulse on the menu; opening the modal clears the pulse. Lives in its own localStorage key so the record survives every Cycle close and every Reset-equivalent of the gameplay save. |
 | **Band Lock** | The pin upgrade. Five tiers (Band Lock I through V), each unlocking one additional pin slot. A pinned band is exempt from the next re-tune — the offer stays, and the re-tune charge drops by that band's share. Costs 5k / 15k / 45k / 135k / 405k Echoes; tiers unlock in order. Reset by cycle close along with every other in-cycle purchase. |
 
 ## Worlds, by cycle (Season 1)

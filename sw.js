@@ -34,9 +34,13 @@ const PRECACHE = [
   './styles/cyclePattern.css',
   './styles/network.css',
   './styles/gameLog.css',
+  './styles/achievements.css',
 
   './src/main.js',
   './src/mainUi.js',
+  './src/achievements.js',
+  './src/achievements-data.js',
+  './src/achievementsUi.js',
   './src/bignum.js',
   './src/breakdown.js',
   './src/breakdownUi.js',

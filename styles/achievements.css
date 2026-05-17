@@ -1,0 +1,194 @@
+/* Achievements modal — read-only retrospective. Lives next to Past Cycles in
+   the hamburger menu, opens to a grouped list of locked + unlocked entries.
+   Visual register: cool blue, modest. The toast on unlock is the only
+   theatrical surface; the modal itself is library / log. */
+
+#achievementsModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 14, 0.78);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+#achievementsModal.open { display: flex; }
+@media (max-width: 520px) {
+  #achievementsModal {
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+}
+#achievementsModal .ach-summary {
+  font-size: 12px;
+  color: #aab0d0;
+  letter-spacing: 0.02em;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid rgba(120, 140, 255, 0.12);
+  margin-bottom: 10px;
+}
+.ach-group { padding: 8px 0 12px; }
+.ach-group + .ach-group {
+  border-top: 1px solid rgba(120, 140, 255, 0.08);
+  margin-top: 4px;
+}
+.ach-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(20, 20, 40, 0.95);
+  backdrop-filter: blur(6px);
+}
+.ach-group-name {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8aa0ff;
+  font-weight: 600;
+}
+.ach-group-count {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #6a6a90;
+  font-variant-numeric: tabular-nums;
+}
+.ach-group-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ach-entry {
+  background: rgba(20, 20, 40, 0.55);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.ach-entry.is-locked { opacity: 0.6; }
+.ach-entry.is-unlocked { border-color: rgba(111, 232, 161, 0.4); background: rgba(20, 28, 30, 0.55); }
+.ach-entry.is-fresh {
+  border-color: rgba(111, 232, 161, 0.75);
+  animation: ach-entry-pulse 2.4s ease-in-out infinite;
+}
+@keyframes ach-entry-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(111, 232, 161, 0.0); }
+  50%      { box-shadow: 0 0 12px 0 rgba(111, 232, 161, 0.45); }
+}
+.ach-entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ach-entry-name {
+  font-size: 13px;
+  color: #e8e8f0;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.ach-entry.is-locked .ach-entry-name {
+  color: #6a6a90;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.ach-entry.is-unlocked .ach-entry-name { color: #6fe8a1; }
+.ach-entry-stamp {
+  font-size: 10px;
+  color: #6a6a90;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.ach-entry-desc {
+  font-size: 11px;
+  color: #aab0d0;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.ach-entry.is-locked .ach-entry-desc { color: #7a7aa0; }
+
+/* Hamburger menu pulse — mirror the contactLog button's green ready state. */
+#menuToggle.has-unseen {
+  color: #6fe8a1;
+  animation: ach-menu-toggle-pulse 2.4s ease-in-out infinite;
+}
+#menuToggle.has-unseen::after {
+  content: '';
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #6fe8a1;
+  box-shadow: 0 0 6px rgba(111, 232, 161, 0.85);
+  animation: ach-dot-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ach-menu-toggle-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(111, 232, 161, 0); }
+  50%      { text-shadow: 0 0 8px rgba(111, 232, 161, 0.7); }
+}
+@keyframes ach-dot-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.25); }
+}
+.menu-item.has-unseen {
+  color: #6fe8a1;
+}
+.menu-item.has-unseen .ri { color: #6fe8a1; }
+.menu-item.has-unseen::after {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #6fe8a1;
+  box-shadow: 0 0 6px rgba(111, 232, 161, 0.85);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Achievement toast — sits in the shared #toasts stack but reads with a
+   green border + two-line layout instead of the amber stall-help look. */
+.toast.ach-toast {
+  border-color: rgba(111, 232, 161, 0.65);
+  box-shadow: 0 0 18px -6px rgba(111, 232, 161, 0.6);
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.toast.ach-toast:hover { border-color: #6fe8a1; }
+.ach-toast-label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6fe8a1;
+  font-weight: 600;
+}
+.ach-toast-name {
+  font-size: 13px;
+  color: #e8e8f0;
+  font-weight: 600;
+}

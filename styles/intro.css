@@ -97,12 +97,16 @@
   font-size: 12px;
   letter-spacing: 0.32em;
   text-transform: lowercase;
-  color: rgba(255, 220, 180, 0.62);
-  animation: intro-prompt-pulse 3.4s ease-in-out infinite;
+  color: rgba(255, 220, 180, 0.72);
+  /* Gentle breathe rather than a dramatic fade — the prompt should never
+     dip low enough that the player thinks the screen has gone away. The
+     old curve hit 0.22 opacity at the trough, which read as "gone for a
+     second" on a fully black background. */
+  animation: intro-prompt-pulse 2.6s ease-in-out infinite;
 }
 @keyframes intro-prompt-pulse {
-  0%, 100% { opacity: 0.22; letter-spacing: 0.30em; }
-  50%      { opacity: 0.78; letter-spacing: 0.34em; }
+  0%, 100% { opacity: 0.62; letter-spacing: 0.32em; }
+  50%      { opacity: 0.95; letter-spacing: 0.34em; }
 }
 
 /* ===== Locale: tagline + date reveal ===== */

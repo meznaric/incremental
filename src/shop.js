@@ -137,19 +137,29 @@ export const RATE_BUFFS = [
       const mid = (a + c) / 2;
       return xs.some((b) => mid >= b.startedAt && mid < b.expiresAt);
     },
-    // ∏_i (1+r)^(t-s_i) = (1+r)^(N*(t-mean(s))). Integrate in relative time so
-    // exponents stay bounded by buff duration — using absolute Unix seconds
-    // (~1.7e9) overflows pow() to Infinity and the difference collapses to NaN.
-    // Assumes all active compound buffs share the same rate (true for the current upgrade pool).
+    // multAt(τ) = ∏ᵢ (1+rᵢ)^(τ-sᵢ) = exp(K·τ + const) where K = Σ ln(1+rᵢ).
+    // So ∫ multAt(τ) dτ from a→c = (multAt(c) − multAt(a)) / K. Works for
+    // any mix of compound rates — previously the formula collapsed all
+    // active buffs to active[0].rate, which silently underestimated accrual
+    // by ~10× whenever a slow long-duration compound (Slow Burn / Black Sky
+    // / Old Carrier) was running underneath a burst (Resonance Build /
+    // Storm). Rate label uses multAt directly so the gap was visible as
+    // "label moves but balance doesn't keep up" past quintillion. Each
+    // factor (1+rᵢ)^(τ-sᵢ) uses elapsed time bounded by buff duration —
+    // absolute Unix seconds (~1.7e9) would overflow pow().
     integral: (xs, a, c) => {
       const mid = (a + c) / 2;
       const active = xs.filter((b) => mid >= b.startedAt && mid < b.expiresAt);
       if (active.length === 0) return c - a;
-      const r = active[0].rate;
-      const n = active.length;
-      const meanS = active.reduce((s, b) => s + b.startedAt, 0) / n;
-      const k = n * Math.log(1 + r);
-      return (Math.pow(1 + r, n * (c - meanS)) - Math.pow(1 + r, n * (a - meanS))) / k;
+      let K = 0;
+      for (const b of active) K += Math.log(1 + b.rate);
+      if (!(K > 0)) return c - a;
+      let multC = 1, multA = 1;
+      for (const b of active) {
+        multC *= Math.pow(1 + b.rate, c - b.startedAt);
+        multA *= Math.pow(1 + b.rate, a - b.startedAt);
+      }
+      return (multC - multA) / K;
     },
   },
 ];

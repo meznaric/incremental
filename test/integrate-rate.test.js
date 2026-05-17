@@ -126,6 +126,37 @@ test('integrateRate stays finite with present-day Unix timestamps', () => {
   }
 });
 
+// Regression: prior `integral` collapsed all active compound buffs to
+// active[0].rate, so a slow long-duration compound (Slow Burn / Black Sky /
+// Old Carrier) running underneath a burst (Resonance Build / Storm) made
+// integrateRate underestimate by ~10×. effectiveRate uses multAt directly
+// and was correct, so the rate label outran balance growth at quintillion
+// scale until the burst expired.
+test('integrateRate of two compound buffs with different rates matches closed-form', () => {
+  const r1 = 0.0002;  // slow long-duration
+  const r2 = 0.05;    // burst
+  const s1Start = 0;
+  const s2Start = 3000; // burst bought later
+  const a = 3030;
+  const c = 3030 + 1 / 60;
+  const B = 1;
+  const s = makeState({
+    basePerSecond: B,
+    buffs: {
+      compound: [
+        { rate: r1, duration: 7200, startedAt: s1Start, expiresAt: s1Start + 7200 },
+        { rate: r2, duration: 60,   startedAt: s2Start, expiresAt: s2Start + 60 },
+      ],
+      rateMul: [], gambleLuck: [], gambleCushion: [],
+    },
+  });
+  const multAt = (t) => Math.pow(1 + r1, t - s1Start) * Math.pow(1 + r2, t - s2Start);
+  const K = Math.log(1 + r1) + Math.log(1 + r2);
+  const expected = B * (multAt(c) - multAt(a)) / K;
+  const actual = integrateRate(s, a, c);
+  assert.ok(Math.abs(actual - expected) / expected < 1e-9, `expected ${expected}, got ${actual}`);
+});
+
 test('integrateRate stays finite with two stacked compound buffs at modern epoch', () => {
   const now = Date.now() / 1000;
   const r = 0.01;

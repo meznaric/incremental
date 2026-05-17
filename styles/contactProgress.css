@@ -70,23 +70,22 @@
   overflow: visible;
 }
 
-/* Wavy signal line — repeating SVG sine cycle scrolled with background-position.
-   The SVG is hand-tiled so the wave continues smoothly across each repeat.
-   Sized to the strip's full height (thin), centred vertically. */
+/* Signal line — a <canvas> that fills the track. The pixel content is the
+   procedural voice-signal waveform plus warm sparks driven from
+   src/contactProgressUi.js. CSS only positions it; everything else is JS.
+   Canvas is intentionally taller than the strip so the wave has headroom
+   to swing without clipping; the parent track/strip both use overflow:visible. */
 .cp-wave {
   position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 40' preserveAspectRatio='none'><path d='M0 20 C 10 4, 30 4, 40 20 C 50 36, 70 36, 80 20' stroke='%23d49a55' stroke-width='1.6' stroke-linecap='round' fill='none' opacity='0.72'/></svg>");
-  background-repeat: repeat-x;
-  background-size: 80px 100%;
-  background-position-y: center;
-  animation: cp-wave-flow 3.6s linear infinite;
-  opacity: 0.9;
-  filter: drop-shadow(0 0 6px rgba(212, 154, 85, 0.25));
-}
-@keyframes cp-wave-flow {
-  from { background-position-x: 0; }
-  to   { background-position-x: 80px; }
+  top: -14px;
+  left: 0;
+  /* <canvas> is a replaced element with intrinsic 300x150 — top/bottom won't
+     stretch it, so width/height are set explicitly. calc gives the strip a
+     14px overhang on each side for wave headroom. */
+  width: 100%;
+  height: calc(100% + 28px);
+  display: block;
+  pointer-events: none;
 }
 
 /* Traveller — anchored bottom of strip like the edges so its full circle
@@ -159,7 +158,8 @@
   .cp-edge { width: 24px; height: 24px; font-size: 14px; }
   .cp-edge-left { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; }
   .cp-edge-right { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
-  .cp-wave { background-size: 64px 100%; }
+  /* Tighter canvas overhang on phones — shop is closer and the icons smaller. */
+  .cp-wave { top: -10px; height: calc(100% + 20px); }
   .cp-traveler { width: 28px; height: 28px; margin-left: -14px; }
   .cp-finale { font-size: 10px; }
 }

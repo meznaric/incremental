@@ -172,7 +172,7 @@ function onResize() {
     // strip claims is the tallest of those overflowing children — that's the
     // value the canvas must avoid and the mobile buff stacks must clear.
     let band = r.height || 0;
-    for (const child of progressEl.querySelectorAll('.cp-edge, .cp-traveler')) {
+    for (const child of progressEl.querySelectorAll('.cp-edge, .cp-traveler, .cp-wave')) {
       const ch = child.getBoundingClientRect().height;
       if (ch > band) band = ch;
     }
@@ -487,10 +487,14 @@ function tick(raf) {
   try { interstitialUi.tick(dtMs); } catch (e) { console.warn('interstitial tick threw', e); }
   try { interstitialUi.drain(); } catch (e) { console.warn('interstitial drain threw', e); }
 
+  // Contact-progress canvas needs per-frame updates for the wave + sparks
+  // simulation. The work inside is cheap (single 96-point polyline + a few
+  // sparks); the visibility + portrait reads short-circuit when hidden.
+  contactProgressUi.update(dt);
+
   if (raf - lastHud > 100) {
     ui.renderHud(t);
     networkUi.refresh();
-    contactProgressUi.update();
     // Mythic detection — any slot currently advertising a mythic-rarity band
     // counts. Cheap: ≤10 slots, plain field read. Bleed and engraving flips
     // happen at the event source, but mythic surfaces from rolls too (not just

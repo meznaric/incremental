@@ -289,8 +289,8 @@ export function initMainUi(state, deps) {
         // voice: Sera. Second person, procedural, periods only. She has read
         // the wait off the rig; the grant is an observation, not a reward.
         const msg = added === 1
-          ? 'Your carrier is sitting on a long wait. One free reroll is on the file.'
-          : `Your carrier is sitting on a long wait. ${added} free rerolls are on the file.`;
+          ? 'Your carrier is sitting on a long wait. One free re-roll is on the file.'
+          : `Your carrier is sitting on a long wait. ${added} free re-rolls are on the file.`;
         showToast(msg);
         renderShop();
       }
@@ -344,7 +344,7 @@ export function initMainUi(state, deps) {
       const el = document.createElement('div');
       el.className = 'slot';
       el.innerHTML = `
-        <button class="pin" type="button" aria-label="Pin"><i class="ri ri-pushpin-2-fill"></i></button>
+        <button class="pin" type="button" aria-label="Lock"><i class="ri ri-pushpin-2-fill"></i></button>
         <div class="head">
           <i class="kind-icon"></i>
           <div class="rarity"></div>
@@ -489,12 +489,12 @@ export function initMainUi(state, deps) {
     const rerollVisible = state.shop.rerollUnlocked;
     setTbBtn('unlock-reroll', rerollUnlockVisible,
       rerollUnlockVisible && state.amount < REROLL_UNLOCK_COST,
-      `Unlock Reroll · <span class="cc">${ECHO_ICON}${formatAbbrev(REROLL_UNLOCK_COST)}</span>`);
+      `Unlock Re-roll · <span class="cc">${ECHO_ICON}${formatAbbrev(REROLL_UNLOCK_COST)}</span>`);
     if (rerollVisible) {
       const n = countRerollableForUi();
       const cost = computeRerollCost(state, nowSeconds(), n);
       setTbBtn('reroll', true, !(n > 0 && state.amount >= cost && state.amount > 0),
-        `Reroll ${n} · <span class="cc">${ECHO_ICON}${formatAbbrev(cost)}</span>`);
+        `Re-roll ${n} · <span class="cc">${ECHO_ICON}${formatAbbrev(cost)}</span>`);
     } else {
       setTbBtn('reroll', false, false, '');
     }
@@ -503,19 +503,17 @@ export function initMainUi(state, deps) {
     const freeVisible = rerollVisible && freeCount > 0;
     const freeN = freeVisible ? countRerollableForUi() : 0;
     setTbBtn('free-reroll', freeVisible, freeVisible && freeN === 0,
-      `<i class="ri ri-gift-fill"></i> Free Reroll (${freeCount})`);
+      `<i class="ri ri-gift-fill"></i> Free Re-roll (${freeCount})`);
 
-    // Band Lock — pin upgrades. The button cycles through five tiers; each
-    // buy increments state.shop.pinSlots and reveals the next tier's price.
-    // Once tier 5 lands the button retreats. Label uses Roman numerals so
-    // the progression reads at a glance (Unlock Pin · I/II/III/IV/V).
+    // Lock Bands — the button cycles through five tiers; each buy increments
+    // state.shop.pinSlots and reveals the next tier's price. Once tier 5 lands
+    // the button retreats. Label uses Roman numerals so the progression reads
+    // at a glance (Lock Bands · I/II/III/IV/V).
     const pinCost = nextPinTierCost(state);
     const pinOwned = state.shop.pinSlots || 0;
     const pinVisible = state.shop.rerollUnlocked && pinCost != null && state.amount >= PIN_UNLOCK_AT;
     const tierRoman = ['I', 'II', 'III', 'IV', 'V'][pinOwned] || '';
-    const pinLabel = pinOwned === 0
-      ? `Unlock Pin · <span class="cc">${ECHO_ICON}${formatAbbrev(pinCost || 0)}</span>`
-      : `Band Lock ${tierRoman} · <span class="cc">${ECHO_ICON}${formatAbbrev(pinCost || 0)}</span>`;
+    const pinLabel = `Lock Bands ${tierRoman} · <span class="cc">${ECHO_ICON}${formatAbbrev(pinCost || 0)}</span>`;
     setTbBtn('unlock-pin', pinVisible, pinVisible && state.amount < (pinCost || 0), pinLabel);
 
     const anyVisible = rerollUnlockVisible || rerollVisible || pinVisible || freeVisible;

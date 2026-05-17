@@ -583,8 +583,17 @@
   margin-right: -16px;
   padding: 0 16px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* Lock the strip to horizontal pans only — vertical swipes fall through to
+     .bm-body so the panel content keeps scrolling normally when the user
+     drags down on the tab row. */
+  touch-action: pan-x;
+  /* Cover the 14px margin-bottom gap so panel content scrolling up doesn't
+     show through underneath the sticky strip. */
+  box-shadow: 0 14px 0 0 rgba(20, 20, 40, 0.95);
 }
 .diag-tabs::-webkit-scrollbar { display: none; }
 .diag-tab {

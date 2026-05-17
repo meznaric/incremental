@@ -12,7 +12,7 @@ import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECOND
 
 // Signal Diagnostic — seven tabs:
 //   Pulse     — live rate factorisation (the original content)
-//   Console   — re-tune (reroll) and Band Lock (pin) — how the bands behave
+//   Console   — Re-roll and Lock Bands — how the bands behave
 //   Windows   — four buff kinds with stacking rules + provenance
 //   Hail      — gamble loop in plain language
 //   Network   — Seed Relay placement system: sectors, clustering, discovery, drip
@@ -68,8 +68,8 @@ export function initBreakdownUi(state) {
     const fmtCost = (n) => new Intl.NumberFormat('en-US').format(n);
     const pinRows = PIN_TIER_COSTS.map((c, i) => `
       <tr>
-        <td>Band Lock ${['I','II','III','IV','V'][i]}</td>
-        <td>${i + 1} pin${i === 0 ? '' : 's'}</td>
+        <td>Lock Bands ${['I','II','III','IV','V'][i]}</td>
+        <td>${i + 1} lock${i === 0 ? '' : 's'}</td>
         <td><i class="ri ri-broadcast-fill cc-icon"></i>${fmtCost(c)}</td>
       </tr>
     `).join('');
@@ -78,39 +78,39 @@ export function initBreakdownUi(state) {
       <p class="diag-intro">The Console is the bank of bands in front of you. Every band carries one offer — a Relay, a Decode, a Window, a Hail, a Seed Relay. You buy the offer or you sweep the bank for new ones.</p>
 
       <div class="faq-block">
-        <div class="faq-head"><i class="ri ri-refresh-line"></i>Re-tune — sweeping the array</div>
+        <div class="faq-head"><i class="ri ri-refresh-line"></i>Re-roll — sweeping the array</div>
         <div class="faq-body">
-          <p>Re-tune throws out every band's current offer and rolls fresh ones in their place. Use it when nothing on the Console is worth your Echoes, or when you are waiting for a specific kind of offer to land.</p>
+          <p>A re-roll throws out every band's current offer and rolls fresh ones in their place. Use it when nothing on the Console is worth your Echoes, or when you are waiting for a specific kind of offer to land.</p>
           <p><strong>Cost.</strong> ${pctLabel} of your balance per swept band, or a ${REROLL_FLOOR_SECONDS}-second floor of your current pulse per swept band — whichever is higher. The floor keeps the price honest when the balance is light.</p>
-          <p><strong>Free sweeps.</strong> If your carrier is sitting on a long wait, the rig grants free re-tunes. They sit on the file. Spend them before paying — they apply first.</p>
+          <p><strong>Free sweeps.</strong> If your carrier is sitting on a long wait, the rig grants free re-rolls. They sit on the file. Spend them before paying — they apply first.</p>
           <p><strong>First sweep of a session.</strong> Free. You always get one on the house when you sit down.</p>
         </div>
       </div>
 
       <div class="faq-block">
-        <div class="faq-head"><i class="ri ri-pushpin-2-fill"></i>Band Lock — holding offers steady</div>
+        <div class="faq-head"><i class="ri ri-pushpin-2-fill"></i>Lock Bands — holding offers steady</div>
         <div class="faq-body">
-          <p>Pinning a band — locking it — exempts it from the next re-tune. The offer stays. A re-tune with three bands pinned only sweeps the unpinned ones, and only charges for those.</p>
-          <p><strong>Two ways the cost drops.</strong> Each pinned band reduces the number of swept bands. Fewer swept bands means a lower percentage charge <em>and</em> a lower floor. Pin everything you do not want to lose; sweep what is left.</p>
-          <p><strong>Five tiers.</strong> Each Band Lock you buy raises your pin cap by one. The first lets you hold a single band; the fifth lets you hold all five. The tiers unlock in order.</p>
+          <p>Locking a band exempts it from the next re-roll. The offer stays. A re-roll with three bands locked only sweeps the unlocked ones, and only charges for those.</p>
+          <p><strong>Two ways the cost drops.</strong> Each locked band reduces the number of swept bands. Fewer swept bands means a lower percentage charge <em>and</em> a lower floor. Lock everything you do not want to lose; sweep what is left.</p>
+          <p><strong>Five tiers.</strong> Each Lock Bands tier you buy raises your lock cap by one. The first lets you hold a single band; the fifth lets you hold all five. The tiers unlock in order.</p>
           <table class="diag-table" style="margin-top:8px;">
-            <thead><tr><th>Tier</th><th>Pin cap</th><th>Cost</th></tr></thead>
+            <thead><tr><th>Tier</th><th>Lock cap</th><th>Cost</th></tr></thead>
             <tbody>${pinRows}</tbody>
           </table>
-          <p style="margin-top:8px;"><strong>If you pin past the cap.</strong> The oldest pin drops off and the new one takes its slot. The tap always lands; you do not need to find and un-pin an old band first.</p>
+          <p style="margin-top:8px;"><strong>If you lock past the cap.</strong> The oldest lock drops off and the new one takes its slot. The tap always lands; you do not need to find and unlock an old band first.</p>
         </div>
       </div>
 
       <div class="faq-block">
         <div class="faq-head"><i class="ri ri-lightbulb-flash-line"></i>How they pair</div>
         <div class="faq-body">
-          <p>Re-tune is how you reach the offer you want. Band Lock is how you keep it once you find it. The clean loop: re-tune until a band lands the offer you have been waiting for, lock that band, sweep the rest at a fraction of the cost. Repeat until the Console reads exactly the way you want it to.</p>
-          <p>Buying a locked band re-rolls that slot under the lock — the slot stays pinned, the offer is replaced. You do not need to re-pin after a purchase.</p>
+          <p>Re-roll is how you reach the offer you want. Lock Bands is how you keep it once you find it. The clean loop: re-roll until a band lands the offer you have been waiting for, lock that band, sweep the rest at a fraction of the cost. Repeat until the Console reads exactly the way you want it to.</p>
+          <p>Buying a locked band re-rolls that slot under the lock — the slot stays locked, the offer is replaced. You do not need to re-lock after a purchase.</p>
           <p><strong>Limit.</strong> Up to ${MAX_PIN_SLOTS} bands can be locked at once. The Console never holds more than that.</p>
         </div>
       </div>
 
-      <p class="faq-foot">The Console resets at every cycle close. Re-tune charges, pin choices, free sweeps — all wiped. Band Lock <em>tiers</em> are part of this cycle's spend, not cross-cycle: a fresh cycle starts at zero pins.</p>
+      <p class="faq-foot">The Console resets at every cycle close. Re-roll charges, lock choices, free sweeps — all wiped. Lock Bands <em>tiers</em> are part of this cycle's spend, not cross-cycle: a fresh cycle starts at zero locks.</p>
     `;
   }
 
@@ -182,7 +182,7 @@ export function initBreakdownUi(state) {
           <p>Buffer windows return a % of a failed wager. Stack Buffers additively up to 100% (full refund). A 30% Buffer turns a busted Hail from "wager X, miss" into "wager X, miss, get 0.3 X back."</p>
         </div>
       </div>
-      <p class="faq-foot">Optimal Hail window: high Carry + active Buffer + a fresh reroll. First reroll of a session is free.</p>
+      <p class="faq-foot">Optimal Hail window: high Carry + active Buffer + a fresh re-roll. First re-roll of a session is free.</p>
     `;
   }
 
@@ -336,7 +336,7 @@ export function initBreakdownUi(state) {
           <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
         </div>
       </div>
-      <p class="faq-foot">Cycle Patterns (free rerolls, surge buff, etc.) are picked once per cycle and hold until you close it. Engravings are bought with Mass and cut once.</p>
+      <p class="faq-foot">Cycle Patterns (free re-rolls, surge buff, etc.) are picked once per cycle and hold until you close it. Engravings are bought with Mass and cut once.</p>
     `;
   }
 

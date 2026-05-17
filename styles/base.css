@@ -793,6 +793,9 @@ input[type="text"]:focus { border-color: #6688ff; }
   margin-left: -16px;
   margin-right: -16px;
   padding: 0 16px;
+  /* Cover the 14px margin-bottom gap so panel content scrolling up doesn't
+     show through underneath the sticky strip. */
+  box-shadow: 0 14px 0 0 rgba(20, 20, 40, 0.95);
 }
 .cl-tab {
   background: transparent;

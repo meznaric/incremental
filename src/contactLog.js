@@ -379,11 +379,11 @@ export const ENGRAVINGS = [
     cost: (lvl) => 3 * Math.pow(2, lvl), max: 8 },
   // One-time. Reroll comes pre-unlocked next cycle.
   { id: 'patched_hands', name: 'Patched Hands',
-    desc: 'Worn tuning gloves; the band-sweep already knows the way. Re-tune is unlocked from cycle open.',
+    desc: 'Worn tuning gloves; the band-sweep knows the way. Re-roll is pre-unlocked at cycle open — no Echoes spent to enable it.',
     cost: () => 8, max: 1 },
   // One-time. Third band patched in from the start.
   { id: 'open_frame',    name: 'Open Frame',
-    desc: 'A third band, permanently patched into the rig.',
+    desc: 'A third band, permanently patched into the rig. Every cycle opens with 3 upgrade slots instead of the default 2.',
     cost: () => 15, max: 1 },
   // Leveled. The *new mathematical variable*. Each level adds +0.02 to the
   // exponent on effective rate: rate becomes max(rate, 1) ^ (1 + 0.02 * level).

@@ -18,10 +18,13 @@ export const COVERAGE_BONUS_PER_SECTOR = 0.20;
 export const CLUSTER_YIELD_PER_NEIGHBOR = 0.5;
 export const CLUSTER_DISCOVERY_PER_NEIGHBOR = 0.5;
 export const ISOLATED_DISCOVERY_FACTOR = 0.1;
-// An isolated relay drops a small Echo Bleed periodically — the sparse-only
-// payoff that gives spread-out builds a positive identity, not just a lower
-// risk profile. Bleed amount = baseYield × sector.yieldMul × this many seconds.
-export const BLEED_YIELD_SECONDS = 30;
+// An isolated relay drops an Echo Bleed periodically — the sparse-only payoff
+// that gives spread-out builds a positive identity, not just a lower risk
+// profile. Bleed amount = baseYield × sector.yieldMul × this many seconds.
+// Tuned high enough that a single isolated mythic in a quiet sector pays
+// meaningfully on its own — bleed lands raw, bypassing the multiplier stack,
+// so it has to be generous in raw seconds to compete with multiplied rate.
+export const BLEED_YIELD_SECONDS = 150;
 
 // Six sectors. yieldMul scales placed-relay yield; discoveryMul scales the
 // per-minute discovery roll; ripenMul stretches/shrinks the tier's ripen time.

@@ -205,10 +205,13 @@ test('reconcileOfflineBleeds: closed-form expectation for an isolated relay', ()
   placeRelay(st, silent, 0);
   const relay = st.network.relays[0];
   relay.ripensAt = 0; // force-ripe
-  // 1 hour offline. Expected drops = 3600 / 1200 = 3. Each drop = 100 × 0.7 × 30 = 2100.
-  // Total expected = 6300.
+  // 1 hour offline. Expected drops = 3600 / common.bleedPeriodSec.
+  // Each drop = baseYield × sector.yieldMul × BLEED_YIELD_SECONDS.
+  const drops = 3600 / TIER_INFO.common.bleedPeriodSec;
+  const perDrop = 100 * SECTORS.silent.yieldMul * BLEED_YIELD_SECONDS;
+  const expected = drops * perDrop;
   const total = reconcileOfflineBleeds(st, 3600, 1);
-  assert.ok(Math.abs(total - 6300) < 1e-6, `got ${total}`);
+  assert.ok(Math.abs(total - expected) < 1e-6, `got ${total}, expected ${expected}`);
 });
 
 test('reconcileOfflineBleeds: clustered relays drop nothing', () => {

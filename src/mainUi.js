@@ -856,10 +856,19 @@ export function initMainUi(state, deps) {
         ? `<div class="buff-bars-multi">${g.bars.map((b) => `<div class="buff-mini" style="flex:${Math.max(b.remain, 0.001)};"></div>`).join('')}</div>`
         : `<div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(g.remain)}</div>
            <div class="buff-bar"><div class="buff-bar-fill" style="width:${g.pct * 100}%"></div></div>`;
+      // Numeric stack-count badge only on the combined card with 2+ buffs.
+      // The multi-bar already encodes count visually, but a number reads
+      // faster at a glance when bars are tightly packed. Lives as its own
+      // flex item (not inside .buff-name) so it survives the name truncation
+      // when value or name are wide.
+      const count = g.count > 1
+        ? `<span class="buff-count">×${g.count}</span>`
+        : '';
       return `
         <div class="buff-card kind-${g.kind || ''} ${extraClass}" ${extraAttrs}>
           <div class="buff-head">
-            <span class="buff-name"><i class="ri ri-fw ${g.icon}"></i>${g.name}</span>
+            <span class="buff-name"><i class="ri ri-fw ${g.icon}"></i><span class="buff-name-text">${g.name}</span></span>
+            ${count}
             <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
             <span class="buff-val">${g.value}</span>
           </div>
@@ -882,7 +891,7 @@ export function initMainUi(state, deps) {
       // The multi-bar render uses the per-buff `bars` list instead.
       const soon = list.reduce((a, x) => (x.remain < a.remain ? x : a), list[0]);
       const bars = list.map((x) => ({ remain: x.remain }));
-      return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct, bars };
+      return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct, bars, count: list.length };
     };
 
     const groupHtml = [];

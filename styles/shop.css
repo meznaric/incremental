@@ -109,7 +109,7 @@
   left: 16px;
   display: none;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   width: 190px;
   pointer-events: none;
 }
@@ -134,8 +134,29 @@
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .buff-name .ri-fw { font-size: 13px; line-height: 1; }
+.buff-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.buff-count {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c0d0ff;
+  flex-shrink: 0;
+}
+.kind-rate     .buff-count { color: #9d6ee0; background: rgba(157, 110, 224, 0.14); }
+.kind-luck     .buff-count { color: #ff5a6e; background: rgba(255, 90, 110, 0.14); }
+.kind-cushion  .buff-count { color: #ff8a8a; background: rgba(255, 138, 138, 0.14); }
+.kind-compound .buff-count { color: #7c5ad4; background: rgba(124, 90, 212, 0.14); }
 .buff-info {
   pointer-events: auto;
   background: transparent;

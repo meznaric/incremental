@@ -431,6 +431,46 @@ function tick(raf) {
 requestAnimationFrame(tick);
 
 window.addEventListener('beforeunload', () => saveState(state));
+
+// Tab-background → return is also a Signal Lock moment. Backgrounded tabs
+// keep ticking (rAF throttled to ~1Hz), so state.amount accrues piecemeal
+// during the away window — diffing snapshot at hide vs current on return
+// gives the right earnings number. MIN_OFFLINE_S inside showWelcomeBack
+// still gates short flicks. Drift mul is intentionally not applied here:
+// Drift is offline-only by design (see save.js / drift kind).
+let _hiddenAt = 0;
+let _hiddenAmount = 0;
+let _hiddenLossCount = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') saveState(state);
+  if (document.visibilityState === 'hidden') {
+    saveState(state);
+    _hiddenAt = nowSeconds();
+    _hiddenAmount = state.amount;
+    _hiddenLossCount = (state.network && state.network.lostCount) || 0;
+    return;
+  }
+  if (document.visibilityState === 'visible' && _hiddenAt > 0) {
+    const savedAt = _hiddenAt;
+    const amountBefore = _hiddenAmount;
+    const lossBefore = _hiddenLossCount;
+    _hiddenAt = 0;
+    const offline = nowSeconds() - savedAt;
+    // Defer one rAF so any pending wall-clock accrual lands before we diff.
+    // Browsers that pause rAF entirely on hidden roll the whole window into
+    // the first foreground tick — read amount after that lands.
+    requestAnimationFrame(() => {
+      const earnings = Math.max(0, state.amount - amountBefore);
+      const lossNow = (state.network && state.network.lostCount) || 0;
+      const networkLosses = Math.max(0, lossNow - lossBefore);
+      if (networkLosses > 0 && offline < 60) {
+        ui.showToast(`ComDef pulled ${networkLosses} relay${networkLosses === 1 ? '' : 's'} while you were away.`);
+      }
+      showWelcomeBack({
+        state, offline, earnings, savedAt,
+        networkBleed: 0,
+        networkLosses,
+        offlineMul: 1,
+      });
+    });
+  }
 });

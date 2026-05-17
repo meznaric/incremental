@@ -91,26 +91,29 @@ test('mul cost ramp does not affect non-mul permanents', () => {
   assert.equal(a, b, 'add-permanent cost should not change with mul owned count');
 });
 
-test('common mul stays in the pool past its original maxRate', () => {
-  // mult_starter used to be filtered out at rate ≥ 500. It now stays eligible
-  // and switches to rate-aware pricing instead.
-  const u = getUpgrade('mult_starter');
-  assert.ok(isEligible(u, { rate: 50,    owned: {} }));
-  assert.ok(isEligible(u, { rate: 1e4,   owned: {} }));
-  assert.ok(isEligible(u, { rate: 1e10,  owned: {} }));
+test('mul perms phase out past their maxRate', () => {
+  // Weak mul commons used to linger past maxRate on a rate-aware cost path.
+  // The resulting offers were both unaffordable and useless (×1.05 priced at
+  // Qi-scale once category ramp landed), so they now filter out like every
+  // other kind.
+  const u = getUpgrade('mult_starter'); // ×1.5, maxRate 500
+  assert.ok(isEligible(u, { rate: 50,   owned: {} }), 'should be offered below maxRate');
+  assert.ok(isEligible(u, { rate: 499,  owned: {} }), 'should be offered just under maxRate');
+  assert.ok(!isEligible(u, { rate: 500, owned: {} }), 'filters out at maxRate');
+  assert.ok(!isEligible(u, { rate: 1e8, owned: {} }), 'and stays filtered out far above');
 });
 
-test('mul cost transitions to rate-aware floor past maxRate', () => {
-  // Below maxRate, cost uses the static baseCost ladder. Above it, the
-  // rate-aware floor kicks in so weak commons aren't trivially cheap at
-  // high production.
-  const u = getUpgrade('mult_starter'); // ×1.5, maxRate 500
-  const below = costFor(u, { balance: 0, rate: 100,  owned: {} });
-  const above = costFor(u, { balance: 0, rate: 1e8,  owned: {} });
-  // Below the threshold, baseCost (50) wins.
-  assert.equal(below, 50);
-  // Above, the floor should make the cost dwarf the static one.
-  assert.ok(above > 1e8, `expected rate-aware floor to dominate at rate 1e8, got ${above}`);
+test('mul cost no longer depends on rate (no rate-aware floor)', () => {
+  // After the filter flip, mul cost is just baseCost × growth^(n+n²/25) ×
+  // category ramp. Rate doesn't enter the math anymore — by the time the
+  // upgrade is offered, it's known to be in-band.
+  const u = getUpgrade('mult_starter'); // ×1.5, baseCost 50
+  const lowRate  = costFor(u, { balance: 0, rate: 100,  owned: {} });
+  const midRate  = costFor(u, { balance: 0, rate: 1e8,  owned: {} });
+  const highRate = costFor(u, { balance: 0, rate: 1e15, owned: {} });
+  assert.equal(lowRate,  50);
+  assert.equal(midRate,  50);
+  assert.equal(highRate, 50);
 });
 
 test('convert cost is capped by baseAdditive × CONVERT_BOOST_CAP', () => {

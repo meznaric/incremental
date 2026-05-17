@@ -62,10 +62,11 @@ export function isEligible(u, ctx) {
   if (u._dyn) return true; // virtual generators are always eligible
   if (u.kind === 'convert' && r <= CONVERT_MIN_RATE) return false;
   if (u.minRate != null && r < u.minRate) return false;
-  // maxRate is *not* a hard filter for mul perms — it acts as a cost-mode
-  // transition in costFor instead, so cheap commons stay in the pool past
-  // their original rate band rather than vanishing once production climbs.
-  if (u.maxRate != null && u.permType !== 'mul' && r >= u.maxRate) return false;
+  // maxRate phases the upgrade out once production climbs past its band. Weak
+  // mul commons used to linger past their band on a rate-aware cost, but the
+  // resulting offers were unaffordable *and* useless (×1.05 priced at Qi-scale)
+  // — they just hogged slots a stronger tier would have filled.
+  if (u.maxRate != null && r >= u.maxRate) return false;
   return true;
 }
 
@@ -265,16 +266,6 @@ export function totalMulOwned(owned) {
 // you stack several alive across spread sectors.
 export const CONVERT_BOOST_CAP = { common: 0.04, uncommon: 0.15, rare: 0.45, legendary: 1.3 };
 
-// Mul perm cost past its original maxRate band: switch from the static
-// baseCost ladder to a rate-aware floor matching the dyn-add pricing curve.
-// Keeps cheap commons in the pool but priced honestly at high production.
-function mulRateAwareCost(upgrade, rate) {
-  const effGain = rate * Math.max(upgrade.value - 1, 0);
-  if (!(effGain > 0)) return 0;
-  const L = Math.log10(Math.max(effGain, 10));
-  return effGain * (40 + L * 30) * Math.pow(1.5, L);
-}
-
 // Permanent cost: super-exponential in own count (growth^(n+n²/25)) so the Nth
 // purchase costs visibly more than the (N-1)th. Mul permanents additionally
 // pay a stacked-exponential category ramp 1.35^(N+N²/40) over total muls owned
@@ -295,10 +286,6 @@ export function costFor(upgrade, ctx) {
       const n = ctx.owned[upgrade.id] || 0;
       let c = upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
       if (upgrade.permType === 'mul') {
-        const rate = Math.max(ctx.rate || 0, 0);
-        if (upgrade.maxRate != null && rate > upgrade.maxRate) {
-          c = Math.max(c, mulRateAwareCost(upgrade, rate));
-        }
         const N = totalMulOwned(ctx.owned);
         c *= Math.pow(MUL_CATEGORY_GROWTH, N + (N * N) / 40);
       }

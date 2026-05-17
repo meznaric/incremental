@@ -70,7 +70,7 @@ const BASE_INTERSTITIALS = {
     introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 01 / 03',
     bgImage: './docs/lore/images/interrogation-cell.png',
     input: {
-      onStep: 2,
+      onStep: 1,
       placeholder: 'Your name',
       onSubmit: (state, value) => {
         state.contactLog.pickedName = value;
@@ -78,15 +78,13 @@ const BASE_INTERSTITIALS = {
       },
     },
     steps: [
-      { voice: 'S', text: 'You knew this would happen.' },
-      { voice: 'S', text: 'Sit down. State your name for the record.' },
-      { voice: 'S', text: 'Type it carefully. The transcript does not edit.' },
+      { voice: 'S', text: 'Sit down.' },
+      { voice: 'S', text: 'State your name. For the record.' },
     ],
   },
 
-  // voice: Sera. Dramatic intro chain — step 2 of 3. The reveal: the name
-  // you typed is not your name. The list of charges sets the world (Quiet
-  // Law, eleven years, ComDef has the file) without spelling out mechanics.
+  // voice: Sera. Dramatic intro chain — page 2. The reveal + charges,
+  // compressed: who he is, what he did, that they have him.
   intro_kalen: {
     cssClass: 'it-intro-frame',
     introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 02 / 03',
@@ -95,48 +93,37 @@ const BASE_INTERSTITIALS = {
       { voice: 'S', text: (s) => {
         const n = (s.contactLog && s.contactLog.pickedName) || '';
         return n
-          ? `No. You are not ${n}.`
-          : 'No. That is not your name.';
+          ? `No. You are not ${n}. You are Kalen Vale, formerly Union Comms.`
+          : 'No. That is not your name. You are Kalen Vale, formerly Union Comms.';
       } },
-      { voice: 'S', text: 'You are Kalen Vale. Former Union Comms, Relay Engineering, Grade 4.' },
-      { voice: 'S', text: 'We know you have been speaking past the Quiet Law for eleven years.' },
-      { voice: 'S', text: 'We have your carrier signature on 80 forbidden worlds.' },
-      { voice: 'S', text: 'We have the consequences on file. The cascades. The deaths.' },
-      { voice: 'S', text: 'And tonight, Kalen, we have you.' },
+      { voice: 'S', text: 'Eleven years past the Quiet Law. Eighty worlds on the carrier. The cascades are in the file.' },
+      { voice: 'S', text: 'Tonight, Kalen, we have you.' },
     ],
   },
 
-  // voice: Sera. Dramatic intro chain — step 3 of 3. The hand-off. When this
-  // closes, main.js dismisses the intro backdrop and the game becomes
-  // visible. The next interstitial (intro_premise, in the regular card
-  // style) is Kalen answering Sera's prompt as the rig appears.
+  // voice: Sera. Dramatic intro chain — page 3. The hand-off, single beat.
+  // When this closes, main.js dismisses the backdrop and the game becomes
+  // visible above the live rig for intro_premise.
   intro_tell_us: {
     cssClass: 'it-intro-frame',
     introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 03 / 03',
     bgImage: './docs/lore/images/interrogation-cell.png',
     steps: [
-      { voice: 'S', text: 'I am going to record everything you say from this point.' },
-      { voice: 'S', text: 'Walk me through it. Slowly. The whole eleven years.' },
-      { voice: 'S', text: 'Start at the beginning, Kalen. Tell us how it began.' },
+      { voice: 'S', text: 'Start at the beginning. Tell me how it began.' },
     ],
   },
 
-  // voice: Kalen. The game has just become visible — the canvas, the rig,
-  // the Console gate. Kalen begins answering Sera's prompt from behind the
-  // desk. This is the first interstitial rendered above the *live* game, so
-  // it's also where the mechanical orientation lives: rig, Echoes, Console,
-  // hails — same content the legacy welcome + tutorial_open covered, now
-  // folded into one Kalen monologue that reads as testimony rather than
-  // tutorial. Uses the regular interstitial style (no it-intro-frame).
+  // voice: Kalen. Plays above the live rig — first time the player sees the
+  // game. Folds the orientation (rig, Echoes, Console, hails, offline) into
+  // Kalen's testimony so it reads as answering Sera's prompt rather than as
+  // a tutorial card.
   intro_premise: {
     bgImage: './docs/lore/images/console-dark.png',
     steps: [
-      { voice: 'K', text: 'The beginning. Alright.' },
-      { voice: 'K', text: 'A rig like this one. A relay channel I was not supposed to touch.' },
-      { voice: 'K', text: 'I listened for years before I answered. Eleven, by her count. She has it right.' },
-      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them. It does not stop while I am away from the desk.' },
-      { voice: 'K', text: 'At a hundred Echoes the Console opens — the bands I can buy. Yield first. Hails when I am brave. The cheap ones always come first.' },
-      { voice: 'K', text: 'Sit at the desk with me. I will show you what answered.' },
+      { voice: 'K', text: 'The beginning, then.' },
+      { voice: 'K', text: 'A rig like this one. A channel I was not supposed to touch.' },
+      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them — even when the desk is empty.' },
+      { voice: 'K', text: 'At a hundred Echoes the Console opens. Yield first. Hails when I am brave.' },
     ],
   },
 

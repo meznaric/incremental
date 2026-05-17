@@ -4,6 +4,7 @@ import {
   patternBaseRateMul, patternRerollCostMul, patternBuffDurationMul,
   patternBuffRateMulStrength, patternGambleLuckBonus,
   patternFreeLeft, consumePatternFreePurchase,
+  patternPurchaseCostMul, patternNetworkYieldMul,
 } from './cyclePatterns.js';
 import { networkContribution, queueToken, countOnlineRelays } from './network.js';
 
@@ -200,8 +201,11 @@ export function applyDampening(rate) {
 
 // Seed-Relay yield folds into the additive base, same place as flatBonus,
 // so it rides every multiplier downstream (permMul, buffs, memory, ascent).
+// patternNetworkYieldMul scales just the mesh contribution — patterns like
+// Echo Loom turn the network into the primary income, not the base rate.
 function additiveBase(state, now) {
-  return (state.basePerSecond || 0) + (state.flatBonus || 0) + networkContribution(state, now);
+  return (state.basePerSecond || 0) + (state.flatBonus || 0)
+    + networkContribution(state, now) * patternNetworkYieldMul(state);
 }
 
 export function effectiveRate(state, now) {
@@ -260,8 +264,10 @@ export function integrateRate(state, t0, t1) {
     if (c <= a) continue;
     const mid = (a + c) / 2;
     // Sample networkContribution per segment so ripening relays start
-    // contributing only from their ripensAt onward.
-    const segBase = ((state.basePerSecond || 0) + state.flatBonus + networkContribution(state, mid)) * flatBaseMul;
+    // contributing only from their ripensAt onward. patternNetworkYieldMul
+    // scales the mesh contribution (Echo Loom).
+    const meshContribution = networkContribution(state, mid) * patternNetworkYieldMul(state);
+    const segBase = ((state.basePerSecond || 0) + state.flatBonus + meshContribution) * flatBaseMul;
     let factor = 1;
     let timeIntegral = c - a;
     let continuousFound = false;
@@ -360,12 +366,14 @@ export function tryBuy(state, slotIdx, now) {
   if (!slot) return { ok: false, reason: 'invalid' };
   const u = resolveUpgrade(slot);
   if (!u) return { ok: false, reason: 'invalid' };
-  const cost = slot.cost;
   // Pattern: free-purchase charges cover any non-hail, non-bleed purchase.
   // Gambles and gifts are excluded — gambles take a real wager, gifts are
   // already free.
   const isCharged = u.kind !== 'gamble' && u.kind !== 'gift';
   const usePatternFree = isCharged && patternFreeLeft(state) > 0;
+  // Pattern: scale charged-purchase cost (Patched Frame). Free purchases bypass
+  // cost entirely, so the multiplier only bites once the freebies run out.
+  const cost = isCharged ? slot.cost * patternPurchaseCostMul(state) : slot.cost;
 
   if (u.kind === 'gamble') {
     if (now < (state.gambleCd[slot.id] || 0)) return { ok: false, reason: 'cooldown' };
@@ -422,7 +430,10 @@ export function tryBuy(state, slotIdx, now) {
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
     const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
-    queueToken(state, u.rarity, convertYieldFor(u, cost, baseAdd));
+    // Yield credit follows the rolled cost, not the pattern-scaled price.
+    // Patched Frame doubles what the player pays for a convert without doubling
+    // what the relay ends up worth — the cost penalty has to actually bite.
+    queueToken(state, u.rarity, convertYieldFor(u, slot.cost, baseAdd));
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };

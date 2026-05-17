@@ -196,6 +196,31 @@ test('evaluateAchievements: patternEverChosen back-derives from log.pattern', ()
   assert.ok(newly.includes('first_pattern'));
 });
 
+test('evaluateAchievements: all_patterns_complete fires once every PATTERN id is recorded', async () => {
+  beforeEach();
+  const { PATTERNS } = await import('../src/cyclePatterns.js');
+  const ach = loadAchievements();
+  // Partial coverage — should not fire yet.
+  const partial = Object.fromEntries(PATTERNS.slice(0, -1).map((p) => [p.id, 1]));
+  const state1 = {
+    contactLog: freshLog({ patternCompleted: partial }),
+    messages: { stats: {} },
+  };
+  const newly1 = evaluateAchievements(ach, { state: state1, buffCount: 0 });
+  assert.ok(!newly1.includes('all_patterns_complete'),
+    'should not fire while a Pattern is still untried');
+  // Full coverage — should fire.
+  const ach2 = loadAchievements();
+  beforeEach();
+  const full = Object.fromEntries(PATTERNS.map((p) => [p.id, 1]));
+  const state2 = {
+    contactLog: freshLog({ patternCompleted: full }),
+    messages: { stats: {} },
+  };
+  const newly2 = evaluateAchievements(ach2, { state: state2, buffCount: 0 });
+  assert.ok(newly2.includes('all_patterns_complete'));
+});
+
 test('markStat returns false on duplicate', () => {
   beforeEach();
   const ach = loadAchievements();

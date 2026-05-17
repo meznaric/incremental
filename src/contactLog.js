@@ -26,6 +26,7 @@
 //   }
 
 import { WORLDS_BY_EP, WORLD_DETAIL } from './worlds-data.js';
+import { markPatternCompleted } from './cyclePatterns.js';
 
 export const CONTACT_LOG_KEY = 'eots.contactlog.v2';
 
@@ -108,7 +109,7 @@ export const STATUS_MEANING = {
 
 const fresh = () => ({
   run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
-  pattern: null, pendingPatternChoice: false, patternUsed: {},
+  pattern: null, pendingPatternChoice: false, patternUsed: {}, patternCompleted: {},
   loopMode: false, loopCycles: 0,
 });
 
@@ -151,6 +152,10 @@ export function loadContactLog() {
     ? Object.fromEntries(Object.entries(s.patternUsed).filter(
         ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
     : {};
+  const patternCompleted = s.patternCompleted && typeof s.patternCompleted === 'object'
+    ? Object.fromEntries(Object.entries(s.patternCompleted).filter(
+        ([k, v]) => typeof k === 'string' && Number.isFinite(v) && v > 0))
+    : {};
   // Loop-mode bookkeeping. New saves carry both fields directly. Legacy
   // saves (no fields) are migrated: only true loop if every EP in the
   // current EP_ORDER is logged. Old players who "finished" the 8-EP version
@@ -165,7 +170,7 @@ export function loadContactLog() {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     introSeen, pickedName,
-    pattern, pendingPatternChoice, patternUsed,
+    pattern, pendingPatternChoice, patternUsed, patternCompleted,
     loopMode, loopCycles,
   };
 }
@@ -335,9 +340,11 @@ export function closeCycle(log, peakAmount) {
   if (log.loopMode) log.loopCycles = (log.loopCycles || 0) + 1;
   if (allEpsComplete(log)) log.loopMode = true;
   advanceRun(log);
-  // Patterns are per-cycle. Clear the previous pick and flag the next run as
-  // owing the player a fresh choice. The chooser modal in main.js gates play
-  // until they pick one.
+  // Patterns are per-cycle. Record the completion for the just-finished cycle
+  // (badge + all-patterns achievement), clear the previous pick, and flag the
+  // next run as owing the player a fresh choice. The chooser modal in main.js
+  // gates play until they pick one.
+  markPatternCompleted(log);
   log.pattern = null;
   log.pendingPatternChoice = true;
   return banked;

@@ -23,6 +23,7 @@ import {
 import { nowSeconds } from './save.js';
 import { installTap } from './tap.js';
 import { isGambleFxActive, fireGambleResult } from './gambleFx.js';
+import { patternPurchaseCostMul } from './cyclePatterns.js';
 
 export function initMainUi(state, deps) {
   const { triggerGambleFx } = deps;
@@ -107,7 +108,11 @@ export function initMainUi(state, deps) {
     const u = slot ? resolveUpgrade(slot) : null;
     if (!u || !slot) return;
     slotModalTitleEl.textContent = u.name;
-    const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${ECHO_ICON}${formatAbbrev(slot.cost)}</span>`;
+    // Pattern-scaled cost (Patched Frame doubles charged purchases). Gambles
+    // and gifts skip the multiplier.
+    const isChargedKindM = u.kind !== 'gamble' && u.kind !== 'gift';
+    const dispCost = isChargedKindM ? slot.cost * patternPurchaseCostMul(state) : slot.cost;
+    const costCell = u.kind === 'gift' ? 'FREE' : `<span class="cc">${ECHO_ICON}${formatAbbrev(dispCost)}</span>`;
     const rows = [`<div class="slot-modal-row"><span>Cost</span><span>${costCell}</span></div>`];
     if (u.kind === 'gamble') {
       const effChance = effectiveGambleChance(state, u, nowSeconds());
@@ -594,7 +599,11 @@ export function initMainUi(state, deps) {
       // mid-animation HUD tick would swap in the new card under the fly-up motion.
       if (el.classList.contains('fx-fly-up')) continue;
       el.style.display = '';
-      const cost = slot.cost;
+      // Pattern: Patched Frame doubles charged-purchase cost. Display the
+      // post-pattern price so the cost cell matches what tryBuy will deduct.
+      // Gambles (wager %) and gifts (free) skip the multiplier — keep slot.cost.
+      const isChargedKind = u.kind !== 'gamble' && u.kind !== 'gift';
+      const cost = isChargedKind ? slot.cost * patternPurchaseCostMul(state) : slot.cost;
       const cdLeft = u.kind === 'gamble' ? (state.gambleCd[u.id] || 0) - now : 0;
       const theme = KIND_THEME[u.kind] || {};
       const buffTheme = u.kind === 'buff' ? BUFF_TYPE_THEME[u.buffType] : null;
@@ -637,9 +646,11 @@ export function initMainUi(state, deps) {
       } else if (u.kind === 'convert') {
         // Convert no longer credits flatBonus on purchase — the burn buys a
         // placement token. Preview what the token will be worth before sector
-        // and clustering multipliers. Yield is capped (see convertYieldFor).
+        // and clustering multipliers. Yield uses the rolled cost (slot.cost),
+        // not the pattern-scaled price — Patched Frame doubles the price
+        // without doubling the yield, so the preview must match.
         const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
-        const tokenYield = convertYieldFor(u, cost, baseAdd);
+        const tokenYield = convertYieldFor(u, slot.cost, baseAdd);
         outcomes = `<div class="outcome win"><i class="ri ri-add-circle-line"></i> Queue token · +${formatAbbrev(tokenYield)}/s base</div>`;
       } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
         const eff = marginalRateForPurchase(state, slot, now);
@@ -836,17 +847,26 @@ export function initMainUi(state, deps) {
     for (const x of active(b.gambleCushion)) push('cushion',  `${Math.round(x.value * 100)}%`,                        x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
     for (const x of active(b.compound))      push('compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, Math.pow(1 + x.rate, now - x.startedAt),     x.expiresAt - now, x.duration, x.sourceId);
 
-    const cardHtml = (g, extraClass = '', extraAttrs = '') => `
-      <div class="buff-card kind-${g.kind || ''} ${extraClass}" ${extraAttrs}>
-        <div class="buff-head">
-          <span class="buff-name"><i class="ri ri-fw ${g.icon}"></i>${g.name}</span>
-          <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
-          <span class="buff-val">${g.value}</span>
+    const cardHtml = (g, extraClass = '', extraAttrs = '') => {
+      // Combined card with 2+ stacked buffs shows one mini bar per buff,
+      // sized proportionally to remaining time. The single time + bar pair
+      // is reserved for the count-1 combined card and the individual cards
+      // inside the expand popup, where one buff = one progress readout.
+      const tail = g.bars && g.bars.length > 1
+        ? `<div class="buff-bars-multi">${g.bars.map((b) => `<div class="buff-mini" style="flex:${Math.max(b.remain, 0.001)};"></div>`).join('')}</div>`
+        : `<div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(g.remain)}</div>
+           <div class="buff-bar"><div class="buff-bar-fill" style="width:${g.pct * 100}%"></div></div>`;
+      return `
+        <div class="buff-card kind-${g.kind || ''} ${extraClass}" ${extraAttrs}>
+          <div class="buff-head">
+            <span class="buff-name"><i class="ri ri-fw ${g.icon}"></i>${g.name}</span>
+            <button type="button" class="buff-info" aria-label="What does this do?"><i class="ri ri-information-line"></i></button>
+            <span class="buff-val">${g.value}</span>
+          </div>
+          ${tail}
         </div>
-        <div class="buff-time"><i class="ri ri-fw ri-time-line"></i> ${fmtDuration(g.remain)}</div>
-        <div class="buff-bar"><div class="buff-bar-fill" style="width:${g.pct * 100}%"></div></div>
-      </div>
-    `;
+      `;
+    };
     const combine = (kind, list) => {
       // rate + compound are multiplicative; luck + cushion are additive percents.
       let value, numeric;
@@ -858,10 +878,11 @@ export function initMainUi(state, deps) {
         const pct = Math.round(numeric * 100);
         value = kind === 'luck' ? `+${pct}%` : `${pct}%`;
       }
-      // Soonest-expiring drives the visible time bar — that's the buff
-      // about to drop, so the player sees the countdown they care about.
+      // Soonest-expiring still drives `remain` for any single-bar fallback.
+      // The multi-bar render uses the per-buff `bars` list instead.
       const soon = list.reduce((a, x) => (x.remain < a.remain ? x : a), list[0]);
-      return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct };
+      const bars = list.map((x) => ({ remain: x.remain }));
+      return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct, bars };
     };
 
     const groupHtml = [];

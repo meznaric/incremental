@@ -150,6 +150,13 @@ export const ACHIEVEMENTS = [
     desc: 'Picked a Cycle Pattern. The next cycle has a shape.',
     hint: 'Choose a Pattern at the start of a new cycle.',
     trigger: { kind: 'logFlag', flag: 'patternEverChosen' } },
+  // Every defined Cycle Pattern has been carried through a cycle close.
+  // The check derives from contactLog.patternCompleted, populated by closeCycle.
+  { id: 'all_patterns_complete', category: 'play',
+    name: 'Every shape of the rig',
+    desc: 'Took every Cycle Pattern through a full cycle close. The rig has been every shape it knows.',
+    hint: 'Close a cycle on each Cycle Pattern at least once.',
+    trigger: { kind: 'logFlag', flag: 'allPatternsCompleted' } },
 ];
 
 export const ACH_BY_ID = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

@@ -6,7 +6,7 @@
 // rate-mul buffs) and the modal closes.
 //
 // voice: Sera (procedural, second person). The introductory line is hers.
-import { PATTERNS, setActivePattern, applyPatternOnFreshBoot } from './cyclePatterns.js';
+import { PATTERNS, setActivePattern, applyPatternOnFreshBoot, isPatternCompleted } from './cyclePatterns.js';
 import { saveContactLog } from './contactLog.js';
 import { nowSeconds } from './save.js';
 import { installTap } from './tap.js';
@@ -19,22 +19,34 @@ export function showPatternSelect(state, onPicked) {
 
   if (introEl) {
     // Sera. Two procedural sentences. The frame the rig comes up in is hers
-    // to call this run — she lays out the four cuts and lets Kalen pick.
+    // to call this run — she lays out the cuts and lets Kalen pick.
     introEl.textContent =
       'The rig boots cold and the wires still hold the shape of the last cycle. '
       + 'Choose a Pattern for this one.';
   }
 
   if (listEl) {
-    listEl.innerHTML = PATTERNS.map((p) => `
+    listEl.innerHTML = PATTERNS.map((p) => {
+      const completed = isPatternCompleted(state.contactLog, p.id);
+      // Completion badge — small chip on the card so the player can see at a
+      // glance which Patterns they've already taken through a cycle close.
+      // Aria-label spells it out for screen readers; visual is a checkmark.
+      const badge = completed
+        ? '<span class="pat-badge pat-badge-done" aria-label="Completed">✓ Completed</span>'
+        : '<span class="pat-badge pat-badge-todo" aria-label="Not yet completed">Untried</span>';
+      return `
       <li>
-        <button type="button" class="pat-item" data-id="${p.id}">
-          <span class="pat-name">${p.name}</span>
+        <button type="button" class="pat-item${completed ? ' pat-item-done' : ''}" data-id="${p.id}">
+          <span class="pat-head">
+            <span class="pat-name">${p.name}</span>
+            ${badge}
+          </span>
           <span class="pat-desc">${p.desc}</span>
           <span class="pat-effect">${p.gameplay}</span>
         </button>
       </li>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Route through installTap so iOS pointercancel-as-tap-completion works and

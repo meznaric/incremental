@@ -6,6 +6,8 @@ import {
   patternBaseRateMul, patternRerollCostMul,
   patternBuffDurationMul, patternBuffRateMulStrength, patternGambleLuckBonus,
   patternFreeLeft, consumePatternFreePurchase, applyPatternOnFreshBoot,
+  patternPurchaseCostMul, patternNetworkYieldMul,
+  markPatternCompleted, isPatternCompleted, allPatternsCompleted,
 } from '../src/cyclePatterns.js';
 import {
   makeShopState, effectiveRate, integrateRate, tryBuy, tryReroll,
@@ -13,11 +15,12 @@ import {
 } from '../src/shop.js';
 import { getUpgrade } from '../src/upgrades.js';
 import { closeCycle, recordContact } from '../src/contactLog.js';
+import { ensureNetwork, placeRelay, queueToken, networkContribution } from '../src/network.js';
 
 function freshLog() {
   return {
     run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
-    pattern: null, pendingPatternChoice: false, patternUsed: {},
+    pattern: null, pendingPatternChoice: false, patternUsed: {}, patternCompleted: {},
   };
 }
 function freshState(over = {}) {
@@ -36,8 +39,8 @@ function installSlot(state, idx, upgradeId, cost) {
   state.shop.slots[idx] = { id: upgradeId, cost };
 }
 
-test('PATTERNS: registry has 3-4 distinct patterns with required fields', () => {
-  assert.ok(PATTERNS.length >= 3 && PATTERNS.length <= 4, 'expected 3-4 patterns');
+test('PATTERNS: registry has at least four distinct patterns with required fields', () => {
+  assert.ok(PATTERNS.length >= 4, `expected ≥4 patterns, got ${PATTERNS.length}`);
   const ids = new Set();
   for (const p of PATTERNS) {
     assert.equal(typeof p.id, 'string');
@@ -149,23 +152,23 @@ test('patched_frame: free-purchase covers buff cost without spending Echoes', ()
   const s = freshState({ amount: 100 });
   setActivePattern(s.contactLog, 'patched_frame');
   applyPatternOnFreshBoot(s, 0);
-  assert.equal(patternFreeLeft(s), 3);
+  assert.equal(patternFreeLeft(s), 5);
   installSlot(s, 1, 'espresso', 200); // cost > balance, but free covers it
   const before = s.amount;
   const res = tryBuy(s, 1, 0);
   assert.ok(res.ok);
   assert.equal(s.amount, before, 'balance untouched on a free pattern purchase');
-  assert.equal(patternFreeLeft(s), 2);
+  assert.equal(patternFreeLeft(s), 4);
   // Buff still landed.
   assert.equal(s.buffs.rateMul.length, 1);
 });
 
-test('patched_frame: free purchases run out after 3, then cost is charged', () => {
+test('patched_frame: free purchases run out after 5, then cost is charged at doubled rate', () => {
   const s = freshState({ amount: 0 });
   setActivePattern(s.contactLog, 'patched_frame');
   applyPatternOnFreshBoot(s, 0);
-  assert.equal(patternFreeLeft(s), 3);
-  for (let i = 0; i < 3; i++) {
+  assert.equal(patternFreeLeft(s), 5);
+  for (let i = 0; i < 5; i++) {
     installSlot(s, 1, 'espresso', 200);
     const r = tryBuy(s, 1, 0);
     assert.ok(r.ok, `purchase ${i} should succeed for free`);
@@ -173,8 +176,39 @@ test('patched_frame: free purchases run out after 3, then cost is charged', () =
   assert.equal(patternFreeLeft(s), 0);
   installSlot(s, 1, 'espresso', 200);
   const r = tryBuy(s, 1, 0);
-  assert.equal(r.ok, false, 'fourth purchase should fail when broke');
+  assert.equal(r.ok, false, 'sixth purchase should fail when broke');
   assert.equal(r.reason, 'broke');
+  // Affording the rolled cost (200) is not enough — the pattern doubles it to 400.
+  s.amount = 200;
+  installSlot(s, 1, 'espresso', 200);
+  assert.equal(tryBuy(s, 1, 0).ok, false, '200 Echoes should not cover the 2× cost');
+  s.amount = 400;
+  installSlot(s, 1, 'espresso', 200);
+  const r2 = tryBuy(s, 1, 0);
+  assert.ok(r2.ok, '400 Echoes covers the 2× cost');
+  assert.equal(s.amount, 0, 'pattern doubled the deducted price');
+});
+
+test('patched_frame: applyPatternOnFreshBoot grants 5 free re-tunes', () => {
+  const s = freshState({ freeRerolls: 0 });
+  setActivePattern(s.contactLog, 'patched_frame');
+  applyPatternOnFreshBoot(s, 0);
+  assert.equal(s.freeRerolls, 5);
+});
+
+test('patched_frame: existing free-reroll bank is not reduced by the grant', () => {
+  const s = freshState({ freeRerolls: 7 });
+  setActivePattern(s.contactLog, 'patched_frame');
+  applyPatternOnFreshBoot(s, 0);
+  // Player already had more than 5 — grant should not shrink the bank.
+  assert.equal(s.freeRerolls, 7);
+});
+
+test('patternPurchaseCostMul: identity outside Patched Frame, 2 under it', () => {
+  const s = freshState();
+  assert.equal(patternPurchaseCostMul(s), 1);
+  setActivePattern(s.contactLog, 'patched_frame');
+  assert.equal(patternPurchaseCostMul(s), 2);
 });
 
 test('patched_frame: gambles are excluded from free-purchase coverage', () => {
@@ -207,23 +241,25 @@ test('patched_frame: reroll cost is doubled', () => {
   assert.equal(computeRerollCost(s, 0, 2), 6_000);
 });
 
-test('bare_wire: base rate halved, gamble luck +5%, durations doubled', () => {
-  const s = freshState({ basePerSecond: 100, amount: 1000 });
+test('bare_wire: base rate ×0.6, gamble luck +8%, durations ×2, buff strength ×1.25', () => {
+  const s = freshState({ basePerSecond: 100, amount: 10_000 });
   setActivePattern(s.contactLog, 'bare_wire');
-  assert.equal(effectiveRate(s, 0), 50);
-  assert.equal(patternGambleLuckBonus(s), 0.05);
-  // Buy a rate buff: duration should be doubled.
-  installSlot(s, 1, 'espresso', 100); // duration 120
+  assert.equal(Number(effectiveRate(s, 0).toFixed(6)), 60);
+  assert.equal(patternGambleLuckBonus(s), 0.08);
+  // Buy a rate buff: duration ×2, bonus ×1.25 (e.g. mult 2.4 → 1 + 1.4×1.25 = 2.75).
+  const u = getUpgrade('espresso');
+  installSlot(s, 1, 'espresso', 100);
   tryBuy(s, 1, 1000);
-  assert.equal(s.buffs.rateMul[0].duration, 240);
+  assert.equal(s.buffs.rateMul[0].duration, u.duration * 2);
+  assert.equal(Number(s.buffs.rateMul[0].value.toFixed(6)), Number((1 + (u.mult - 1) * 1.25).toFixed(6)));
 });
 
 test('bare_wire: gamble luck bonus tips a coinflip win when forced', () => {
   // coin_flip now sits at chance 0.47 (the band-floor takes a small slice);
-  // force RNG just above 0.47 so the bare_wire +0.05 luck bonus lifts the
-  // player into the win bracket. Effective threshold: 0.52.
+  // force RNG just above 0.47 so the bare_wire +0.08 luck bonus lifts the
+  // player into the win bracket. Effective threshold: 0.55.
   const origRandom = Math.random;
-  Math.random = () => 0.49;
+  Math.random = () => 0.5;
   try {
     const s = freshState({ amount: 1000 });
     setActivePattern(s.contactLog, 'bare_wire');
@@ -234,6 +270,65 @@ test('bare_wire: gamble luck bonus tips a coinflip win when forced', () => {
   } finally {
     Math.random = origRandom;
   }
+});
+
+test('echo_loom: networkYieldMul doubles mesh contribution, base halved', () => {
+  const s = freshState({ basePerSecond: 100 });
+  setActivePattern(s.contactLog, 'echo_loom');
+  assert.equal(patternNetworkYieldMul(s), 2);
+  assert.equal(patternBaseRateMul(s), 0.5);
+  // No relays placed → only base * 0.5 applies. 100 * 0.5 = 50.
+  assert.equal(effectiveRate(s, 0), 50);
+});
+
+test('echo_loom: with a placed online relay, contribution is doubled', () => {
+  const s = freshState({ basePerSecond: 0 });
+  ensureNetwork(s);
+  queueToken(s, 'common', 100);
+  // Place far enough in the past that ripening completes by `now`.
+  placeRelay(s, { q: 0, r: 0 }, 0);
+  // Hop forward past the ripen window.
+  const now = 1e6;
+  const raw = networkContribution(s, now);
+  assert.ok(raw > 0, 'baseline network contribution should be positive');
+  // Bare networkContribution does not include the pattern multiplier — the
+  // multiplier lands inside effectiveRate's additiveBase.
+  setActivePattern(s.contactLog, 'echo_loom');
+  // effectiveRate = (base + net*2) * patternBaseRateMul. base=0, base mul=0.5.
+  assert.equal(Number(effectiveRate(s, now).toFixed(6)), Number((raw * 2 * 0.5).toFixed(6)));
+});
+
+test('markPatternCompleted: bumps counter for the active pattern', () => {
+  const log = freshLog();
+  setActivePattern(log, 'surge_tide');
+  assert.equal(isPatternCompleted(log, 'surge_tide'), false);
+  assert.ok(markPatternCompleted(log));
+  assert.equal(isPatternCompleted(log, 'surge_tide'), true);
+  assert.equal(log.patternCompleted.surge_tide, 1);
+});
+
+test('markPatternCompleted: no-op when no pattern is set', () => {
+  const log = freshLog();
+  assert.equal(markPatternCompleted(log), false);
+  assert.deepEqual(log.patternCompleted || {}, {});
+});
+
+test('closeCycle: records the active pattern as completed', () => {
+  const log = freshLog();
+  recordContact(log, 'milestone_1k', 100);
+  setActivePattern(log, 'bare_wire');
+  closeCycle(log, 10_000);
+  assert.equal(isPatternCompleted(log, 'bare_wire'), true);
+});
+
+test('allPatternsCompleted: true only after every PATTERN id is completed', () => {
+  const log = freshLog();
+  assert.equal(allPatternsCompleted(log), false);
+  for (const p of PATTERNS) {
+    log.pattern = p.id;
+    markPatternCompleted(log);
+  }
+  assert.equal(allPatternsCompleted(log), true);
 });
 
 test('consumePatternFreePurchase: no-op when none remain', () => {

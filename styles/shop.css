@@ -181,6 +181,28 @@
 .kind-compound .buff-bar-fill { background: #7c5ad4; }
 .kind-compound .buff-val      { color: #7c5ad4; }
 
+/* Combined-card multi-bar: one segment per stacked buff, width scaled
+   to remaining time. Replaces the single time/bar pair when count > 1. */
+.buff-bars-multi {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  margin-top: 10px;
+  height: 6px;
+}
+.buff-mini {
+  flex: 1 1 0;
+  min-width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.9;
+  transition: flex-grow 0.1s linear;
+}
+.kind-rate     .buff-mini { background: #9d6ee0; }
+.kind-luck     .buff-mini { background: #ff5a6e; }
+.kind-cushion  .buff-mini { background: #ff8a8a; }
+.kind-compound .buff-mini { background: #7c5ad4; }
+
 /* Desktop buff-group: one stack per kind, combined card on top with
    dashed border, individuals peeking underneath. Hover opens a row to
    the right. Mobile hides groups and shows .buff-tile strip instead.
@@ -214,6 +236,13 @@
   width: 190px;
   height: 100%;
   pointer-events: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  transition: left 0.18s ease, top 0.18s ease, width 0.18s ease,
+              background 0.18s ease, border-color 0.18s ease,
+              box-shadow 0.18s ease, backdrop-filter 0.18s ease;
 }
 .buff-group .buff-stack-card {
   position: absolute;
@@ -232,39 +261,51 @@
 /* Expanded layout — desktop only. .is-expanded is toggled by mainUi.js
    via mouseover/mouseout delegation rather than :hover, so the hit area
    stays stable across the width transition (cursor can't fall off a
-   shrinking box mid-animate and re-trigger a flicker loop). Combined card
-   fades out and the stack lays out 3 per row from left:0 to use the
-   freed space. min-height grows per row count. */
+   shrinking box mid-animate and re-trigger a flicker loop). The combined
+   card stays put; the individual stack fans out into a popup panel to the
+   right of the combined card. The group's own height doesn't change, so
+   sibling groups stay anchored. */
 @media (min-width: 641px) {
-  .buff-group.is-expanded { width: 560px; z-index: 30; min-height: 57px; padding-bottom: 0; }
-  .buff-group[data-count="4"].is-expanded,
-  .buff-group[data-count="5"].is-expanded,
-  .buff-group[data-count="6"].is-expanded { min-height: 127px; }
-  .buff-group[data-count="7"].is-expanded,
-  .buff-group[data-count="8"].is-expanded,
-  .buff-group[data-count="9"].is-expanded { min-height: 197px; }
-  .buff-group[data-count="10"].is-expanded,
-  .buff-group[data-count="11"].is-expanded,
-  .buff-group[data-count="12"].is-expanded { min-height: 267px; }
-  .buff-group.is-expanded .buff-combined { opacity: 0; pointer-events: none; }
-  .buff-group.is-expanded .buff-stack { pointer-events: auto; width: 100%; }
+  .buff-group.is-expanded { width: 760px; z-index: 30; }
+  .buff-group.is-expanded .buff-stack {
+    pointer-events: auto;
+    left: 200px;
+    top: -6px;
+    width: 560px;
+    height: auto;
+    min-height: 82px;
+    background: rgba(20, 20, 40, 0.92);
+    border-color: rgba(120, 140, 255, 0.35);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  }
+  .buff-group[data-count="4"].is-expanded .buff-stack,
+  .buff-group[data-count="5"].is-expanded .buff-stack,
+  .buff-group[data-count="6"].is-expanded .buff-stack { min-height: 152px; }
+  .buff-group[data-count="7"].is-expanded .buff-stack,
+  .buff-group[data-count="8"].is-expanded .buff-stack,
+  .buff-group[data-count="9"].is-expanded .buff-stack { min-height: 222px; }
+  .buff-group[data-count="10"].is-expanded .buff-stack,
+  .buff-group[data-count="11"].is-expanded .buff-stack,
+  .buff-group[data-count="12"].is-expanded .buff-stack { min-height: 292px; }
   .buff-group.is-expanded .buff-stack-card {
-    top: 0;
     width: 168px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
-  .buff-group.is-expanded .buff-stack-card:nth-child(1) { left: 0;     top: 0;     }
-  .buff-group.is-expanded .buff-stack-card:nth-child(2) { left: 186px; top: 0;     }
-  .buff-group.is-expanded .buff-stack-card:nth-child(3) { left: 372px; top: 0;     }
-  .buff-group.is-expanded .buff-stack-card:nth-child(4) { left: 0;     top: 70px;  }
-  .buff-group.is-expanded .buff-stack-card:nth-child(5) { left: 186px; top: 70px;  }
-  .buff-group.is-expanded .buff-stack-card:nth-child(6) { left: 372px; top: 70px;  }
-  .buff-group.is-expanded .buff-stack-card:nth-child(7) { left: 0;     top: 140px; }
-  .buff-group.is-expanded .buff-stack-card:nth-child(8) { left: 186px; top: 140px; }
-  .buff-group.is-expanded .buff-stack-card:nth-child(9) { left: 372px; top: 140px; }
-  .buff-group.is-expanded .buff-stack-card:nth-child(10) { left: 0;     top: 210px; }
-  .buff-group.is-expanded .buff-stack-card:nth-child(11) { left: 186px; top: 210px; }
-  .buff-group.is-expanded .buff-stack-card:nth-child(n+12) { left: 372px; top: 210px; }
+  /* Absolute children are positioned from the padding box, so the 12px
+     inset is added by hand to each coord instead of via padding. */
+  .buff-group.is-expanded .buff-stack-card:nth-child(1)  { left: 12px;  top: 12px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(2)  { left: 196px; top: 12px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(3)  { left: 380px; top: 12px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(4)  { left: 12px;  top: 82px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(5)  { left: 196px; top: 82px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(6)  { left: 380px; top: 82px;  }
+  .buff-group.is-expanded .buff-stack-card:nth-child(7)  { left: 12px;  top: 152px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(8)  { left: 196px; top: 152px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(9)  { left: 380px; top: 152px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(10) { left: 12px;  top: 222px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(11) { left: 196px; top: 222px; }
+  .buff-group.is-expanded .buff-stack-card:nth-child(n+12) { left: 380px; top: 222px; }
 }
 
 @media (max-width: 640px) {

@@ -13,6 +13,7 @@
 
 import { ACHIEVEMENTS, ACH_BY_ID } from './achievements-data.js';
 import { isEpComplete, allEpsComplete, getRun } from './contactLog.js';
+import { allPatternsCompleted } from './cyclePatterns.js';
 
 export const ACHIEVEMENTS_KEY = 'eots.achievements.v1';
 
@@ -79,6 +80,9 @@ function readLogFlag(ctx, flag) {
   if (flag === 'patternEverChosen') {
     if (typeof log.pattern === 'string' && log.pattern.length > 0) return true;
     if (log.patternUsed && Object.keys(log.patternUsed).length > 0) return true;
+  }
+  if (flag === 'allPatternsCompleted') {
+    return allPatternsCompleted(log);
   }
   return false;
 }

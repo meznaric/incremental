@@ -14,6 +14,10 @@
 //                                     next pick. Gates the chooser modal.
 //   contactLog.patternUsed          : { [patternId]: count } – kept around for
 //                                     possible future stats; not consumed yet.
+//   contactLog.patternCompleted     : { [patternId]: count } – pattern was
+//                                     active when the cycle closed. Drives the
+//                                     completion badge and the all-patterns
+//                                     achievement.
 // The mutable per-run "free purchases remaining" counter is mirrored onto the
 // gameplay save under state.patternFreeLeft so it persists across reloads in
 // the same cycle.
@@ -38,24 +42,41 @@ export const PATTERNS = [
     buffDurationMul: 0.5,
     buffRateMulStrength: 2.0,
   },
-  // voice: Sera. "Three bands are free. After that the band-sweep gets expensive."
+  // voice: Sera. "Five bands are free, and five re-tunes ride for nothing. Past that the rig charges double for the privilege."
   { id: 'patched_frame',
     name: 'Patched Frame',
     voice: 'sera',
-    desc: 'Three bands ride free at cycle open. Every re-roll after that bills double.',
-    gameplay: 'First three non-hail purchases are free. Re-roll costs are doubled.',
-    freePurchases: 3,
+    desc: 'Five bands ride free at cycle open and the sweep grants five free re-tunes. After that, every purchase and every re-tune bills double.',
+    gameplay: 'First 5 non-hail purchases are free. 5 free re-tunes granted. Purchase and re-tune costs ×2 thereafter.',
+    freePurchases: 5,
+    freeRerolls: 5,
     rerollCostMul: 2.0,
+    purchaseCostMul: 2.0,
   },
   // voice: Sera. "Quiet base. Loud windows. The hails carry further this run."
+  // Bumped: base less harsh (0.5 → 0.6), buffs come in stronger (+25%), hail
+  // luck +8% (was +5%). Still a real tradeoff, but the upside finally bites.
   { id: 'bare_wire',
     name: 'Bare Wire',
     voice: 'sera',
-    desc: 'Base listening runs half-strength, but windows hold twice as long and every hail carries five points further.',
-    gameplay: '×0.5 base rate. Window durations doubled. Hail carry-chance +5%.',
-    baseRateMul: 0.5,
+    desc: 'Base listening runs lean, but every window holds twice as long, lands stronger, and every hail carries eight points further.',
+    gameplay: '×0.6 base rate. Window durations ×2, strength ×1.25. Hail carry-chance +8%.',
+    baseRateMul: 0.6,
     buffDurationMul: 2.0,
-    gambleLuckBonus: 0.05,
+    buffRateMulStrength: 1.25,
+    gambleLuckBonus: 0.08,
+  },
+  // voice: Sera. "The mesh sings double this cycle. Live on it; the rig itself barely listens."
+  // Network-oriented. Every placed relay contributes double, but the base
+  // listening yield is halved — the player has to commit to converts + sector
+  // placement to outpace the cycle.
+  { id: 'echo_loom',
+    name: 'Echo Loom',
+    voice: 'sera',
+    desc: 'The mesh sings double this cycle. The rig itself barely listens — live on the carrier you place.',
+    gameplay: 'Network contribution ×2. Base listening ×0.5.',
+    networkYieldMul: 2.0,
+    baseRateMul: 0.5,
   },
 ];
 
@@ -90,9 +111,25 @@ export function patternCostMul(state, _kind) {
   return 1;
 }
 
+// Pattern multiplier on the cost of any charged purchase (permanent, buff,
+// convert, drift, coil). Gambles and gifts are excluded by the caller — gambles
+// have their own wager economy; gifts are free. Identity (1) when no pattern
+// is active or the pattern doesn't touch purchase cost.
+export function patternPurchaseCostMul(state) {
+  const p = getActivePattern(state);
+  return (p && Number.isFinite(p.purchaseCostMul) && p.purchaseCostMul > 0) ? p.purchaseCostMul : 1;
+}
+
 export function patternRerollCostMul(state) {
   const p = getActivePattern(state);
   return (p && Number.isFinite(p.rerollCostMul) && p.rerollCostMul > 0) ? p.rerollCostMul : 1;
+}
+
+// Pattern multiplier on Seed-Relay yield. Applied inside networkContribution
+// so coverage and adjacency stay correctly composed before the boost lands.
+export function patternNetworkYieldMul(state) {
+  const p = getActivePattern(state);
+  return (p && Number.isFinite(p.networkYieldMul) && p.networkYieldMul > 0) ? p.networkYieldMul : 1;
 }
 
 export function patternBuffDurationMul(state) {
@@ -126,8 +163,8 @@ export function consumePatternFreePurchase(state) {
 }
 
 // Called once on a fresh cycle boot (no save loaded) when a pattern is active.
-// Seeds any one-time effects (buffs, free-purchase counter) so the player can
-// see the pattern at work the moment the Console comes up.
+// Seeds any one-time effects (buffs, free-purchase counter, free re-tunes) so
+// the player can see the pattern at work the moment the Console comes up.
 export function applyPatternOnFreshBoot(state, now) {
   const p = getActivePattern(state);
   if (!p) return;
@@ -142,6 +179,9 @@ export function applyPatternOnFreshBoot(state, now) {
   }
   if (Number.isFinite(p.freePurchases) && p.freePurchases > 0) {
     state.patternFreeLeft = p.freePurchases;
+  }
+  if (Number.isFinite(p.freeRerolls) && p.freeRerolls > 0) {
+    state.freeRerolls = Math.max(state.freeRerolls || 0, p.freeRerolls);
   }
 }
 
@@ -169,4 +209,30 @@ export function setActivePattern(log, id) {
 
 export function hasPendingPatternChoice(log) {
   return !!(log && log.pendingPatternChoice);
+}
+
+// Increment the completion counter for whichever pattern was active on this
+// log. Called from closeCycle *before* the pattern is cleared. No-op if no
+// pattern was set (legacy logs, or a cycle closed without ever picking).
+export function markPatternCompleted(log) {
+  if (!log || typeof log.pattern !== 'string' || !BY_ID.has(log.pattern)) return false;
+  log.patternCompleted = log.patternCompleted || {};
+  log.patternCompleted[log.pattern] = (log.patternCompleted[log.pattern] || 0) + 1;
+  return true;
+}
+
+export function isPatternCompleted(log, id) {
+  if (!log || !log.patternCompleted) return false;
+  const n = log.patternCompleted[id];
+  return Number.isFinite(n) && n > 0;
+}
+
+// True when every defined pattern has at least one completion recorded.
+// Drives the all-patterns achievement.
+export function allPatternsCompleted(log) {
+  if (!log || !log.patternCompleted) return false;
+  for (const p of PATTERNS) {
+    if (!isPatternCompleted(log, p.id)) return false;
+  }
+  return true;
 }

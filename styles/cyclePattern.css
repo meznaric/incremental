@@ -90,12 +90,45 @@
   background: rgba(40, 38, 60, 0.7);
 }
 .pat-item:active { transform: translateY(1px); }
+.pat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .pat-name {
   color: #d49a55;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.pat-badge {
+  flex: 0 0 auto;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pat-badge-done {
+  color: #6ee7a8;
+  background: rgba(110, 231, 168, 0.08);
+}
+.pat-badge-todo {
+  color: #6c6c8a;
+  background: rgba(108, 108, 138, 0.06);
+}
+.pat-item-done {
+  border-color: rgba(110, 231, 168, 0.32);
+  background: rgba(28, 38, 32, 0.55);
+}
+.pat-item-done:hover {
+  border-color: rgba(110, 231, 168, 0.6);
+  background: rgba(36, 50, 42, 0.7);
 }
 .pat-desc {
   color: #c0c0d8;

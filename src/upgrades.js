@@ -263,7 +263,7 @@ export function totalMulOwned(owned) {
 // previous tuning — yellow upgrades were overshadowing every other lever once
 // production climbed past trillion. A single convert is now meant to chip in,
 // not leapfrog the entire build.
-export const CONVERT_BOOST_CAP = { common: 0.01, uncommon: 0.04, rare: 0.15, legendary: 0.5 };
+export const CONVERT_BOOST_CAP = { common: 0.015, uncommon: 0.06, rare: 0.22, legendary: 0.7 };
 
 // Mul perm cost past its original maxRate band: switch from the static
 // baseCost ladder to a rate-aware floor matching the dyn-add pricing curve.

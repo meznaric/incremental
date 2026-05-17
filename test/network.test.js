@@ -74,10 +74,10 @@ test('contribution: zero before ripen, positive after, includes sector yield mul
   placeRelay(st, hex, 1000);
   const ripeAt = 1000 + TIER_INFO.common.ripenSec * SECTORS.core.ripenMul;
   assert.equal(networkContribution(st, 1000), 0);
-  // Coverage: 1 sector covered → 1.06. Yield = 100 × 1.4 × 1 (no neighbours) = 140.
-  // Contribution = 140 × 1.06 = 148.4.
+  // Coverage: 1 sector covered → 1.09. Yield = 100 × 1.4 × 1 (no neighbours) = 140.
+  // Contribution = 140 × 1.09 = 152.6.
   const c = networkContribution(st, ripeAt + 1);
-  assert.ok(Math.abs(c - 148.4) < 1e-6, `got ${c}`);
+  assert.ok(Math.abs(c - 152.6) < 1e-6, `got ${c}`);
 });
 
 test('clustering: adjacency boosts yield and is symmetric', () => {
@@ -92,9 +92,9 @@ test('clustering: adjacency boosts yield and is symmetric', () => {
   const r2 = st.network.relays[1];
   assert.equal(adjacentOnlineCount(st.network, r1, ripeAt + 1), 1);
   assert.equal(adjacentOnlineCount(st.network, r2, ripeAt + 1), 1);
-  // Coverage still 1 sector. Each yields 100 × 1.4 × 1.25 = 175. Total 350 × 1.06 = 371.
+  // Coverage still 1 sector (1.09). Each yields 100 × 1.4 × 1.33 = 186.2. Total 372.4 × 1.09 = 405.916.
   const c = networkContribution(st, ripeAt + 1);
-  assert.ok(Math.abs(c - 371) < 1e-6, `got ${c}`);
+  assert.ok(Math.abs(c - 405.916) < 1e-6, `got ${c}`);
 });
 
 test('coverage: stacks per distinct sector with online relay', () => {
@@ -107,7 +107,7 @@ test('coverage: stacks per distinct sector with online relay', () => {
   for (const h of picks) placeRelay(st, h, 0);
   const longAfter = 10_000_000;
   const mul = coverageMultiplier(st.network, longAfter);
-  assert.ok(Math.abs(mul - (1 + 0.06 * 3)) < 1e-6);
+  assert.ok(Math.abs(mul - (1 + 0.09 * 3)) < 1e-6);
 });
 
 test('reconcileOffline: zero rate sector with mythic rarity keeps relay essentially safe', () => {

@@ -326,11 +326,25 @@ ui.renderShop();
   achievementsUi.updateAffordance();
 }
 
+// Backdrop handle for the dramatic intro overlay. Lives on the module so the
+// interstitialUi onShown callback can dismiss it at the right beat (when
+// intro_tell_us closes), exposing the game for Kalen's narration.
+let introBackdrop = null;
+
 const interstitialUi = makeInterstitialUi(state, (id) => {
-  // Mark the new intro chain as seen the moment the last beat closes. Gated
-  // on the contact log so a future cycle close (which wipes messages.shown)
-  // does not replay the dramatic opener.
-  if (id === 'intro_console' && !state.contactLog.introSeen) {
+  // Dramatic chain hand-off: Sera's "tell us from the beginning" closes →
+  // fade out the intro backdrop, reveal the game canvas/HUD, then queue
+  // Kalen's first-person narration (intro_premise) above the live game.
+  if (id === 'intro_tell_us') {
+    if (introBackdrop) { introBackdrop.dismissBackdrop(); introBackdrop = null; }
+    enqueueInterstitial(state, 'intro_premise');
+    interstitialUi.drain();
+    return;
+  }
+  // Mark the intro chain as seen the moment the last beat (Kalen's
+  // narration) closes. Gated on the contact log so a future cycle close
+  // (which wipes messages.shown) does not replay the dramatic opener.
+  if (id === 'intro_premise' && !state.contactLog.introSeen) {
     state.contactLog.introSeen = true;
     saveContactLog(state.contactLog);
   }
@@ -344,19 +358,26 @@ const interstitialUi = makeInterstitialUi(state, (id) => {
 scheduleTutorialIfEligible(state);
 
 // First-boot intro overlay → interstitial chain. Plays only when there's no
-// save AND the contact log has never recorded a completed intro. The chain
-// is enqueued from the overlay's onDone so the dramatic gate/locale screens
-// land *before* the first card opens; without the gating the interstitial
-// modal would flash up under the overlay and steal the moment.
+// save AND the contact log has never recorded a completed intro. The intro
+// overlay covers the game throughout the dramatic chain (intro_name →
+// intro_kalen → intro_tell_us) — the game canvas only appears when Sera
+// hands off to Kalen.
 if (!loaded && !state.contactLog.introSeen) {
-  runIntroSequence(() => {
-    enqueueInterstitial(state, 'intro_name');
-    enqueueInterstitial(state, 'intro_kalen');
-    enqueueInterstitial(state, 'intro_premise');
-    enqueueInterstitial(state, 'intro_console');
-    interstitialUi.drain();
+  introBackdrop = runIntroSequence({
+    onLocaleAdvance: () => {
+      // Year reveal dismissed. Backdrop persists; chain renders above it.
+      document.documentElement.classList.add('intro-chain');
+      enqueueInterstitial(state, 'intro_name');
+      enqueueInterstitial(state, 'intro_kalen');
+      enqueueInterstitial(state, 'intro_tell_us');
+      interstitialUi.drain();
+    },
   });
 } else {
+  // Returning player — the inline head script already set intro-skip;
+  // remove the intro-pending lock from CSS just in case stale class
+  // remnants leaked through.
+  document.documentElement.classList.remove('intro-pending');
   interstitialUi.drain();
 }
 

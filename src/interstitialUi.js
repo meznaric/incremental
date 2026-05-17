@@ -121,6 +121,14 @@ export function makeInterstitialUi(state, onShown) {
       card.classList.add(def.cssClass);
       appliedClass = def.cssClass;
     }
+    // Optional transcript stamp — rendered at the top of intro-frame cards
+    // via the ::before pseudo-element on .it-intro-frame, which reads
+    // data-intro-stamp. Set once per card-open and cleared on close.
+    if (def && def.introStamp) {
+      card.setAttribute('data-intro-stamp', def.introStamp);
+    } else {
+      card.removeAttribute('data-intro-stamp');
+    }
     // Cinematic interstitials may want a full-bleed background image (the
     // season finale, future season openers). We inject a dedicated layer
     // behind the card content so the existing contact-portrait styling
@@ -139,6 +147,7 @@ export function makeInterstitialUi(state, onShown) {
       card.classList.remove(appliedClass);
       appliedClass = null;
     }
+    if (card) card.removeAttribute('data-intro-stamp');
     if (appliedBgEl && appliedBgEl.parentNode) {
       appliedBgEl.parentNode.removeChild(appliedBgEl);
       appliedBgEl = null;

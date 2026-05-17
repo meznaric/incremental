@@ -58,12 +58,16 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. First-boot intro chain — step 1 of 4. After the dramatic
-  // gate + locale overlays close, Sera opens the interrogation by asking the
-  // player to identify themselves. The text input is the player's first act
-  // in-game; what they type is captured to state.contactLog.pickedName so the
-  // very next beat (intro_kalen) can recall it verbatim.
+  // voice: Sera. Dramatic intro chain — step 1 of 3. The intro overlay still
+  // covers the game during this whole chain, so these read as transcript
+  // pages rather than ordinary interstitials. cssClass `it-intro-frame`
+  // gives them the transcript-page treatment; the introStamp is rendered at
+  // the top of the card and tracks which page we're on. The text input is
+  // the player's first act; what they type is captured to pickedName for
+  // intro_kalen to recall.
   intro_name: {
+    cssClass: 'it-intro-frame',
+    introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 01 / 03',
     bgImage: './docs/lore/images/interrogation-cell.png',
     input: {
       onStep: 2,
@@ -80,11 +84,12 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. First-boot intro chain — step 2 of 4. The reveal: the name
-  // you typed is not your name. The opening list of charges sets the world
-  // (Quiet Law, eleven years, ComDef has the file) without spelling out the
-  // mechanics. Mechanics arrive in intro_premise + intro_console.
+  // voice: Sera. Dramatic intro chain — step 2 of 3. The reveal: the name
+  // you typed is not your name. The list of charges sets the world (Quiet
+  // Law, eleven years, ComDef has the file) without spelling out mechanics.
   intro_kalen: {
+    cssClass: 'it-intro-frame',
+    introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 02 / 03',
     bgImage: './docs/lore/images/interrogation-cell.png',
     steps: [
       { voice: 'S', text: (s) => {
@@ -101,31 +106,37 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
-  // voice: Kalen. First-boot intro chain — step 3 of 4. Kalen acknowledges
-  // the charges in his own register and sets the loop's emotional frame:
-  // every Echo that comes back is something he chose to keep doing. Replaces
-  // the cold-open content of the legacy `welcome` interstitial for new players.
-  intro_premise: {
-    bgImage: './docs/lore/images/console-dark.png',
+  // voice: Sera. Dramatic intro chain — step 3 of 3. The hand-off. When this
+  // closes, main.js dismisses the intro backdrop and the game becomes
+  // visible. The next interstitial (intro_premise, in the regular card
+  // style) is Kalen answering Sera's prompt as the rig appears.
+  intro_tell_us: {
+    cssClass: 'it-intro-frame',
+    introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 03 / 03',
+    bgImage: './docs/lore/images/interrogation-cell.png',
     steps: [
-      { voice: 'K', text: 'Eleven years. She has the count right.' },
-      { voice: 'K', text: 'There are worlds out there the Quiet Law says I cannot speak to. I have been speaking to them anyway.' },
-      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig in front of me counts them.' },
-      { voice: 'K', text: 'They keep arriving. Whether I sit at the desk or not.' },
+      { voice: 'S', text: 'I am going to record everything you say from this point.' },
+      { voice: 'S', text: 'Walk me through it. Slowly. The whole eleven years.' },
+      { voice: 'S', text: 'Start at the beginning, Kalen. Tell us how it began.' },
     ],
   },
 
-  // voice: Sera. First-boot intro chain — step 4 of 4. The procedural how-do-
-  // I-play beat. Same content as the legacy tutorial_open, retuned to land
-  // immediately after intro_premise without the 10-second scheduled delay
-  // the legacy flow used.
-  intro_console: {
-    bgImage: './docs/lore/images/console-bands.png',
+  // voice: Kalen. The game has just become visible — the canvas, the rig,
+  // the Console gate. Kalen begins answering Sera's prompt from behind the
+  // desk. This is the first interstitial rendered above the *live* game, so
+  // it's also where the mechanical orientation lives: rig, Echoes, Console,
+  // hails — same content the legacy welcome + tutorial_open covered, now
+  // folded into one Kalen monologue that reads as testimony rather than
+  // tutorial. Uses the regular interstitial style (no it-intro-frame).
+  intro_premise: {
+    bgImage: './docs/lore/images/console-dark.png',
     steps: [
-      { voice: 'S', text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
-      { voice: 'S', text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
-      { voice: 'S', text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
-      { voice: 'S', text: 'Sit at the desk, Kalen. Let us see what answers.' },
+      { voice: 'K', text: 'The beginning. Alright.' },
+      { voice: 'K', text: 'A rig like this one. A relay channel I was not supposed to touch.' },
+      { voice: 'K', text: 'I listened for years before I answered. Eleven, by her count. She has it right.' },
+      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them. It does not stop while I am away from the desk.' },
+      { voice: 'K', text: 'At a hundred Echoes the Console opens — the bands I can buy. Yield first. Hails when I am brave. The cheap ones always come first.' },
+      { voice: 'K', text: 'Sit at the desk with me. I will show you what answered.' },
     ],
   },
 

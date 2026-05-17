@@ -22,8 +22,21 @@
   opacity: 0;
   transition: opacity 320ms ease;
 }
+/* Pre-paint state — set by the inline head script when no save+log indicate
+   the intro has already played. The overlay starts fully visible from the
+   first frame so the canvas/HUD never flashes underneath while JS boots.
+   Hide everything else under body until intro finishes — visibility:hidden
+   keeps layout but suppresses paint, so HUD measurements stay correct. */
+html.intro-pending #intro { display: flex; opacity: 1; }
+html.intro-pending body > *:not(#intro):not(#interstitial):not(script) {
+  visibility: hidden;
+}
 #intro.intro-visible { opacity: 1; }
 #intro.intro-open { display: flex; }
+/* The interrogation chain (intro_name → intro_kalen → intro_tell_us) runs
+   above the intro backdrop. Bump its z-index so the modal renders in front
+   of #intro while the game canvas is still hidden behind both. */
+html.intro-chain #interstitial { z-index: 10000; }
 
 #intro .intro-stage {
   position: absolute;
@@ -137,54 +150,83 @@
   padding: 0 24px;
   max-width: 880px;
   z-index: 2;
+  white-space: nowrap;
 }
 
-#intro .intro-tagline {
-  font-size: clamp(20px, 3.4vw, 38px);
-  letter-spacing: 0.34em;
-  font-weight: 300;
-  color: #e8e8ea;
-  margin: 0 0 28px;
+/* The year is the dramatic element. Everything else orbits it. */
+#intro .intro-year-label {
+  font-size: clamp(10px, 1.2vw, 13px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(255, 220, 180, 0.55);
+  margin-bottom: 18px;
   opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 1600ms ease 200ms, transform 2400ms ease 200ms, letter-spacing 4000ms ease 200ms;
-  text-shadow: 0 0 18px rgba(255, 200, 150, 0.04);
+  transform: translateY(4px);
+  transition: opacity 900ms ease 200ms, transform 1400ms ease 200ms;
 }
-#intro .intro-stage-on .intro-tagline {
-  opacity: 1;
-  transform: translateY(0);
-  letter-spacing: 0.40em;
-}
+#intro .intro-stage-on .intro-year-label { opacity: 1; transform: translateY(0); }
 
-#intro .intro-stamp {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  font-size: clamp(11px, 1.3vw, 14px);
-  letter-spacing: 0.22em;
-  color: rgba(255, 220, 180, 0.78);
-  text-transform: lowercase;
+#intro .intro-year {
+  font-size: clamp(72px, 14vw, 168px);
+  letter-spacing: 0.06em;
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  color: #f4ead8;
+  line-height: 1;
+  margin: 0 0 18px;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  text-shadow: 0 0 32px rgba(255, 200, 130, 0.10);
+  transition: opacity 1800ms ease 600ms, transform 2400ms ease 600ms;
+}
+#intro .intro-stage-on .intro-year { opacity: 1; transform: translateY(0) scale(1); }
+
+#intro .intro-rule {
+  width: 140px;
+  height: 1px;
+  margin: 18px auto 22px;
+  background: linear-gradient(to right, transparent, rgba(255, 200, 130, 0.4), transparent);
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition: opacity 800ms ease 1800ms, transform 1600ms ease 1800ms;
+}
+#intro .intro-stage-on .intro-rule { opacity: 1; transform: scaleX(1); }
+
+#intro .intro-place {
+  font-size: clamp(15px, 2vw, 22px);
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  color: #e6e6ec;
+  margin: 0 0 14px;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 1200ms ease 2200ms, transform 1600ms ease 2200ms;
 }
-#intro .intro-stage-on .intro-stamp { opacity: 1; transform: translateY(0); }
-#intro .intro-stamp .intro-date { color: rgba(255, 220, 180, 0.92); font-variant-numeric: tabular-nums; }
-#intro .intro-stamp .intro-place { color: rgba(232, 232, 234, 0.85); }
-#intro .intro-stamp .intro-sep { opacity: 0.5; }
+#intro .intro-stage-on .intro-place { opacity: 1; transform: translateY(0); }
+
+#intro .intro-sub {
+  font-size: clamp(11px, 1.2vw, 13px);
+  letter-spacing: 0.18em;
+  color: rgba(220, 220, 230, 0.6);
+  margin: 0;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 1000ms ease 3000ms, transform 1400ms ease 3000ms;
+}
+#intro .intro-stage-on .intro-sub { opacity: 1; transform: translateY(0); }
 
 #intro .intro-locale-hint {
-  margin-top: 56px;
+  margin-top: 64px;
   font-size: 11px;
   letter-spacing: 0.3em;
   text-transform: lowercase;
-  color: rgba(180, 180, 195, 0.5);
+  color: rgba(180, 180, 195, 0.62);
   opacity: 0;
-  transition: opacity 800ms ease 3600ms;
+  transition: opacity 800ms ease 4200ms;
 }
 #intro .intro-stage-on .intro-locale-hint {
   opacity: 1;
-  animation: intro-prompt-pulse 3.4s ease-in-out infinite 4200ms;
+  animation: intro-prompt-pulse 2.6s ease-in-out infinite 4800ms;
 }
 
 /* Input guard — block stage-advance taps during the opening fade so the

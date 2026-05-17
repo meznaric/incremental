@@ -371,6 +371,78 @@
    submitting the input is the only way out of this step. */
 .it-card.it-awaiting-input .it-btn-next { display: none; }
 .it-card.it-awaiting-input .it-dots { opacity: 0.4; }
+
+/* ===== Intro-chain frame =====
+   Used by intro_name / intro_kalen / intro_tell_us. Reads as an interrogation
+   transcript dropped onto a black backdrop — distinct from the regular
+   interstitial card so the player knows the dramatic opener is still running
+   and the game proper hasn't started yet. The .it-bg-image layer behind
+   stays in place; this style frames the foreground. */
+.it-card.it-intro-frame {
+  background: rgba(8, 6, 14, 0.92);
+  border: 1px solid rgba(255, 200, 130, 0.20);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px rgba(255, 200, 130, 0.06) inset,
+    0 18px 60px rgba(0, 0, 0, 0.6);
+  max-width: 720px;
+  padding-top: 38px;
+}
+/* Stamped transcript header. Generated from the data-intro-stamp attribute
+   set by interstitialUi when an it-intro-frame card opens. */
+.it-card.it-intro-frame::before {
+  content: attr(data-intro-stamp);
+  position: absolute;
+  top: 12px;
+  left: 20px;
+  right: 20px;
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 200, 130, 0.55);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  text-align: left;
+}
+.it-card.it-intro-frame::after {
+  content: "";
+  position: absolute;
+  top: 30px;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 200, 130, 0.32), transparent 70%);
+  pointer-events: none;
+}
+.it-card.it-intro-frame .it-text {
+  color: #f0ead8;
+  letter-spacing: 0.01em;
+}
+.it-card.it-intro-frame .it-speaker-name { color: rgba(255, 200, 130, 0.85); }
+.it-card.it-intro-frame .it-btn {
+  border-color: rgba(255, 200, 130, 0.36);
+  color: rgba(255, 220, 180, 0.78);
+}
+.it-card.it-intro-frame .it-btn:hover {
+  border-color: rgba(255, 200, 130, 0.78);
+  color: #ffd9a8;
+  background: rgba(255, 200, 130, 0.06);
+}
+.it-card.it-intro-frame .it-btn.is-close {
+  background: rgba(255, 200, 130, 0.10);
+  border-color: rgba(255, 200, 130, 0.6);
+  color: rgba(255, 220, 180, 0.92);
+}
+.it-card.it-intro-frame .it-input {
+  border-color: rgba(255, 200, 130, 0.42);
+  caret-color: #ffd9a8;
+}
+.it-card.it-intro-frame .it-input:focus {
+  border-color: rgba(255, 200, 130, 0.85);
+}
+.it-card.it-intro-frame .it-dot { background: rgba(255, 200, 130, 0.25); }
+.it-card.it-intro-frame .it-dot.on { background: rgba(255, 220, 180, 0.92); }
+.it-card.it-intro-frame .it-bg-image { opacity: 0.18; filter: blur(2px); }
 /* Season-finale tone — match the warm palette across both buttons. */
 .it-card.it-season-finale .it-btn {
   border-color: rgba(212, 154, 85, 0.42);

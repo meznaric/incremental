@@ -51,6 +51,27 @@
       }
     }
   </script>
+  <!--
+    Pre-paint intro gate. Reads contactLog synchronously so the very first
+    frame is either the intro overlay (fresh player) or the game (returning
+    player) — never a brief flash of the game underneath the intro. Inline
+    so it lands before the body parses and before any module script runs.
+  -->
+  <script>
+    (function () {
+      var seen = false;
+      try {
+        var raw = localStorage.getItem('eots.contactlog.v2');
+        if (raw) {
+          var log = JSON.parse(raw);
+          if (log && (log.introSeen || (Array.isArray(log.worlds) && log.worlds.length > 0) || (log.run && log.run > 1))) {
+            seen = true;
+          }
+        }
+      } catch (e) { /* fall through to fresh-player path */ }
+      document.documentElement.classList.add(seen ? 'intro-skip' : 'intro-pending');
+    })();
+  </script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -336,8 +357,11 @@
     <div class="intro-stage" data-stage="locale" hidden>
       <div class="intro-locale-bg" aria-hidden="true"></div>
       <div class="intro-locale-content">
-        <div class="intro-tagline">THE DARK WAS NEVER SILENT.</div>
-        <div class="intro-stamp"><span class="intro-date">s.y. 2407</span><span class="intro-sep">&mdash;</span><span class="intro-place">Ear of Saen Station</span></div>
+        <div class="intro-year-label">standard year</div>
+        <div class="intro-year">2407</div>
+        <div class="intro-rule" aria-hidden="true"></div>
+        <div class="intro-place">Ear of Saen Station</div>
+        <div class="intro-sub">Union border &middot; eleventh year of the listen</div>
         <div class="intro-locale-hint">tap to continue</div>
       </div>
     </div>

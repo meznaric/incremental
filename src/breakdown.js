@@ -19,6 +19,7 @@
 
 import { patternBaseRateMul, getActivePattern } from './cyclePatterns.js';
 import { applyDampening, DAMPEN_AT } from './shop.js';
+import { networkContribution } from './network.js';
 
 const MEMORY_PER_SHARD = 0.10; // mirror of contactLog.ECHO_MEMORY_PER_SHARD
 
@@ -45,15 +46,19 @@ function activeCompound(buffs, now) {
 
 export function breakdownRate(state, now) {
   const rows = [];
-  const base = (state.basePerSecond || 0) + (state.flatBonus || 0);
+  const core = state.basePerSecond || 0;
+  const flat = state.flatBonus || 0;
+  const mesh = networkContribution(state, now);
+  const base = core + flat + mesh;
+  const parts = [];
+  if (flat > 0) parts.push(`+${flat} patched relays`);
+  if (mesh > 0) parts.push(`+${mesh < 100 ? mesh.toFixed(1) : Math.round(mesh)} seed mesh`);
   rows.push({
     kind: 'base',
     label: 'Base listening yield',
     op: '+ /s',
     factor: base,
-    note: state.flatBonus > 0
-      ? `${state.basePerSecond || 0} core · +${state.flatBonus} from patched relays`
-      : null,
+    note: parts.length ? `${core} core · ${parts.join(' · ')}` : null,
   });
 
   const permMul = state.permMul || 1;

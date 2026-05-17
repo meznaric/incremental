@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { breakdownRate } from '../src/breakdown.js';
 import { effectiveRate } from '../src/shop.js';
+import { makeNetworkState, queueToken, placeRelay } from '../src/network.js';
 
 function makeState(over = {}) {
   return {
@@ -104,4 +105,20 @@ test('breakdown omits dampening row below threshold', () => {
   const s = makeState({ basePerSecond: 1e9 });
   const rows = breakdownRate(s, 0);
   assert.equal(rows.find((r) => r.label === 'Log dampening'), undefined);
+});
+
+test('breakdown folds online seed-mesh contribution into the base and matches effectiveRate', () => {
+  const s = makeState({ basePerSecond: 10, permMul: 2, network: makeNetworkState() });
+  queueToken(s, 'common', 100);
+  // Place at origin (Core), then advance past the ripen window so the relay is online.
+  const placed = placeRelay(s, { q: 0, r: 0 }, 0);
+  assert.ok(placed, 'relay should place at (0,0)');
+  const now = placed.ripensAt + 1;
+  const rows = breakdownRate(s, now);
+  const base = rows.find((r) => r.kind === 'base');
+  // base.factor includes core + flatBonus + mesh; with a single Core relay,
+  // mesh = baseYield × sector.yieldMul × (1 + 0·cluster) × coverageMul.
+  assert.ok(base.factor > 10, `base ${base.factor} should be lifted by mesh contribution`);
+  assert.ok(base.note && base.note.includes('seed mesh'), 'note should mention seed mesh');
+  assert.equal(rows[rows.length - 1].factor, effectiveRate(s, now));
 });

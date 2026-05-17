@@ -461,6 +461,10 @@ export function makeNetworkUi(state, opts) {
     const aspect = bounds.height / bounds.width;
     return { w: cw, h: cw * aspect };
   }
+  // Overscroll headroom past the natural fit. Without it, the bottom hexes
+  // get trapped under the placement bar / iOS home indicator because the
+  // tightest clamp aligns the map's bottom edge with the container's bottom.
+  const OVERSCROLL_FRAC = 0.5;
   function clampView(mapEl) {
     const nat = naturalLayoutSize(mapEl);
     if (!nat) return;
@@ -468,10 +472,20 @@ export function makeNetworkUi(state, opts) {
     const ch = mapEl.clientHeight;
     const vw = nat.w * view.scale;
     const vh = nat.h * view.scale;
-    if (vw <= cw) view.tx = (cw - vw) / 2;
-    else view.tx = Math.max(cw - vw, Math.min(0, view.tx));
-    if (vh <= ch) view.ty = (ch - vh) / 2;
-    else view.ty = Math.max(ch - vh, Math.min(0, view.ty));
+    const padX = cw * OVERSCROLL_FRAC;
+    const padY = ch * OVERSCROLL_FRAC;
+    if (vw <= cw) {
+      const cx = (cw - vw) / 2;
+      view.tx = Math.max(cx - padX, Math.min(cx + padX, view.tx));
+    } else {
+      view.tx = Math.max(cw - vw - padX, Math.min(padX, view.tx));
+    }
+    if (vh <= ch) {
+      const cy = (ch - vh) / 2;
+      view.ty = Math.max(cy - padY, Math.min(cy + padY, view.ty));
+    } else {
+      view.ty = Math.max(ch - vh - padY, Math.min(padY, view.ty));
+    }
   }
   function centerView(mapEl) {
     const nat = naturalLayoutSize(mapEl);

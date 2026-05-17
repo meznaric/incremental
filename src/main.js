@@ -481,7 +481,14 @@ function tick(raf) {
     lastHud = raf;
   }
   if (raf - lastSave > SAVE_INTERVAL_MS) {
-    saveState(state);
+    // Same guard as beforeunload: don't autosave while the first-boot intro
+    // is on screen, so a forced reload mid-cinematic still leaves the player
+    // with no save and the intro replays cleanly.
+    const introOpen = (() => {
+      const el = document.getElementById('intro');
+      return !!(el && el.classList.contains('intro-open'));
+    })();
+    if (!introOpen) saveState(state);
     lastSave = raf;
   }
 
@@ -490,7 +497,16 @@ function tick(raf) {
 }
 requestAnimationFrame(tick);
 
-window.addEventListener('beforeunload', () => saveState(state));
+window.addEventListener('beforeunload', () => {
+  // Skip the save if the first-boot intro is still on screen — if anything
+  // forces a reload mid-opener (manual refresh, SW handoff that slips past
+  // the deferred reload, etc.) the post-reload boot must still see !loaded
+  // so the intro replays. The player can't have made meaningful progress
+  // during the intro window anyway — the shop isn't reachable yet.
+  const intro = document.getElementById('intro');
+  if (intro && intro.classList.contains('intro-open')) return;
+  saveState(state);
+});
 
 // Tab-background → return is also a Signal Lock moment. Backgrounded tabs
 // keep ticking (rAF throttled to ~1Hz), so state.amount accrues piecemeal

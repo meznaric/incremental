@@ -437,11 +437,25 @@
           }).catch(() => { /* offline-first is an upgrade, not a requirement */ });
 
           // Reload once when the new SW takes control, so the page is on the fresh assets.
+          // BUT: defer the reload while the first-boot intro overlay is on
+          // screen. On a fresh install (or any deploy update) the SW takes
+          // control ~1-3s after page load, which would otherwise interrupt
+          // the dramatic opener and dump the player into the game without
+          // any introduction. The new assets are already cached either way;
+          // we just don't reload while the player is mid-cinematic.
           let reloaded = false;
           navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (reloaded) return;
             reloaded = true;
-            location.reload();
+            const tryReload = () => {
+              const intro = document.getElementById('intro');
+              if (intro && intro.classList.contains('intro-open')) {
+                setTimeout(tryReload, 600);
+                return;
+              }
+              location.reload();
+            };
+            tryReload();
           });
         });
       }

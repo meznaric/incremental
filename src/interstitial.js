@@ -124,6 +124,7 @@ const BASE_INTERSTITIALS = {
       { voice: 'K', text: 'A rig like this one. A channel I was not supposed to touch.' },
       { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them — even when the desk is empty.' },
       { voice: 'K', text: 'At a hundred Echoes the Console opens. Yield first. Hails when I am brave.' },
+      { voice: 'K', text: 'The green bands first — Relays, then Decodes. Each one I patch in lifts the floor.' },
     ],
   },
 

@@ -44,6 +44,7 @@
   <link rel="stylesheet" href="./styles/network.css" />
   <link rel="stylesheet" href="./styles/gameLog.css" />
   <link rel="stylesheet" href="./styles/achievements.css" />
+  <link rel="stylesheet" href="./styles/contactProgress.css" />
   <script type="importmap">
     {
       "imports": {
@@ -199,6 +200,8 @@
       <button id="slotsRight" class="slots-nav right hidden" type="button" aria-label="Scroll upgrades right"><i class="ri ri-arrow-right-s-line"></i></button>
     </div>
   </div>
+
+  <div id="contactProgress" class="cp-root" aria-hidden="true"></div>
 
   <div id="metaBuffs"></div>
   <div id="buffs"></div>
@@ -445,7 +448,17 @@
       if (isStandalone) root.classList.add('is-standalone');
 
       // --- Service worker ----------------------------------------------------
-      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      // Skip the SW on localhost — otherwise every src/* edit needs a CACHE_VERSION
+      // bump or a manual cache wipe. Also tear down any SW + caches left behind
+      // from prior local dev so the page stops being served from a stale shell.
+      const isLocalDev = ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(location.hostname);
+      if (isLocalDev && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister());
+        }).catch(() => {});
+        if (self.caches) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
+      }
+      if (!isLocalDev && 'serviceWorker' in navigator && location.protocol !== 'file:') {
         addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js').then((reg) => {
             // Notify when an update is downloaded and waiting.

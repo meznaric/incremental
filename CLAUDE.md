@@ -86,7 +86,9 @@ Visual/render regressions: Playwright via MCP — start server, navigate, check 
 
 GitHub Pages serves via `sw.js`, service worker. **Cache-firsts every static asset** (incl. `src/*.js`, `vendor/*`). Stale `src/main.js` = failure mode — fresh HTML imports same URL, SW intercepts, serves cache.
 
-Cache key = `CACHE_VERSION` in `sw.js`. **Bump per deploy = invalidate all cached assets for existing players.** Pages workflow (`.github/workflows/pages.yml`) does this auto: `sed` rewrites `CACHE_VERSION` to commit SHA inside `_site/sw.js` pre-upload, `grep -q` after fails build if sub didn't land. **Don't break `CACHE_VERSION = '…'` line shape** in `sw.js` — rename or requote = update sed + grep in `pages.yml` to match. Local dev keeps static value baked in `sw.js`. Fine because dev cache scoped to `localhost`.
+Cache key = `CACHE_VERSION` in `sw.js`. **Bump per deploy = invalidate all cached assets for existing players.** Pages workflow (`.github/workflows/pages.yml`) does this auto: `sed` rewrites `CACHE_VERSION` to commit SHA inside `_site/sw.js` pre-upload, `grep -q` after fails build if sub didn't land. **Don't break `CACHE_VERSION = '…'` line shape** in `sw.js` — rename or requote = update sed + grep in `pages.yml` to match.
+
+Local dev does **not** register the SW. `index.html` short-circuits on `localhost` / `127.0.0.1` / `0.0.0.0` / `::1`, and also unregisters any SW + deletes any `caches` left over from earlier dev sessions. So `src/*` edits show up on plain refresh — no `CACHE_VERSION` bump needed. If you're chasing a "stale shell" bug on localhost, the SW is not the culprit; it's not running.
 
 Rest of chain robust: SW install uses `{cache: 'reload'}` → bypass HTTP cache. `skipWaiting()` + `clients.claim()` → activate new SW immediately. `controllerchange` listener in `index.html` → auto-reload page on update. Players get fresh build mid-session, no prompt.
 

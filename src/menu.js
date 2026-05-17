@@ -41,8 +41,11 @@ export function initMenu() {
   // Outside-click closes the menu. The toggle's tap fires on pointerup before
   // this listener sees the synthetic click, and the click that does bubble has
   // its target inside #menu (so the contains() check skips it).
+  // Debug view is sticky: it's easy to graze the canvas while poking knobs,
+  // and re-entering via the PIN every time is painful. Escape still closes it.
   document.addEventListener('click', (e) => {
     if (!menu.classList.contains('open')) return;
+    if (view === 'debug') return;
     if (!menu.contains(e.target)) setOpen(false);
   });
 

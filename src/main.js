@@ -30,6 +30,7 @@ import { ensureNetwork, tickNetwork, tickBleedDrip, SECTORS } from './network.js
 import { makeNetworkUi } from './networkUi.js';
 import { initMainUi } from './mainUi.js';
 import { initDebugUi } from './debugUi.js';
+import { initContactProgressUi } from './contactProgressUi.js';
 import {
   loadAchievements, saveAchievements, evaluateAchievements, markStat,
 } from './achievements.js';
@@ -155,12 +156,34 @@ const hero = new HeroDisplay();
 scene.add(hero.group);
 
 const shopEl = document.getElementById('shop');
+const progressEl = document.getElementById('contactProgress');
 function onResize() {
   const shopRect = shopEl.getBoundingClientRect();
   const shopTop = shopRect.height ? shopRect.top : window.innerHeight;
   document.documentElement.style.setProperty('--shop-h', shopRect.height + 'px');
+  // Carve canvas room for the Contact Progress strip when it's on screen.
+  // The element is fixed-positioned just above the shop, so its top is the
+  // new upper boundary for the WebGL canvas.
+  let upperBound = shopTop;
+  if (progressEl && progressEl.classList.contains('cp-visible')) {
+    const r = progressEl.getBoundingClientRect();
+    // The strip itself is thin, but the planet/radar/traveler glyphs are
+    // bottom-anchored and overflow upward. The effective vertical band the
+    // strip claims is the tallest of those overflowing children — that's the
+    // value the canvas must avoid and the mobile buff stacks must clear.
+    let band = r.height || 0;
+    for (const child of progressEl.querySelectorAll('.cp-edge, .cp-traveler')) {
+      const ch = child.getBoundingClientRect().height;
+      if (ch > band) band = ch;
+    }
+    const bandTop = r.bottom - band;
+    if (band) upperBound = Math.min(upperBound, bandTop);
+    document.documentElement.style.setProperty('--cp-h', band + 'px');
+  } else {
+    document.documentElement.style.setProperty('--cp-h', '0px');
+  }
   const w = window.innerWidth;
-  const h = Math.max(240, shopTop - 8);
+  const h = Math.max(240, upperBound - 8);
   renderer.setSize(w, h);
   canvas.style.height = h + 'px';
   camera.aspect = w / h;
@@ -169,6 +192,7 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(shopEl);
+if (progressEl) new ResizeObserver(onResize).observe(progressEl);
 
 // mainUi owns every DOM-touching surface on the page (HUD inputs, shop slots,
 // buffs, toolbar, modals). Initialising it here — after THREE setup so the
@@ -187,6 +211,7 @@ const debugUi = initDebugUi(state, {
   refreshShop: () => ui.renderShop(),
   refreshNetwork: () => networkUi.refresh(),
 });
+const contactProgressUi = initContactProgressUi(state);
 
 const loaded = loadState(state);
 // Back-fill the Contact Log from any milestones already marked shown by an
@@ -465,6 +490,7 @@ function tick(raf) {
   if (raf - lastHud > 100) {
     ui.renderHud(t);
     networkUi.refresh();
+    contactProgressUi.update();
     // Mythic detection — any slot currently advertising a mythic-rarity band
     // counts. Cheap: ≤10 slots, plain field read. Bleed and engraving flips
     // happen at the event source, but mythic surfaces from rolls too (not just

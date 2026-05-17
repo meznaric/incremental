@@ -1,0 +1,165 @@
+/* Contact Progress Bar — thin strip between the column display and the shop.
+   The strip itself is short (~20px); the planet, traveller, and radar are
+   anchored to its bottom and overflow upward into the canvas region above so
+   they keep their full visual presence without eating layout height. Hidden
+   until first contact (toggled by .cp-visible from src/contactProgressUi.js).
+   The --cp-h CSS var is read by src/main.js to carve the canvas height. */
+
+:root { --cp-h: 0px; }
+
+#contactProgress {
+  position: fixed;
+  left: 50%;
+  bottom: var(--shop-h, 200px);
+  transform: translateX(-50%);
+  width: min(1232px, 100vw);
+  height: 22px;
+  box-sizing: border-box;
+  display: none;
+  align-items: center;
+  z-index: 25;
+  pointer-events: none;
+  overflow: visible;
+  font-variant-numeric: tabular-nums;
+}
+#contactProgress.cp-visible { display: flex; }
+
+/* Anchored to the bottom of the strip so the glyph extends upward over the
+   canvas area instead of cramping the row height. Width = visible footprint
+   we want to reserve laterally inside the strip. */
+.cp-edge {
+  position: relative;
+  border: 1px solid #d49a5599;
+  background: #000000;
+  z-index: 1;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d49a55;
+  font-size: 16px;
+  line-height: 1;
+}
+.cp-edge .ri { position: relative; z-index: 1; line-height: 1; }
+.cp-edge-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(212, 154, 85, 0.35) 0%, rgba(212, 154, 85, 0) 70%);
+}
+.cp-edge-left  { color: #c89a64; }
+.cp-edge-right { color: #8aa0ff; }
+.cp-edge-right .cp-edge-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(138, 160, 255, 0.32) 0%, rgba(138, 160, 255, 0) 70%);
+}
+.cp-edge-right .ri { animation: cp-radar-pulse 3.2s ease-in-out infinite; }
+@keyframes cp-radar-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1.0; transform: scale(1.08); }
+}
+
+.cp-track {
+  position: relative;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Wavy signal line — repeating SVG sine cycle scrolled with background-position.
+   The SVG is hand-tiled so the wave continues smoothly across each repeat.
+   Sized to the strip's full height (thin), centred vertically. */
+.cp-wave {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 40' preserveAspectRatio='none'><path d='M0 20 C 10 4, 30 4, 40 20 C 50 36, 70 36, 80 20' stroke='%23d49a55' stroke-width='1.6' stroke-linecap='round' fill='none' opacity='0.72'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 80px 100%;
+  background-position-y: center;
+  animation: cp-wave-flow 3.6s linear infinite;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px rgba(212, 154, 85, 0.25));
+}
+@keyframes cp-wave-flow {
+  from { background-position-x: 0; }
+  to   { background-position-x: 80px; }
+}
+
+/* Traveller — anchored bottom of strip like the edges so its full circle
+   extends upward over the canvas, not into the shop below. */
+.cp-traveler {
+  position: absolute;
+  bottom: 50%;
+  transform: translateY(50%);
+  left: 0%;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  pointer-events: none;
+  transition: left 0.32s ease;
+}
+.cp-traveler-bob {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 8px rgba(212, 154, 85, 0.5));
+}
+.cp-traveler-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 154, 85, 0.7);
+  background: #0a0a14;
+}
+.cp-traveler-fallback {
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 154, 85, 0.7);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(212, 154, 85, 0.4) 0%, rgba(212, 154, 85, 0.05) 60%, transparent 70%),
+    #0a0a14;
+}
+
+/* Finale lore line — replaces the traveller when the cycle's contact set is
+   exhausted. Sits centred on the thin strip; no overflow needed. */
+.cp-finale {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #d49a55;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 12px rgba(212, 154, 85, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#contactProgress.cp-finale-on .cp-finale { display: flex; }
+#contactProgress.cp-finale-on .cp-traveler { display: none; }
+#contactProgress.cp-finale-on .cp-wave { opacity: 0.45; animation-duration: 6s; }
+#contactProgress.cp-finale-on .cp-edge-right .ri { animation-duration: 1.6s; }
+
+@media (max-width: 820px) {
+  #contactProgress {
+    height: 16px;
+  }
+  .cp-edge { width: 24px; height: 24px; font-size: 14px; }
+  .cp-edge-left { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; }
+  .cp-edge-right { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+  .cp-wave { background-size: 64px 100%; }
+  .cp-traveler { width: 28px; height: 28px; margin-left: -14px; }
+  .cp-finale { font-size: 10px; }
+}

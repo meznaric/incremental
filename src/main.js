@@ -4,7 +4,7 @@ import { HeroDisplay } from './hero.js';
 import { formatAbbrev } from './bignum.js';
 import { getUpgrade, buildSlot } from './upgrades.js';
 import {
-  makeShopState, effectiveRate, integrateRate, validateSlate,
+  makeShopState, effectiveRate, unbufedEffectiveRate, integrateRate, validateSlate,
 } from './shop.js';
 import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
@@ -346,7 +346,10 @@ function tick(raf) {
   }
 
   const rate = effectiveRate(state, t);
-  const baseRate = ((state.basePerSecond || 0) + state.flatBonus) * state.permMul;
+  // baseRate is what the rate would be with no rateMul/compound buffs active,
+  // post-dampening. Hero uses rate > baseRate to drive the "buffed" tint —
+  // comparing against pre-dampening base broke that past 1e12.
+  const baseRate = unbufedEffectiveRate(state, t);
   // Use closed-form integral over wall-clock so backgrounded tabs (where rAF
   // throttles to ~1Hz) and resumes from sleep don't undercount production.
   // Also handles buff start/expiry transitions inside the window.

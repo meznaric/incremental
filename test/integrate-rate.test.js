@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { effectiveRate, integrateRate, pruneBuffs, applyDampening, DAMPEN_AT, DAMPEN_ALPHA } from '../src/shop.js';
+import { effectiveRate, unbufedEffectiveRate, integrateRate, marginalRateForPurchase, pruneBuffs, applyDampening, DAMPEN_AT, DAMPEN_ALPHA } from '../src/shop.js';
 
 // Minimal state factory — only the fields integrateRate / effectiveRate read.
 function makeState(over = {}) {
@@ -249,6 +249,75 @@ test('integrateRate: dampening applies segment-by-segment', () => {
   const dampened = DAMPEN_AT * Math.pow(1e15 / DAMPEN_AT, DAMPEN_ALPHA);
   const expected = dampened * 10;
   assert.ok(Math.abs(integrateRate(s, 0, 10) - expected) / expected < 1e-6);
+});
+
+test('unbufedEffectiveRate strips rateMul and compound but keeps everything else', () => {
+  const s = makeState({
+    basePerSecond: 10,
+    buffs: {
+      rateMul: [{ value: 3, duration: 100, expiresAt: 100 }],
+      compound: [{ rate: 0.02, duration: 60, startedAt: 0, expiresAt: 60 }],
+      gambleLuck: [], gambleCushion: [],
+    },
+  });
+  // With buffs at t=30: 10 × 3 × (1.02)^30 ≈ 54.27
+  // Without buffs: 10.
+  const eff = effectiveRate(s, 30);
+  const unb = unbufedEffectiveRate(s, 30);
+  assert.ok(eff > unb, `expected eff > unb, got ${eff} vs ${unb}`);
+  assert.equal(unb, 10);
+});
+
+test('unbufedEffectiveRate matches effectiveRate when no buffs are active', () => {
+  const s = makeState({ basePerSecond: 5, flatBonus: 3, permMul: 2 });
+  assert.equal(unbufedEffectiveRate(s, 0), effectiveRate(s, 0));
+});
+
+// Regression: the HUD "buffed" tint compared rate to (basePerSecond + flatBonus)
+// × permMul, a pre-dampening value that's always > effectiveRate past 1e12.
+// Past dampening the tint never lit up. unbufedEffectiveRate runs the same
+// chain minus the buff layer so the comparison is honest at any scale.
+test('unbufedEffectiveRate stays below effectiveRate in dampening territory with a buff', () => {
+  const s = makeState({
+    basePerSecond: 1e15, // well past DAMPEN_AT
+    buffs: {
+      rateMul: [{ value: 2, duration: 100, expiresAt: 100 }],
+      gambleLuck: [], gambleCushion: [], compound: [],
+    },
+  });
+  assert.ok(effectiveRate(s, 0) > unbufedEffectiveRate(s, 0));
+});
+
+// Regression: marginalRateForPurchase was missing the buff branch entirely,
+// returning 0 for the slot modal's "Effective gain" row on Carrier windows.
+test('marginalRateForPurchase reports nonzero gain for a rateMul buff slot', () => {
+  const s = makeState({ basePerSecond: 10 });
+  // 'caffeine' is a rateMul buff (×1.7, 600s) defined in upgrades-data.
+  const margin = marginalRateForPurchase(s, { id: 'caffeine', cost: 100 }, 0);
+  assert.ok(margin > 0, `expected positive margin, got ${margin}`);
+});
+
+// Regression: networkContribution was sampled at t1 only, so a relay that
+// ripened mid-window contributed for the whole window (over-credit) or none
+// at all if not yet online by t1 (under-credit). Per-segment sampling lets
+// it kick in exactly at ripensAt.
+test('integrateRate splits at relay ripensAt so post-ripen yield lands', () => {
+  const ripensAt = 5;
+  const s = makeState({
+    basePerSecond: 0,
+    network: {
+      relays: [{
+        id: 'r1', tier: 'common', baseYield: 10, sector: 'frontier',
+        plantedAt: 0, ripensAt, hex: { q: 0, r: 0 },
+      }],
+      queued: [], lostCount: 0, recentLosses: [],
+    },
+  });
+  // Pre-ripen [0,5): relay offline → 0 contribution. Post-ripen [5,10):
+  // single frontier relay, yieldMul 1.0, no neighbours, coverage 1.09.
+  // Yield/s = 10 × 1.0 × 1.09 = 10.9. Over 5 seconds = 54.5.
+  const result = integrateRate(s, 0, 10);
+  assert.ok(Math.abs(result - 54.5) < 1e-6, `expected 54.5, got ${result}`);
 });
 
 test('pruneBuffs drops expired entries across all keys', () => {

@@ -259,10 +259,10 @@ export function totalMulOwned(owned) {
 }
 
 // Convert cap: caps a single convert's *yield* (and matching spend) so its
-// flatBonus delta can never exceed CAP × baseAdditive. Caps are 1/10 of the
-// previous tuning — yellow upgrades were overshadowing every other lever once
-// production climbed past trillion. A single convert is now meant to chip in,
-// not leapfrog the entire build.
+// flatBonus delta can never exceed CAP × baseAdditive. Originally tuned 10×
+// tighter to stop yellow upgrades from leapfrogging every other lever past
+// trillion; once placement + ripen + discovery loss landed, the cap got
+// loosened so the network actually pays for the effort.
 export const CONVERT_BOOST_CAP = { common: 0.015, uncommon: 0.06, rare: 0.22, legendary: 0.7 };
 
 // Mul perm cost past its original maxRate band: switch from the static

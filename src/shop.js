@@ -209,12 +209,26 @@ export function effectiveRate(state, now) {
   return applyAscent(rate, ascentExp(state));
 }
 
+// Same chain as effectiveRate but without the RATE_BUFFS layer. Used by the
+// HUD to detect whether a buff is currently lifting the rate — past 1e12
+// dampening, raw pre-dampening baseRate is always greater than effectiveRate
+// even with no buffs active, so comparing against that gives a false "off"
+// reading for the buffed glow on the rate label.
+export function unbufedEffectiveRate(state, now) {
+  let rate = additiveBase(state, now) * state.permMul;
+  rate *= patternBaseRateMul(state);
+  rate *= memoryFactor(state);
+  rate = applyDampening(rate);
+  return applyAscent(rate, ascentExp(state));
+}
+
 // Closed-form integral of effective rate from t0 to t1. Splits the window at every
-// buff transition (start or expiry), then for each segment multiplies all
-// piecewise-constant buff factors at the midpoint with the segment's time integral.
-// If a buff has a continuous multiplier (e.g. compound), its analytical integral
-// replaces the (c - a) factor. Assumes at most one continuous descriptor is active
-// per segment; extending to more would require generalized numerical integration.
+// buff transition (start or expiry) AND every relay ripensAt, then for each
+// segment multiplies all piecewise-constant buff factors at the midpoint with
+// the segment's time integral. If a buff has a continuous multiplier (e.g.
+// compound), its analytical integral replaces the (c - a) factor. Assumes at
+// most one continuous descriptor is active per segment; extending to more
+// would require generalized numerical integration.
 export function integrateRate(state, t0, t1) {
   if (t1 <= t0) return 0;
   const transitions = new Set([t0, t1]);
@@ -224,19 +238,26 @@ export function integrateRate(state, t0, t1) {
       if (tr > t0 && tr < t1) transitions.add(tr);
     }
   }
+  // Relays that ripen mid-window change networkContribution at that
+  // instant — split here too so post-ripen segments pick up the new
+  // relay's yield. Discoveries are handled separately by reconcileOffline
+  // before this call, so by t1 the surviving set is fixed.
+  if (state.network && state.network.relays) {
+    for (const r of state.network.relays) {
+      if (r.ripensAt > t0 && r.ripensAt < t1) transitions.add(r.ripensAt);
+    }
+  }
   const sorted = [...transitions].sort((x, y) => x - y);
-  // Network contribution is treated as constant across the integration window
-  // — adjacency and coverage can shift mid-window (ripens, discoveries) but we
-  // sample at t1, the value the player will see post-load. Overestimates a
-  // ripen-during-window by a small margin; underestimates a discovery. Both
-  // small relative to flatBonus over a typical window.
-  const base = ((state.basePerSecond || 0) + state.flatBonus + networkContribution(state, t1)) * state.permMul
-    * patternBaseRateMul(state) * memoryFactor(state);
   const exp = ascentExp(state);
+  const flatBaseMul = state.permMul * patternBaseRateMul(state) * memoryFactor(state);
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i], c = sorted[i + 1];
     if (c <= a) continue;
+    const mid = (a + c) / 2;
+    // Sample networkContribution per segment so ripening relays start
+    // contributing only from their ripensAt onward.
+    const segBase = ((state.basePerSecond || 0) + state.flatBonus + networkContribution(state, mid)) * flatBaseMul;
     let factor = 1;
     let timeIntegral = c - a;
     let continuousFound = false;
@@ -257,7 +278,7 @@ export function integrateRate(state, t0, t1) {
     // segments dampen exactly; continuous (compound) segments dampen the
     // segment-average rate, which is the strictest closed-form available
     // without numerical integration. Ascent stacks on top of dampening.
-    const linearBase = base * factor;
+    const linearBase = segBase * factor;
     if (linearBase > 0) {
       const dt = c - a;
       let segmentTotal;
@@ -311,7 +332,19 @@ export function marginalRateForPurchase(state, slot, now) {
     // surfaces "queue token" rather than effective /s; the actual gain lands
     // after the player places the relay and it ripens.
     after = before;
+  } else if (u.kind === 'buff' && u.buffType === 'rateMul') {
+    // Carrier window: flat multiplier the moment it lands. Mirror applyBuff's
+    // value composition (pattern strength × meta strength) so the projection
+    // matches what the buff will actually contribute.
+    const sMul = patternBuffRateMulStrength(state);
+    const metaStr = metaMulAt(state.buffs.metaStrength, now);
+    const entry = { value: u.mult * sMul * metaStr, duration: u.duration, expiresAt: now + u.duration };
+    state.buffs.rateMul.push(entry);
+    after = effectiveRate(state, now);
+    state.buffs.rateMul.pop();
   }
+  // Compound buffs ramp from ×1 at start — the marginal at the instant of
+  // purchase is zero by design, so they fall through to after = before.
   return Math.max(0, after - before);
 }
 

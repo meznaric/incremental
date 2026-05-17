@@ -396,12 +396,6 @@ export function tryBuy(state, slotIdx, now) {
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
     applyBuff(state, u, now);
-    // Gamble-helper buffs are decode-priced (costFor → upgrades.js), so the
-    // own-count drives the per-cycle escalation. Carrier/Resonance buffs stay
-    // priced off live rate and don't need ownership tracking.
-    if (u.buffType === 'gambleLuck' || u.buffType === 'gambleCushion') {
-      state.owned[u.id] = (state.owned[u.id] || 0) + 1;
-    }
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };

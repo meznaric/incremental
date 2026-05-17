@@ -297,18 +297,15 @@ export function convertYieldFor(upgrade, cost, baseAdditive) {
   return Math.min(cost * upgrade.ratio, yieldCap);
 }
 
-// Per-rarity own-count growth for the gamble-affecting buffs (Carry / Buffer
-// windows). They price like decode permanents — a flat-ish base that climbs
-// per purchase — instead of the rate × costSec model the rate/compound buffs
-// still use, which used to make the *first* Hail-helper cruelly expensive in
-// early cycles and only modestly painful late.
-const GAMBLE_BUFF_GROWTH = {
-  common:    1.5,
-  uncommon:  1.7,
-  rare:      2.0,
-  legendary: 2.5,
-  mythic:    3.0,
-};
+// Discount on Carry / Buffer windows (gamble-helper buffs) relative to the
+// generic rate × costSec buff price. They previously charged the full rate
+// × costSec, which felt punishing early (you couldn't afford a Hunch before
+// your first balance build-up) and slightly steep late. A flat 0.5× shaves
+// the wall enough that taking one is a real option without making them
+// spammable — they still scale with production, so they always cost
+// something meaningful. Own-count would compound past one cycle and isn't
+// the lever we want here.
+export const GAMBLE_BUFF_DISCOUNT = 0.5;
 function isGambleBuff(u) {
   return u.kind === 'buff' && (u.buffType === 'gambleLuck' || u.buffType === 'gambleCushion');
 }
@@ -321,16 +318,8 @@ export function costFor(upgrade, ctx) {
   switch (upgrade.kind) {
     case 'gamble':    return ctx.balance * upgrade.wagerPct;
     case 'buff': {
-      // Gamble-helper buffs: decode-style. costSec doubles as a flat baseCost
-      // (still respects the per-buff intent in upgrades-data.js — bigger
-      // costSec = bigger initial outlay). Carrier/Resonance buffs keep the
-      // rate-scaled model.
-      if (isGambleBuff(upgrade)) {
-        const n = ctx.owned[upgrade.id] || 0;
-        const growth = GAMBLE_BUFF_GROWTH[upgrade.rarity] || 1.6;
-        return Math.max(1, upgrade.costSec * Math.pow(growth, n + (n * n) / 25));
-      }
-      return Math.max(1, ctx.rate * upgrade.costSec);
+      const base = Math.max(1, ctx.rate * upgrade.costSec);
+      return isGambleBuff(upgrade) ? Math.max(1, base * GAMBLE_BUFF_DISCOUNT) : base;
     }
     case 'drift': {
       // Drifts follow the permanent baseCost/growth ladder but skip the

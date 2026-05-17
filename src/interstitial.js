@@ -58,6 +58,77 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
+  // voice: Sera. First-boot intro chain — step 1 of 4. After the dramatic
+  // gate + locale overlays close, Sera opens the interrogation by asking the
+  // player to identify themselves. The text input is the player's first act
+  // in-game; what they type is captured to state.contactLog.pickedName so the
+  // very next beat (intro_kalen) can recall it verbatim.
+  intro_name: {
+    bgImage: './docs/lore/images/interrogation-cell.png',
+    input: {
+      onStep: 2,
+      placeholder: 'Your name',
+      onSubmit: (state, value) => {
+        state.contactLog.pickedName = value;
+        saveContactLog(state.contactLog);
+      },
+    },
+    steps: [
+      { voice: 'S', text: 'You knew this would happen.' },
+      { voice: 'S', text: 'Sit down. State your name for the record.' },
+      { voice: 'S', text: 'Type it carefully. The transcript does not edit.' },
+    ],
+  },
+
+  // voice: Sera. First-boot intro chain — step 2 of 4. The reveal: the name
+  // you typed is not your name. The opening list of charges sets the world
+  // (Quiet Law, eleven years, ComDef has the file) without spelling out the
+  // mechanics. Mechanics arrive in intro_premise + intro_console.
+  intro_kalen: {
+    bgImage: './docs/lore/images/interrogation-cell.png',
+    steps: [
+      { voice: 'S', text: (s) => {
+        const n = (s.contactLog && s.contactLog.pickedName) || '';
+        return n
+          ? `No. You are not ${n}.`
+          : 'No. That is not your name.';
+      } },
+      { voice: 'S', text: 'You are Kalen Vale. Former Union Comms, Relay Engineering, Grade 4.' },
+      { voice: 'S', text: 'We know you have been speaking past the Quiet Law for eleven years.' },
+      { voice: 'S', text: 'We have your carrier signature on 80 forbidden worlds.' },
+      { voice: 'S', text: 'We have the consequences on file. The cascades. The deaths.' },
+      { voice: 'S', text: 'And tonight, Kalen, we have you.' },
+    ],
+  },
+
+  // voice: Kalen. First-boot intro chain — step 3 of 4. Kalen acknowledges
+  // the charges in his own register and sets the loop's emotional frame:
+  // every Echo that comes back is something he chose to keep doing. Replaces
+  // the cold-open content of the legacy `welcome` interstitial for new players.
+  intro_premise: {
+    bgImage: './docs/lore/images/console-dark.png',
+    steps: [
+      { voice: 'K', text: 'Eleven years. She has the count right.' },
+      { voice: 'K', text: 'There are worlds out there the Quiet Law says I cannot speak to. I have been speaking to them anyway.' },
+      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig in front of me counts them.' },
+      { voice: 'K', text: 'They keep arriving. Whether I sit at the desk or not.' },
+    ],
+  },
+
+  // voice: Sera. First-boot intro chain — step 4 of 4. The procedural how-do-
+  // I-play beat. Same content as the legacy tutorial_open, retuned to land
+  // immediately after intro_premise without the 10-second scheduled delay
+  // the legacy flow used.
+  intro_console: {
+    bgImage: './docs/lore/images/console-bands.png',
+    steps: [
+      { voice: 'S', text: 'Watch the number rise. That is your log. At one hundred, the Console will open under it.' },
+      { voice: 'S', text: 'The Console offers bands. Each band is one thing the rig can do this minute. Buy the cheap ones first; they lift your listening yield.' },
+      { voice: 'S', text: 'Some bands are hails. They wager Echoes for the chance of a return. Most hails carry nothing. Some carry a great deal.' },
+      { voice: 'S', text: 'Sit at the desk, Kalen. Let us see what answers.' },
+    ],
+  },
+
   // voice: Sera. The "how do I play" beat. Fires ~10s after welcome on the
   // player's very first session.
   tutorial_open: {
@@ -456,16 +527,18 @@ export function scheduleTutorialIfEligible(state) {
   }, TUTORIAL_DELAY_MS);
 }
 
-// Call once on game start. Welcome only fires for fresh players. If the player
-// drifted away for >OFFLINE_RETURN_S seconds, queue a soft return beat.
-// From cycle 4 onward, queue the Sera-heavy interrogation opener once per cycle.
+// Call once on game start. The first-boot intro chain (intro_name → ...) is
+// enqueued from main.js after the runIntroSequence overlay closes, so the
+// dramatic gate + locale screens are guaranteed to play before any
+// interstitial card appears. The legacy `welcome` key remains in the table
+// for back-compat with old saves that may carry it in `messages.shown`, but
+// it is no longer auto-enqueued from here. If the player drifted away for
+// >OFFLINE_RETURN_S seconds, queue a soft return beat. From cycle 4 onward,
+// queue the Sera-heavy interrogation opener once per cycle.
 export function checkStart(state, isFreshPlayer, offlineSeconds) {
   const run = getRun(state.contactLog);
   const s = state.messages.stats;
-  // Welcome only on the very first boot (cycle 1, no save). Subsequent
-  // cycles get the cycle_open beat instead, which knows about the episode.
-  if (isFreshPlayer && run === 1) enqueue(state, 'welcome');
-  else if (isFreshPlayer && run > 1 && (s.lastCycleOpener || 0) < run) {
+  if (isFreshPlayer && run > 1 && (s.lastCycleOpener || 0) < run) {
     s.lastCycleOpener = run;
     delete state.messages.shown.cycle_open;
     enqueue(state, 'cycle_open');

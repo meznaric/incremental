@@ -116,6 +116,24 @@ IMAGES = [
         "Painterly silhouette, atmospheric distance, severe and silent."
     ),
     (
+        # Establishing shot used by the first-boot intro overlay (locale stage).
+        # Sits behind the THE DARK WAS NEVER SILENT tagline and the s.y. 2407
+        # date stamp, so the composition has to leave the centre frame readable
+        # under tagline-weight text — silhouette + atmosphere, not midground
+        # focal subject. See src/introUi.js + styles/intro.css for the layered
+        # gradient that darkens this background to ~0.55 opacity in the UI.
+        "intro-locale", "16:9", False,
+        "Painted wide establishing shot of a small communications listening station "
+        "perched on the edge of a cold rocky planetoid at the very rim of inhabited space. "
+        "A few warm tungsten window-lights glow faintly inside the silhouette of the station; "
+        "above the structure, an immense empty starfield with a single pale gas giant low on the horizon. "
+        "A faint horizontal carrier-beam haze stretches across the upper third of the frame — "
+        "barely-visible cool-blue interference suggesting an active signal in the dark. "
+        "Composition: station occupies the lower third in silhouette, leaving the upper two thirds "
+        "as deep sky for tagline-weight typography to sit cleanly over. "
+        "Severe, lonely, vast. Painterly soft edges, atmospheric distance, no lens flare, no text."
+    ),
+    (
         "desert-ahn-tar", "16:9", False,
         "Painted wide illustration of a pre-industrial arid alien culture's settlement at dusk. "
         "A crude wooden radio tower silhouetted against twin pale moons low on the horizon. "

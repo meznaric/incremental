@@ -32,6 +32,9 @@ export function makeInterstitialUi(state, onShown) {
   const speakerNameEl = root.querySelector('.it-speaker-name');
   const prevBtn = root.querySelector('.it-btn-prev');
   const nextBtn = root.querySelector('.it-btn-next');
+  const inputRow = root.querySelector('.it-input-row');
+  const inputEl = root.querySelector('.it-input');
+  const submitBtn = root.querySelector('.it-btn-submit');
 
   const VOICE_CLASSES = ['voice-kalen', 'voice-sera', 'voice-narrator', 'voice-anonymous'];
   const VOICE_CLASS = { K: 'voice-kalen', S: 'voice-sera', N: 'voice-narrator', A: 'voice-anonymous' };
@@ -187,7 +190,9 @@ export function makeInterstitialUi(state, onShown) {
     autoTimer = 0;
     if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
     clearCustomFrame();
-    if (card) card.classList.remove('it-single', 'it-has-speaker', ...VOICE_CLASSES);
+    if (card) card.classList.remove('it-single', 'it-has-speaker', 'it-awaiting-input', ...VOICE_CLASSES);
+    if (inputRow) inputRow.hidden = true;
+    if (inputEl) inputEl.value = '';
     root.classList.remove('it-visible', 'it-guard');
     setTimeout(() => { if (!active) root.style.display = 'none'; }, 180);
     state.messages.shown[id] = true;
@@ -213,11 +218,63 @@ export function makeInterstitialUi(state, onShown) {
     }
   }
 
+  // Reveal / hide the input row depending on whether the active step is the
+  // one declared in def.input. The row is rendered statically in index.html;
+  // we only flip visibility + bind the submit handler per step.
+  function applyInputRow() {
+    if (!inputRow) return;
+    const def = active && active.def;
+    const inputDef = def && def.input;
+    const stepIdx = active ? active.stepIdx : -1;
+    const onThisStep = !!(inputDef && (inputDef.onStep ?? def.steps.length - 1) === stepIdx);
+    if (!onThisStep) {
+      inputRow.hidden = true;
+      if (card) card.classList.remove('it-awaiting-input');
+      return;
+    }
+    inputRow.hidden = false;
+    if (card) card.classList.add('it-awaiting-input');
+    if (inputEl) {
+      inputEl.placeholder = inputDef.placeholder || 'Type here';
+      inputEl.value = '';
+      // Focus on next tick so the keyboard surfaces on mobile after the
+      // step transition has settled.
+      setTimeout(() => { try { inputEl.focus({ preventScroll: true }); } catch (e) { inputEl.focus(); } }, 60);
+    }
+  }
+
+  function submitInputValue() {
+    if (!active) return;
+    const def = active.def;
+    const inputDef = def && def.input;
+    if (!inputDef) return;
+    const raw = (inputEl && inputEl.value) || '';
+    const value = raw.trim().slice(0, 32);
+    // Empty → ignore. Sera's prompt explicitly asks for a name, and the
+    // downstream line interpolates it; a blank submission would read awkwardly.
+    if (!value) {
+      if (inputEl) inputEl.focus();
+      return;
+    }
+    try {
+      if (typeof inputDef.onSubmit === 'function') inputDef.onSubmit(state, value);
+    } catch (e) {
+      console.warn('interstitial input onSubmit threw', e);
+    }
+    if (card) card.classList.remove('it-awaiting-input');
+    if (inputRow) inputRow.hidden = true;
+    // Treat submission as "advance past this step". If this is also the
+    // final step, close instead.
+    if (active.stepIdx >= active.def.steps.length - 1) close();
+    else { active.stepIdx++; showStep(); }
+  }
+
   function showStep() {
     const step = active.def.steps[active.stepIdx] || {};
     renderDots();
     updateNav();
     applySpeaker();
+    applyInputRow();
     waitingInput = false;
     autoTimer = 0;
     // Allow dynamic text — a function lets Sera reference past contacts at
@@ -315,6 +372,13 @@ export function makeInterstitialUi(state, onShown) {
 
   function onKey(e) {
     if (!active) return;
+    // While the player is typing into the name input, the global key handler
+    // mustn't eat space (which would interrupt mid-word) or enter (which the
+    // input's own listener already routes to submit). Esc still closes.
+    if (e.target && e.target.classList && e.target.classList.contains('it-input')) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      return;
+    }
     if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); return; }
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
@@ -350,7 +414,12 @@ export function makeInterstitialUi(state, onShown) {
     if (!active) return;
     const step = active.def.steps[active.stepIdx];
     const isLast = active.stepIdx >= active.def.steps.length - 1;
-    if (isLast) {
+    // Steps that own an input field never auto-advance — the player has to
+    // type and submit, and an auto-dismiss mid-typing would be hostile.
+    const def = active.def;
+    const inputDef = def && def.input;
+    const ownsInput = !!(inputDef && (inputDef.onStep ?? def.steps.length - 1) === active.stepIdx);
+    if (isLast || ownsInput) {
       waitingInput = true;
       autoTimer = 0;
       return;
@@ -384,8 +453,24 @@ export function makeInterstitialUi(state, onShown) {
     if (action === 'prev') { goPrev(); return; }
     if (action === 'next') { goNext(); return; }
     if (action === 'close') { close(); return; }
+    if (action === 'submit') { submitInputValue(); return; }
+    // Taps inside the input field itself should let the browser focus it —
+    // don't route the gesture as "advance the typewriter".
+    if (downTarget && downTarget.closest && downTarget.closest('.it-input-row')) return;
+    // When the active step owns the input, body taps must not skip past it.
+    if (card && card.classList.contains('it-awaiting-input')) return;
     handleInput();
   });
+
+  // Enter inside the input submits; Escape stays as global dismiss above.
+  if (inputEl) {
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitInputValue();
+      }
+    });
+  }
 
   return { tick, drain };
 }

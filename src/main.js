@@ -10,8 +10,10 @@ import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
   scheduleTutorialIfEligible, bindEpisode, enqueueSeasonCompleteBeat,
+  enqueue as enqueueInterstitial,
 } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
+import { runIntroSequence } from './introUi.js';
 import { initMenu } from './menu.js';
 import {
   loadContactLog, saveContactLog, backfillFromShown, closeCycle, memoryMul,
@@ -198,6 +200,18 @@ if (state.contactLog.worlds.length > 0 && !state.contactLog.firstContactSeen) {
   state.contactLog.firstContactSeen = true;
   saveContactLog(state.contactLog);
 }
+// Back-compat: any player who has played before counts as having seen the
+// intro. Mid-cycle save, any logged worlds, any cycle past 1, or the legacy
+// `welcome` interstitial flag — all are proof they don't need the new opener.
+// Stamps introSeen so a future save-wipe doesn't replay the dramatic chain.
+if (!state.contactLog.introSeen) {
+  const hadOldWelcome = !!(loaded && state.messages && state.messages.shown && state.messages.shown.welcome);
+  const hasProgress = (state.contactLog.worlds || []).length > 0 || (state.contactLog.run || 1) > 1;
+  if (hadOldWelcome || hasProgress) {
+    state.contactLog.introSeen = true;
+    saveContactLog(state.contactLog);
+  }
+}
 checkStart(state, !loaded, loaded ? loaded.offline : 0);
 // First close beat — fires once across the player's whole history, on the
 // very first fresh boot of a cycle >= 2. The log is the gate (the gameplay
@@ -313,17 +327,38 @@ ui.renderShop();
 }
 
 const interstitialUi = makeInterstitialUi(state, (id) => {
-  // After the welcome set closes, schedule the in-theme tutorial. Also fires
-  // on every other close — but scheduleTutorialIfEligible is idempotent and
-  // gated on welcome.shown && !tutorial_open.shown && cycle === 1, so it is
-  // a no-op once the tutorial has been seen.
+  // Mark the new intro chain as seen the moment the last beat closes. Gated
+  // on the contact log so a future cycle close (which wipes messages.shown)
+  // does not replay the dramatic opener.
+  if (id === 'intro_console' && !state.contactLog.introSeen) {
+    state.contactLog.introSeen = true;
+    saveContactLog(state.contactLog);
+  }
+  // Legacy welcome path stays bound — old saves with welcome in their queue
+  // still chain into the tutorial beat. New saves never enqueue welcome so
+  // this is a no-op for them.
   if (id === 'welcome') scheduleTutorialIfEligible(state);
 });
-// Returning players who saw welcome on a previous session but never reached
-// the tutorial beat: schedule it now. (The gate inside the scheduler refuses
-// to fire it twice.)
+// Returning players who saw the legacy welcome on a previous session but
+// never reached the legacy tutorial beat: schedule it now. Idempotent.
 scheduleTutorialIfEligible(state);
-interstitialUi.drain();
+
+// First-boot intro overlay → interstitial chain. Plays only when there's no
+// save AND the contact log has never recorded a completed intro. The chain
+// is enqueued from the overlay's onDone so the dramatic gate/locale screens
+// land *before* the first card opens; without the gating the interstitial
+// modal would flash up under the overlay and steal the moment.
+if (!loaded && !state.contactLog.introSeen) {
+  runIntroSequence(() => {
+    enqueueInterstitial(state, 'intro_name');
+    enqueueInterstitial(state, 'intro_kalen');
+    enqueueInterstitial(state, 'intro_premise');
+    enqueueInterstitial(state, 'intro_console');
+    interstitialUi.drain();
+  });
+} else {
+  interstitialUi.drain();
+}
 
 let last = performance.now();
 let lastWall = nowSeconds();

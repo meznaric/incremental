@@ -1,0 +1,193 @@
+/* First-boot intro overlays. Two stages — a "tap to open carrier" gate and a
+   year/location reveal — that play before any interstitial fires. Both stages
+   live above the HUD (z-index: 9999) and are torn down once the player has
+   acknowledged the locale. See src/introUi.js for the wiring; first-boot gate
+   lives in src/main.js, persisted in state.contactLog.introSeen. */
+
+#intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  color: #e6e6e8;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--app-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+#intro.intro-visible { opacity: 1; }
+#intro.intro-open { display: flex; }
+
+#intro .intro-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 480ms ease;
+  pointer-events: none;
+}
+#intro .intro-stage[hidden] { display: none; }
+#intro .intro-stage.intro-stage-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ===== Gate: slow signal sweep + faint prompt ===== */
+
+#intro .intro-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    transparent 12%,
+    rgba(255, 200, 130, 0.05) 28%,
+    rgba(255, 210, 150, 0.55) 50%,
+    rgba(255, 200, 130, 0.05) 72%,
+    transparent 88%,
+    transparent 100%
+  );
+  filter: drop-shadow(0 0 6px rgba(255, 180, 100, 0.25));
+  transform: translateY(-0.5px);
+  animation: intro-sweep-cross 5.4s ease-in-out infinite;
+  opacity: 0.85;
+}
+
+#intro .intro-stage[data-stage="gate"] .intro-sweep::before,
+#intro .intro-stage[data-stage="gate"] .intro-sweep::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 80px;
+  pointer-events: none;
+}
+#intro .intro-stage[data-stage="gate"] .intro-sweep::before {
+  top: -80px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 190, 120, 0.04));
+}
+#intro .intro-stage[data-stage="gate"] .intro-sweep::after {
+  top: 0;
+  background: linear-gradient(to top, transparent, rgba(255, 190, 120, 0.04));
+}
+
+@keyframes intro-sweep-cross {
+  0%   { transform: translateX(-110%) translateY(-0.5px); }
+  50%  { transform: translateX(0%)    translateY(-0.5px); }
+  100% { transform: translateX(110%)  translateY(-0.5px); }
+}
+
+#intro .intro-gate-prompt {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(50% + 64px);
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: lowercase;
+  color: rgba(255, 220, 180, 0.62);
+  animation: intro-prompt-pulse 3.4s ease-in-out infinite;
+}
+@keyframes intro-prompt-pulse {
+  0%, 100% { opacity: 0.22; letter-spacing: 0.30em; }
+  50%      { opacity: 0.78; letter-spacing: 0.34em; }
+}
+
+/* ===== Locale: tagline + date reveal ===== */
+
+#intro .intro-locale-bg {
+  position: absolute;
+  inset: 0;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0;
+  filter: blur(1.5px) brightness(0.45) saturate(0.85);
+  transition: opacity 1600ms ease;
+}
+#intro .intro-stage-on .intro-locale-bg.intro-bg-on { opacity: 0.55; }
+#intro .intro-locale-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.35) 55%, #000 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.85));
+}
+
+#intro .intro-locale-content {
+  position: relative;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 880px;
+  z-index: 2;
+}
+
+#intro .intro-tagline {
+  font-size: clamp(20px, 3.4vw, 38px);
+  letter-spacing: 0.34em;
+  font-weight: 300;
+  color: #e8e8ea;
+  margin: 0 0 28px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 1600ms ease 200ms, transform 2400ms ease 200ms, letter-spacing 4000ms ease 200ms;
+  text-shadow: 0 0 18px rgba(255, 200, 150, 0.04);
+}
+#intro .intro-stage-on .intro-tagline {
+  opacity: 1;
+  transform: translateY(0);
+  letter-spacing: 0.40em;
+}
+
+#intro .intro-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: clamp(11px, 1.3vw, 14px);
+  letter-spacing: 0.22em;
+  color: rgba(255, 220, 180, 0.78);
+  text-transform: lowercase;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 1200ms ease 2200ms, transform 1600ms ease 2200ms;
+}
+#intro .intro-stage-on .intro-stamp { opacity: 1; transform: translateY(0); }
+#intro .intro-stamp .intro-date { color: rgba(255, 220, 180, 0.92); font-variant-numeric: tabular-nums; }
+#intro .intro-stamp .intro-place { color: rgba(232, 232, 234, 0.85); }
+#intro .intro-stamp .intro-sep { opacity: 0.5; }
+
+#intro .intro-locale-hint {
+  margin-top: 56px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: rgba(180, 180, 195, 0.5);
+  opacity: 0;
+  transition: opacity 800ms ease 3600ms;
+}
+#intro .intro-stage-on .intro-locale-hint {
+  opacity: 1;
+  animation: intro-prompt-pulse 3.4s ease-in-out infinite 4200ms;
+}
+
+/* Input guard — block stage-advance taps during the opening fade so the
+   player can't fire-and-forget through both screens in one accidental tap. */
+#intro.intro-guard { pointer-events: none; }
+#intro.intro-guard::after {
+  /* keeps the visual but disables hit-testing */
+  content: "";
+  pointer-events: none;
+}

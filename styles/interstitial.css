@@ -328,6 +328,49 @@
 }
 /* Single-step interstitials hide Previous — only a Close-style Next remains. */
 .it-card.it-single .it-btn-prev { display: none; }
+
+/* Input row — surfaces a text field below the body text on interstitials
+   that declare an `input` field (e.g. intro_name, where Sera asks the
+   player's name). Hidden by default; revealed by interstitialUi when the
+   step that owns the input is reached. Submit replaces the Next/Close
+   button's normal behaviour. */
+.it-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 10px;
+}
+.it-input-row[hidden] { display: none; }
+.it-input {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 10px 14px;
+  background: rgba(10, 10, 20, 0.75);
+  border: 1px solid rgba(120, 140, 255, 0.42);
+  color: #e8e8f0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  caret-color: #8aa0ff;
+  outline: none;
+  transition: border-color 0.14s, background 0.14s;
+}
+.it-input::placeholder { color: rgba(180, 180, 220, 0.36); letter-spacing: 0.02em; }
+.it-input:focus {
+  border-color: rgba(138, 160, 255, 0.85);
+  background: rgba(16, 16, 32, 0.9);
+}
+.it-btn.it-btn-submit {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.it-btn.it-btn-submit:disabled { opacity: 0.32; }
+/* When the input row is showing, the footer's Next/Close button is hidden —
+   submitting the input is the only way out of this step. */
+.it-card.it-awaiting-input .it-btn-next { display: none; }
+.it-card.it-awaiting-input .it-dots { opacity: 0.4; }
 /* Season-finale tone — match the warm palette across both buttons. */
 .it-card.it-season-finale .it-btn {
   border-color: rgba(212, 154, 85, 0.42);

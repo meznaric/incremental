@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="./styles/base.css" />
   <link rel="stylesheet" href="./styles/shop.css" />
   <link rel="stylesheet" href="./styles/welcomeBack.css" />
+  <link rel="stylesheet" href="./styles/intro.css" />
   <link rel="stylesheet" href="./styles/interstitial.css" />
   <link rel="stylesheet" href="./styles/cyclePattern.css" />
   <link rel="stylesheet" href="./styles/network.css" />
@@ -327,6 +328,21 @@
     </div>
   </div>
 
+  <div id="intro" aria-hidden="true">
+    <div class="intro-stage" data-stage="gate">
+      <div class="intro-sweep" aria-hidden="true"></div>
+      <div class="intro-gate-prompt">tap to open carrier</div>
+    </div>
+    <div class="intro-stage" data-stage="locale" hidden>
+      <div class="intro-locale-bg" aria-hidden="true"></div>
+      <div class="intro-locale-content">
+        <div class="intro-tagline">THE DARK WAS NEVER SILENT.</div>
+        <div class="intro-stamp"><span class="intro-date">s.y. 2407</span><span class="intro-sep">&mdash;</span><span class="intro-place">Ear of Saen Station</span></div>
+        <div class="intro-locale-hint">tap to continue</div>
+      </div>
+    </div>
+  </div>
+
   <div id="interstitial">
     <div class="it-card">
       <div class="it-head">
@@ -349,6 +365,10 @@
       </div>
       <div class="it-body">
         <div class="it-text"></div>
+        <div class="it-input-row" hidden>
+          <input class="it-input" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" maxlength="32" />
+          <button class="it-btn it-btn-submit" type="button" data-it-action="submit">Answer</button>
+        </div>
       </div>
       <div class="it-foot">
         <div class="it-dots"></div>

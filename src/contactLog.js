@@ -136,6 +136,15 @@ export function loadContactLog() {
   const firstEngravingSeen = !!s.firstEngravingSeen;
   const firstContactSeen = !!s.firstContactSeen;
   const seasonCompleteShown = !!s.seasonCompleteShown;
+  // The new first-boot intro (gate → locale → Sera asks name → Sera reveals
+  // Kalen → premise → console). Once seen it never replays, even across cycle
+  // closes — the contact log survives the gameplay wipe, which is the right
+  // gate for a one-time story beat.
+  const introSeen = !!s.introSeen;
+  // The (false) name the player typed before Sera corrected them. Stored so
+  // the reveal can recall it verbatim and so post-intro beats can occasionally
+  // reference it. Sanitised to 32 chars max, plain string.
+  const pickedName = typeof s.pickedName === 'string' ? s.pickedName.slice(0, 32) : '';
   const pattern = typeof s.pattern === 'string' && s.pattern.length > 0 ? s.pattern : null;
   const pendingPatternChoice = !!s.pendingPatternChoice;
   const patternUsed = s.patternUsed && typeof s.patternUsed === 'object'
@@ -155,6 +164,7 @@ export function loadContactLog() {
   return {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
+    introSeen, pickedName,
     pattern, pendingPatternChoice, patternUsed,
     loopMode, loopCycles,
   };

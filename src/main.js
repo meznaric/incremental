@@ -157,6 +157,7 @@ scene.add(hero.group);
 
 const shopEl = document.getElementById('shop');
 const progressEl = document.getElementById('contactProgress');
+const topHudEl = document.getElementById('topHud');
 function onResize() {
   const shopRect = shopEl.getBoundingClientRect();
   const shopTop = shopRect.height ? shopRect.top : window.innerHeight;
@@ -183,7 +184,18 @@ function onResize() {
     document.documentElement.style.setProperty('--cp-h', '0px');
   }
   const w = window.innerWidth;
-  const h = Math.max(240, upperBound - 8);
+  // On phones the HUD (Echoes + rate) is anchored at the top of the viewport
+  // and the canvas would otherwise start at y=0, painting column tops behind
+  // those numbers. Push the canvas down so the falling columns begin just
+  // below the HUD instead. Desktop centres the HUD horizontally so it doesn't
+  // overlap the column band; keep the top flush there.
+  let topOffset = 0;
+  if (w <= 820 && topHudEl) {
+    const hr = topHudEl.getBoundingClientRect();
+    if (hr.height) topOffset = Math.max(0, Math.round(hr.bottom + 6));
+  }
+  canvas.style.top = topOffset + 'px';
+  const h = Math.max(240, upperBound - topOffset - 8);
   renderer.setSize(w, h);
   canvas.style.height = h + 'px';
   camera.aspect = w / h;
@@ -193,6 +205,7 @@ function onResize() {
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(shopEl);
 if (progressEl) new ResizeObserver(onResize).observe(progressEl);
+if (topHudEl) new ResizeObserver(onResize).observe(topHudEl);
 
 // mainUi owns every DOM-touching surface on the page (HUD inputs, shop slots,
 // buffs, toolbar, modals). Initialising it here — after THREE setup so the

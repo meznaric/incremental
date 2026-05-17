@@ -7,7 +7,7 @@ import {
   getHexes, getHexAt,
   SECTORS, TIER_INFO, BLEED_YIELD_SECONDS, bleedValue,
   reconcileOffline, tickNetwork, reconcileOfflineBleeds, tickBleedDrip,
-  MAP_RADIUS,
+  MAP_RADIUS, COVERAGE_BONUS_PER_SECTOR, CLUSTER_YIELD_PER_NEIGHBOR,
 } from '../src/network.js';
 
 function s() {
@@ -74,10 +74,11 @@ test('contribution: zero before ripen, positive after, includes sector yield mul
   placeRelay(st, hex, 1000);
   const ripeAt = 1000 + TIER_INFO.common.ripenSec * SECTORS.core.ripenMul;
   assert.equal(networkContribution(st, 1000), 0);
-  // Coverage: 1 sector covered → 1.09. Yield = 100 × 1.4 × 1 (no neighbours) = 140.
-  // Contribution = 140 × 1.09 = 152.6.
+  // 1 sector covered. Yield = 100 × 1.4 × 1 (no neighbours).
+  const cov = 1 + COVERAGE_BONUS_PER_SECTOR;
+  const expected = 100 * SECTORS.core.yieldMul * cov;
   const c = networkContribution(st, ripeAt + 1);
-  assert.ok(Math.abs(c - 152.6) < 1e-6, `got ${c}`);
+  assert.ok(Math.abs(c - expected) < 1e-6, `got ${c}, expected ${expected}`);
 });
 
 test('clustering: adjacency boosts yield and is symmetric', () => {
@@ -92,9 +93,12 @@ test('clustering: adjacency boosts yield and is symmetric', () => {
   const r2 = st.network.relays[1];
   assert.equal(adjacentOnlineCount(st.network, r1, ripeAt + 1), 1);
   assert.equal(adjacentOnlineCount(st.network, r2, ripeAt + 1), 1);
-  // Coverage still 1 sector (1.09). Each yields 100 × 1.4 × 1.33 = 186.2. Total 372.4 × 1.09 = 405.916.
+  // Coverage still 1 sector. Each yields 100 × 1.4 × (1 + 1·CLUSTER_YIELD); total ×coverage.
+  const cluster = 1 + CLUSTER_YIELD_PER_NEIGHBOR;
+  const cov = 1 + COVERAGE_BONUS_PER_SECTOR;
+  const expected = 2 * 100 * SECTORS.core.yieldMul * cluster * cov;
   const c = networkContribution(st, ripeAt + 1);
-  assert.ok(Math.abs(c - 405.916) < 1e-6, `got ${c}`);
+  assert.ok(Math.abs(c - expected) < 1e-6, `got ${c}, expected ${expected}`);
 });
 
 test('coverage: stacks per distinct sector with online relay', () => {
@@ -107,7 +111,7 @@ test('coverage: stacks per distinct sector with online relay', () => {
   for (const h of picks) placeRelay(st, h, 0);
   const longAfter = 10_000_000;
   const mul = coverageMultiplier(st.network, longAfter);
-  assert.ok(Math.abs(mul - (1 + 0.09 * 3)) < 1e-6);
+  assert.ok(Math.abs(mul - (1 + COVERAGE_BONUS_PER_SECTOR * 3)) < 1e-6, `got ${mul}`);
 });
 
 test('reconcileOffline: zero rate sector with mythic rarity keeps relay essentially safe', () => {

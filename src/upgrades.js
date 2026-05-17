@@ -259,11 +259,11 @@ export function totalMulOwned(owned) {
 }
 
 // Convert cap: caps a single convert's *yield* (and matching spend) so its
-// flatBonus delta can never exceed CAP × baseAdditive. Originally tuned 10×
-// tighter to stop yellow upgrades from leapfrogging every other lever past
-// trillion; once placement + ripen + discovery loss landed, the cap got
-// loosened so the network actually pays for the effort.
-export const CONVERT_BOOST_CAP = { common: 0.015, uncommon: 0.06, rare: 0.22, legendary: 0.7 };
+// raw baseYield never exceeds CAP × baseAdditive. Once sector × cluster ×
+// coverage land on top, a well-placed legendary can roughly match its raw
+// cap × ~4, so the late-cycle network can plausibly overtake base rate when
+// you stack several alive across spread sectors.
+export const CONVERT_BOOST_CAP = { common: 0.04, uncommon: 0.15, rare: 0.45, legendary: 1.3 };
 
 // Mul perm cost past its original maxRate band: switch from the static
 // baseCost ladder to a rate-aware floor matching the dyn-add pricing curve.

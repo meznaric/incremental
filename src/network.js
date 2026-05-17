@@ -10,8 +10,12 @@
 // See docs/lore/world-rules.md for the in-fiction grammar.
 
 export const MAP_RADIUS = 5;  // 91 hexes — roughly 2.5× the MVP grid; gives sparse builds room to spread.
-export const COVERAGE_BONUS_PER_SECTOR = 0.09;
-export const CLUSTER_YIELD_PER_NEIGHBOR = 0.33;
+// Coverage and cluster pay hard so late-cycle mesh can plausibly overtake the
+// additive base on its own — six-sector coverage ≈ ×2.2, three-neighbour
+// dense ≈ ×2.5. The risk side (discovery) already scales with cluster, so
+// dense play stays a real trade.
+export const COVERAGE_BONUS_PER_SECTOR = 0.20;
+export const CLUSTER_YIELD_PER_NEIGHBOR = 0.5;
 export const CLUSTER_DISCOVERY_PER_NEIGHBOR = 0.5;
 export const ISOLATED_DISCOVERY_FACTOR = 0.1;
 // An isolated relay drops a small Echo Bleed periodically — the sparse-only

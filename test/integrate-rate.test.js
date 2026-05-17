@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { effectiveRate, unbufedEffectiveRate, integrateRate, marginalRateForPurchase, pruneBuffs, applyDampening, DAMPEN_AT, DAMPEN_ALPHA } from '../src/shop.js';
+import { COVERAGE_BONUS_PER_SECTOR, SECTORS } from '../src/network.js';
 
 // Minimal state factory — only the fields integrateRate / effectiveRate read.
 function makeState(over = {}) {
@@ -314,10 +315,12 @@ test('integrateRate splits at relay ripensAt so post-ripen yield lands', () => {
     },
   });
   // Pre-ripen [0,5): relay offline → 0 contribution. Post-ripen [5,10):
-  // single frontier relay, yieldMul 1.0, no neighbours, coverage 1.09.
-  // Yield/s = 10 × 1.0 × 1.09 = 10.9. Over 5 seconds = 54.5.
+  // single frontier relay, yieldMul 1.0, no neighbours, 1 sector covered.
+  const cov = 1 + COVERAGE_BONUS_PER_SECTOR;
+  const perSec = 10 * SECTORS.frontier.yieldMul * cov;
+  const expected = perSec * 5; // five post-ripen seconds
   const result = integrateRate(s, 0, 10);
-  assert.ok(Math.abs(result - 54.5) < 1e-6, `expected 54.5, got ${result}`);
+  assert.ok(Math.abs(result - expected) < 1e-6, `expected ${expected}, got ${result}`);
 });
 
 test('pruneBuffs drops expired entries across all keys', () => {

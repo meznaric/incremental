@@ -91,7 +91,49 @@
           <label for="rateInput"><i class="ri-pulse-line cc-icon"></i> per second</label>
           <input id="rateInput" type="text" autocomplete="off" spellcheck="false" />
         </div>
+        <div class="row">
+          <label for="dbgFlatInput">flat bonus</label>
+          <input id="dbgFlatInput" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="dbgPermInput">decode mul</label>
+          <input id="dbgPermInput" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="dbgMemInput">memory mul</label>
+          <input id="dbgMemInput" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="dbgMassInput">carrier mass</label>
+          <input id="dbgMassInput" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="dbgFreeRerollsInput">free rerolls</label>
+          <input id="dbgFreeRerollsInput" type="text" autocomplete="off" spellcheck="false" />
+        </div>
         <div class="hint">accepts: <code>1234</code>, <code>1.5m</code>, <code>2.3e18</code>, <code>200k</code></div>
+
+        <div class="dbg-section">Spawn buff · 60s</div>
+        <div class="dbg-actions">
+          <button type="button" class="dbg-btn" data-debug="buff-carrier">Carrier ×5</button>
+          <button type="button" class="dbg-btn" data-debug="buff-resonance">Resonance</button>
+          <button type="button" class="dbg-btn" data-debug="buff-carry">Carry +30%</button>
+          <button type="button" class="dbg-btn" data-debug="buff-buffer">Buffer 50%</button>
+        </div>
+
+        <div class="dbg-section">Network</div>
+        <div class="dbg-actions">
+          <button type="button" class="dbg-btn" data-debug="ripen-all">Ripen all</button>
+          <button type="button" class="dbg-btn" data-debug="queue-rare">Queue rare seed</button>
+          <button type="button" class="dbg-btn" data-debug="queue-mythic">Queue mythic seed</button>
+          <button type="button" class="dbg-btn" data-debug="clear-relays">Clear relays</button>
+        </div>
+
+        <div class="dbg-section">Shop · Cycle</div>
+        <div class="dbg-actions">
+          <button type="button" class="dbg-btn" data-debug="unlock-shop">Unlock all slots/locks</button>
+          <button type="button" class="dbg-btn danger" data-debug="close-cycle">Close cycle now</button>
+        </div>
       </div>
 
       <div class="menu-view" data-view="community">

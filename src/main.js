@@ -27,6 +27,7 @@ import { showPatternSelect } from './patternUi.js';
 import { ensureNetwork, tickNetwork, tickBleedDrip, SECTORS } from './network.js';
 import { makeNetworkUi } from './networkUi.js';
 import { initMainUi } from './mainUi.js';
+import { initDebugUi } from './debugUi.js';
 import {
   loadAchievements, saveAchievements, evaluateAchievements, markStat,
 } from './achievements.js';
@@ -62,33 +63,35 @@ initGameLogUi();
 // is derived from the log itself (first incomplete EP), so a cycle that
 // closed early continues the same EP next time.
 bindEpisode(state.contactLog);
+// "Close the Cycle" — wipes the gameplay save, advances the log's run counter
+// so milestones can fire again, leaves the world list (and therefore Echo
+// Memory) intact, banks Carrier Mass against the cycle's peakAmount, then
+// reloads. Shared between the Contact Log button and the Debug menu shortcut.
+function closeCycleNow() {
+  const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+  const endedAt = nowSeconds();
+  const startedAt = Number.isFinite(state.cycleStartedAt) ? state.cycleStartedAt : endedAt;
+  const cycle = (state.contactLog.run || 1);
+  const contacts = state.contactLog.worlds.filter((w) => (w.run || 1) === cycle).length;
+  const memoryShards = state.contactLog.worlds.length;
+  const banked = closeCycle(state.contactLog, peak);
+  if (banked === false) return false;
+  // Capture the run's footprint *after* closeCycle so massBanked reflects
+  // what was just credited. Cycle counter is the run we just finished, not
+  // the new one closeCycle advanced to.
+  recordCycleClose({
+    endedAt, cycle, runDurationS: Math.max(0, endedAt - startedAt),
+    endAmount: state.amount || 0, peakAmount: peak,
+    contacts, massBanked: banked || 0, memoryShards,
+  });
+  saveContactLog(state.contactLog);
+  clearSave();
+  location.reload();
+  return true;
+}
+
 const contactLogUi = initContactLogUi(state, {
-  // "Close the Cycle" — the cycle-close action. Wipes the gameplay save, advances the
-  // log's run counter so milestones can fire again, leaves the world list
-  // (and therefore Echo Memory) intact, banks Carrier Mass against the
-  // cycle's peakAmount, then reloads.
-  onCloseCycle() {
-    const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
-    const endedAt = nowSeconds();
-    const startedAt = Number.isFinite(state.cycleStartedAt) ? state.cycleStartedAt : endedAt;
-    const cycle = (state.contactLog.run || 1);
-    const contacts = state.contactLog.worlds.filter((w) => (w.run || 1) === cycle).length;
-    const memoryShards = state.contactLog.worlds.length;
-    const banked = closeCycle(state.contactLog, peak);
-    if (banked === false) return false;
-    // Capture the run's footprint *after* closeCycle so massBanked reflects
-    // what was just credited. Cycle counter is the run we just finished, not
-    // the new one closeCycle advanced to.
-    recordCycleClose({
-      endedAt, cycle, runDurationS: Math.max(0, endedAt - startedAt),
-      endAmount: state.amount || 0, peakAmount: peak,
-      contacts, massBanked: banked || 0, memoryShards,
-    });
-    saveContactLog(state.contactLog);
-    clearSave();
-    location.reload();
-    return true;
-  },
+  onCloseCycle: closeCycleNow,
   onBuyEngraving(id) {
     // Live updates for engravings whose effect should bite immediately rather
     // than wait for the next cycle. Ascent applies to the rate pipeline now;
@@ -176,6 +179,13 @@ const ui = initMainUi(state, {
   },
 });
 
+const debugUi = initDebugUi(state, {
+  onCloseCycle: closeCycleNow,
+  showToast: (msg) => ui.showToast(msg),
+  refreshShop: () => ui.renderShop(),
+  refreshNetwork: () => networkUi.refresh(),
+});
+
 const loaded = loadState(state);
 // Back-fill the Contact Log from any milestones already marked shown by an
 // older code version. One-time, idempotent.
@@ -206,6 +216,7 @@ if (!loaded) {
 }
 if (loaded) {
   ui.syncInputsToState();
+  debugUi.sync();
   checkAmount(state, state.amount);
   if (loaded.offline > 1) {
     console.log(`[save] welcome back — ${loaded.offline.toFixed(0)}s away, +${formatAbbrev(loaded.earnings)}`);
@@ -266,6 +277,7 @@ if (!loaded) {
     state.buffs.rateMul.push({ value: qw, duration: QUICK_WAKE_DURATION, expiresAt: t0 + QUICK_WAKE_DURATION, sourceId: 'quick_wake' });
   }
   ui.syncInputsToState();
+  debugUi.sync();
 }
 
 // Cycle Pattern chooser — runs on EVERY boot, fresh or loaded. closeCycle sets

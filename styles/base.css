@@ -128,6 +128,37 @@ input[type="text"]:focus { border-color: #6688ff; }
   max-width: 280px;
   line-height: 1.4;
 }
+.dbg-section {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6a6a90;
+  padding: 10px 0 4px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(120, 140, 255, 0.12);
+}
+.dbg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 280px;
+}
+.dbg-btn {
+  background: rgba(120, 140, 255, 0.10);
+  border: 1px solid rgba(120, 140, 255, 0.28);
+  color: #d6d8ee;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.dbg-btn:hover { background: rgba(120, 140, 255, 0.20); color: #e8e8f0; }
+.dbg-btn.danger { border-color: rgba(255, 90, 110, 0.35); color: #ffb0bd; }
+.dbg-btn.danger:hover { background: rgba(255, 90, 110, 0.18); color: #ff8a9a; }
 .pin-input {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(120, 140, 255, 0.4);

@@ -47,6 +47,7 @@ const PRECACHE = [
   './src/contactLog.js',
   './src/contactLogUi.js',
   './src/cyclePatterns.js',
+  './src/debugUi.js',
   './src/display.js',
   './src/episodes.js',
   './src/gambleFx.js',

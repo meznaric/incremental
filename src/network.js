@@ -269,28 +269,51 @@ export function bleedValue(relay) {
   return (relay.baseYield || 0) * sec.yieldMul * BLEED_YIELD_SECONDS;
 }
 
-// Per-tick Bleed drip — only isolated online relays drop. Probabilistic per
-// tick; on average each relay drops once per its tier's bleedPeriodSec. The
-// caller credits the returned Echoes to state.amount.
+// Per-tick Bleed drip — only isolated online relays drop. On average each
+// relay drops once per its tier's bleedPeriodSec. The caller credits the
+// returned Echoes to state.amount.
 //
-// Side effect: each drop also rolls against coilDropChance(state) for a free
-// re-roll, capped by REROLL_BANK_CAP. Caller can detect a grant by diffing
-// state.freeRerolls before/after.
+// Drop count is computed closed-form (floor + bernoulli on the fractional
+// part) rather than as a single probabilistic roll, so a tick that spans more
+// than one bleed period still credits every drop the player accrued. That
+// matters whenever the foreground loop sees a large dt — most often when a
+// hidden tab resumes (rAF was paused, so wallDt rolls the whole away window
+// into one tick). For a typical 16ms frame this collapses to the same single
+// bernoulli the old code did.
+//
+// Side effect: each drop rolls against coilDropChance(state) for a free
+// re-roll, capped by REROLL_BANK_CAP. Aggregated across drops within this
+// tick using the same expected-value math reconcileOfflineBleeds uses, so
+// the visibility-resume path grants rerolls at the same rate as the reload
+// path. Caller can detect a grant by diffing state.freeRerolls before/after.
 export function tickBleedDrip(state, dt, now) {
   const network = state.network;
   if (!network || !network.relays.length || dt <= 0) return 0;
   const coilP = coilDropChance(state);
   let total = 0;
+  let drops = 0;
   for (const r of network.relays) {
     if (!isOnline(r, now)) continue;
     if (adjacentOnlineCount(network, r, now) > 0) continue;
     const tier = TIER_INFO[r.tier] || TIER_INFO.common;
     if (!(tier.bleedPeriodSec > 0)) continue;
-    const p = dt / tier.bleedPeriodSec;
-    if (Math.random() < p) {
-      total += bleedValue(r);
-      if (coilP > 0 && Math.random() < coilP) grantRerolls(state, 1);
+    const lambda = dt / tier.bleedPeriodSec;
+    const whole = Math.floor(lambda);
+    const frac = lambda - whole;
+    let n = whole;
+    if (frac > 0 && Math.random() < frac) n += 1;
+    if (n > 0) {
+      total += bleedValue(r) * n;
+      drops += n;
     }
+  }
+  if (coilP > 0 && drops > 0) {
+    const expected = drops * coilP;
+    const whole = Math.floor(expected);
+    const frac = expected - whole;
+    let grant = whole;
+    if (frac > 0 && Math.random() < frac) grant += 1;
+    if (grant > 0) grantRerolls(state, grant);
   }
   return total;
 }

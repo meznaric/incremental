@@ -289,6 +289,32 @@ test('tickBleedDrip: with coils, a drip can also grant a free re-roll', () => {
   }
 });
 
+test('tickBleedDrip: long dt credits every drop and grants rerolls in expectation', () => {
+  // Regression: when rAF is paused (hidden tab, suspended PWA) the resume
+  // tick's wallDt spans multiple bleed periods. The old single-roll code
+  // dropped at most one bleed per relay no matter how long away, so coil
+  // grants were almost never rolled even with deep coil stacks. Closed-form
+  // expansion matches reconcileOfflineBleeds.
+  const st = s();
+  st.owned = { [COIL_ID]: 1e6 }; // chance pinned at PMAX = 0.22
+  st.freeRerolls = 0;
+  const silent = getHexes().find((h) => h.sector === 'silent');
+  queueToken(st, 'common', 100);
+  placeRelay(st, silent, 0);
+  st.network.relays[0].ripensAt = 0;
+  // dt = 100 bleed periods → 100 drops expected → 22 rerolls expected (capped at 9).
+  const dt = 100 * TIER_INFO.common.bleedPeriodSec;
+  const orig = Math.random;
+  try {
+    Math.random = () => 0.5;
+    const got = tickBleedDrip(st, dt, 1);
+    assert.equal(got, bleedValue(st.network.relays[0]) * 100);
+    assert.equal(st.freeRerolls, 9);
+  } finally {
+    Math.random = orig;
+  }
+});
+
 test('tickBleedDrip: no coils, no re-rolls even on drip', () => {
   const st = s();
   st.owned = {};

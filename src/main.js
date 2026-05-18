@@ -189,7 +189,6 @@ function onResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   display.setVisibleColumns(w <= 820 ? 3 : 5);
-  display.setMobileLayout(w <= 820);
 }
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(shopEl);

@@ -1018,9 +1018,6 @@ export class MagnitudeDisplay {
       this.columns.push(new Column(this.group, 0));
     }
     this.visibleColumns = COLUMN_COUNT;
-    // Horizontal-gap multiplier between columns. Phones use a tighter row so
-    // three columns fit the narrow canvas without crowding the edges.
-    this._spacingMul = 1;
     // Global buff envelope — single source of truth so every column reads the
     // same boost and the ripple wavefront stays coherent across them.
     this._boost = 0;
@@ -1035,10 +1032,6 @@ export class MagnitudeDisplay {
   setVisibleColumns(n) {
     const clamped = Math.max(1, Math.min(COLUMN_COUNT, n | 0));
     this.visibleColumns = clamped;
-  }
-
-  setMobileLayout(isMobile) {
-    this._spacingMul = isMobile ? 0.78 : 1;
   }
 
   // Pull every alive particle across every column toward `attractorWorld`,
@@ -1103,9 +1096,8 @@ export class MagnitudeDisplay {
     }
 
     const n = positioned.length;
-    const spacing = COLUMN_SPACING * this._spacingMul;
     for (let i = 0; i < n; i++) {
-      positioned[i].targetX = (i - (n - 1) / 2) * spacing;
+      positioned[i].targetX = (i - (n - 1) / 2) * COLUMN_SPACING;
     }
 
     for (const { col, m } of freshAssigns) {

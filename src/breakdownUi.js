@@ -8,6 +8,7 @@ import {
   CLUSTER_YIELD_PER_NEIGHBOR, CLUSTER_DISCOVERY_PER_NEIGHBOR,
   ISOLATED_DISCOVERY_FACTOR, BLEED_YIELD_SECONDS,
   COIL_DROP_K, COIL_DROP_PMAX,
+  VIGIL_K, VIGIL_MAX_REDUCTION,
 } from './network.js';
 import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS } from './shop.js';
 
@@ -274,7 +275,7 @@ export function initBreakdownUi(state) {
       </div>
 
       <div class="faq-block kind-coil">
-        <div class="faq-head"><i class="ri ri-shuffle-line"></i>Patient Coil — sweep tokens in the bleed</div>
+        <div class="faq-head"><i class="ri ri-shuffle-line"></i>Patient Coil — reroll-drops in the bleed</div>
         <div class="faq-body">
           <p>The <strong>Patient Coil</strong> upgrade appears in the console once you have a Seed Relay online. Each coil you splice in raises the chance that an isolated relay's next bleed will also drop a <strong>free re-roll</strong> alongside the Echoes.</p>
           <p>The chance climbs softly — every new coil helps less than the last:</p>
@@ -285,7 +286,22 @@ export function initBreakdownUi(state) {
             <li>20 coils → ~${((COIL_DROP_K * Math.log(21)) * 100).toFixed(1)}% per bleed</li>
             <li>asymptote → ${(COIL_DROP_PMAX * 100).toFixed(0)}%, never higher</li>
           </ul>
-          <p>The cap is the thing: stack coils as deep as you can, the sweep-drop chance still won't run away. It rewards <em>more isolated relays</em> rather than more coils alone — the chance only fires when a bleed fires, and only isolated relays bleed.</p>
+          <p>The cap is the thing: stack coils as deep as you can, the reroll-drop chance still won't run away. It rewards <em>more isolated relays</em> rather than more coils alone — the chance only fires when a bleed fires, and only isolated relays bleed.</p>
+        </div>
+      </div>
+
+      <div class="faq-block kind-coil">
+        <div class="faq-head"><i class="ri ri-shuffle-line"></i>Vigil Coil — quieter while you're away</div>
+        <div class="faq-body">
+          <p>The <strong>Vigil Coil</strong> appears alongside Patient Coil once you have a Seed Relay online. Each coil damps Kalen's carrier while he is offline — listener triangulation slows, every Seed Relay survives longer through the night.</p>
+          <p>The reduction climbs with diminishing returns toward a ceiling of <strong>×${(1 - VIGIL_MAX_REDUCTION).toFixed(2)}</strong> offline discovery (offline half-life triples at the cap):</p>
+          <ul class="diag-bullets">
+            <li>1 coil → ×${(1 - VIGIL_MAX_REDUCTION * (1 / (1 + VIGIL_K))).toFixed(2)} discovery</li>
+            <li>${VIGIL_K} coils → ×${(1 - VIGIL_MAX_REDUCTION * (VIGIL_K / (VIGIL_K + VIGIL_K))).toFixed(2)} (half the cap)</li>
+            <li>${VIGIL_K * 2} coils → ×${(1 - VIGIL_MAX_REDUCTION * ((VIGIL_K * 2) / ((VIGIL_K * 2) + VIGIL_K))).toFixed(2)}</li>
+            <li>asymptote → ×${(1 - VIGIL_MAX_REDUCTION).toFixed(2)}, never lower</li>
+          </ul>
+          <p>Foreground discovery is untouched on purpose — Vigil pays for absence, the way Drift does. Pair it with dense placements in dangerous sectors and the mesh stops getting torn down between sessions.</p>
         </div>
       </div>
 

@@ -462,9 +462,10 @@ export function tryBuy(state, slotIdx, now) {
   }
 
   if (u.kind === 'coil') {
-    // Coil = mesh-bleed modifier. Buying it doesn't change rate or balance
-    // directly — the payoff is the chance a Mesh Bleed drop also carries a
-    // free sweep token (see coilDropChance + tickBleedDrip in network.js).
+    // Coil = mesh modifier. Buying it doesn't change rate or balance
+    // directly. Patient Coil rolls a Mesh Bleed reroll-drop (see
+    // coilDropChance + tickBleedDrip in network.js); Vigil Coil damps offline
+    // discovery (see vigilOfflineDiscoveryMul + reconcileOffline).
     if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;

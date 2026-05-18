@@ -13,7 +13,7 @@
 
 import { formatAbbrev, parseAmount } from './bignum.js';
 import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade, convertYieldFor } from './upgrades.js';
-import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX } from './network.js';
+import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX, VIGIL_ID, VIGIL_K, VIGIL_MAX_REDUCTION } from './network.js';
 import {
   effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
@@ -382,9 +382,9 @@ export function initMainUi(state, deps) {
           return;
         }
         if (target.closest('.slot-info')) { openSlotModal(idx); return; }
-        // Block taps on a gamble slot while a WIN/LOSS banner is on screen —
-        // double-rolling through the reveal is jarring and lets the player
-        // stack overlapping bursts. Non-gamble slots still buy through.
+        // Block taps on a gamble slot while a Hail reveal is on screen —
+        // double-rolling through it is jarring and lets the player stack
+        // overlapping bursts. Non-gamble slots still buy through.
         if (isGambleFxActive()) {
           const slot = state.shop.slots[idx];
           const u = slot ? resolveUpgrade(slot) : null;
@@ -393,7 +393,7 @@ export function initMainUi(state, deps) {
         const res = tryBuy(state, idx, nowSeconds());
         if (res.ok) {
           // Gambles get the dramatic centred reveal flow — gravity pull, hold,
-          // then a WIN/LOSS banner with a green burst or a quiet fall. The
+          // then a Hail reveal banner with a green burst or a quiet fall. The
           // ordinary fly-up/fly-in card swap is replaced by an onMid callback
           // that triggers renderShop midway through the burst so the new card
           // appears while the banner is the focal point. Non-gamble purchases
@@ -660,14 +660,22 @@ export function initMainUi(state, deps) {
         // foreground /s gain (it doesn't move foreground rate).
         const pct = Math.round((u.value - 1) * 100);
         outcomes = `<div class="outcome win"><i class="ri ri-moon-line"></i> +${pct}% offline gain</div>`;
+      } else if (u.kind === 'coil' && u.id === VIGIL_ID) {
+        // Vigil Coil — preview the current → post-purchase offline discovery
+        // mul. Lower is better; the player reads the cap inline.
+        const ownedN = state.owned[VIGIL_ID] || 0;
+        const curr = 1 - VIGIL_MAX_REDUCTION * (ownedN / (ownedN + VIGIL_K));
+        const next = 1 - VIGIL_MAX_REDUCTION * ((ownedN + 1) / (ownedN + 1 + VIGIL_K));
+        const fmt = (x) => `×${x.toFixed(2)}`;
+        outcomes = `<div class="outcome win"><i class="ri ri-shuffle-line"></i> ${fmt(curr)} → ${fmt(next)} offline discovery (cap ${fmt(1 - VIGIL_MAX_REDUCTION)})</div>`;
       } else if (u.kind === 'coil') {
-        // Show the current → post-purchase Mesh-Bleed drop chance for a sweep
-        // token. Cap announced inline so the player sees the ceiling.
+        // Patient Coil — current → post-purchase Mesh-Bleed reroll-drop
+        // chance. Cap announced inline so the player sees the ceiling.
         const ownedN = state.owned[COIL_ID] || 0;
         const curr = ownedN <= 0 ? 0 : Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(1 + ownedN));
         const next = Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(2 + ownedN));
         const fmt = (x) => `${(x * 100).toFixed(1)}%`;
-        outcomes = `<div class="outcome win"><i class="ri ri-shuffle-line"></i> ${fmt(curr)} → ${fmt(next)} sweep-drop per Mesh Bleed</div>`;
+        outcomes = `<div class="outcome win"><i class="ri ri-shuffle-line"></i> ${fmt(curr)} → ${fmt(next)} reroll-drop per Mesh Bleed</div>`;
       } else if (u.kind === 'gift') {
         outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(u.reward)}</span></div>`;
       }

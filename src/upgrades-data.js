@@ -301,14 +301,28 @@ export const UPGRADES = [
 
   // Patient Coil — a coil you splice into an isolated relay so its Mesh Bleed
   // sometimes carries a re-tune signature on top of the Echoes. Each owned
-  // coil widens the chance a drip also drops a free sweep, logarithmically
+  // coil widens the chance a drip also drops a free re-roll, logarithmically
   // — see network.js coilDropChance for the curve and the hard cap.
   // Eligibility: appears once the player has at least one online Seed Relay.
   // The kind has its own theme/color in upgrades.js KIND_THEME.
   { id: 'patient_coil', kind: 'coil', rarity: 'uncommon',
     name: 'Patient Coil',
-    desc: 'Splice a tuned coil into the isolated antennas. Sometimes a Mesh Bleed drips a sweep token alongside the Echoes. Chance climbs with every coil — softly, never past a hard cap.',
+    desc: 'Splices into isolated antennas. A Mesh Bleed sometimes drops a reroll-drop alongside the Echoes. Soft climb, hard cap.',
     baseCost: 4000, growth: 2.4 },
+
+  // Vigil Coil — companion to Patient Coil. Where Patient widens the bleed,
+  // Vigil shrinks the listener footprint while Kalen is away. Each owned coil
+  // multiplies offline discovery rate by 1 - (2/3) × n/(n+K) — asymptote ×1/3,
+  // i.e. triples the offline half-life of every Seed Relay at the cap. See
+  // vigilOfflineDiscoveryMul in network.js. Same Seed-Relay-online gate as
+  // Patient Coil. rateCostSec keeps the price meaningful late: cost floors at
+  // baseCost early, then scales with current /s once production overtakes it
+  // (see coil case in costFor) — otherwise a billions/s player would cap the
+  // upgrade for pocket change.
+  { id: 'vigil_coil', kind: 'coil', rarity: 'uncommon',
+    name: 'Vigil Coil',
+    desc: 'Damps the carrier while Kalen is away. Listeners take longer to triangulate any Seed Relay. Soft climb toward ×1/3 discovery.',
+    baseCost: 6000, growth: 2.2, rateCostSec: 240 },
 
   // Drift — "while-you-are-away" multipliers. Only apply over the offline
   // integral (see save.js); foreground rate is unchanged. Cheap early, costly

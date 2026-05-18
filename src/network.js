@@ -45,6 +45,21 @@ export function coilDropChance(state) {
   return Math.min(COIL_DROP_PMAX, COIL_DROP_K * Math.log(1 + n));
 }
 
+// Vigil Coil — multiplies offline discovery rate by 1 - VIGIL_MAX_REDUCTION ×
+// n/(n+VIGIL_K). Asymptote: ×1/3 discovery, i.e. every Seed Relay's offline
+// half-life triples at the cap. n=K hits half the cap. Foreground discovery
+// is untouched on purpose — the upgrade pays for absence, mirroring how
+// drift pays for the offline integral.
+export const VIGIL_ID = 'vigil_coil';
+export const VIGIL_MAX_REDUCTION = 2 / 3;
+export const VIGIL_K = 6;
+
+export function vigilOfflineDiscoveryMul(state) {
+  const n = (state && state.owned && state.owned[VIGIL_ID]) || 0;
+  if (n <= 0) return 1;
+  return 1 - VIGIL_MAX_REDUCTION * (n / (n + VIGIL_K));
+}
+
 function grantRerolls(state, n) {
   if (!(n > 0)) return 0;
   const before = state.freeRerolls || 0;
@@ -400,10 +415,11 @@ export function reconcileOffline(state, offlineSeconds, now) {
   if (!online.length) return [];
   const lossCap = Math.max(1, Math.floor(online.length / 4));
   const offlineMin = offlineSeconds / 60;
+  const vigilMul = vigilOfflineDiscoveryMul(state);
   const lost = [];
   for (const r of online) {
     if (lost.length >= lossCap) break;
-    const rate = discoveryRatePerMin(network, r, now);
+    const rate = discoveryRatePerMin(network, r, now) * vigilMul;
     if (rate <= 0) continue;
     const p = 1 - Math.exp(-rate * offlineMin);
     if (Math.random() < p) lost.push(r);

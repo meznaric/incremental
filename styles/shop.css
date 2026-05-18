@@ -579,10 +579,12 @@
   will-change: transform, opacity;
 }
 .gx-banner .gx-label {
-  font-size: clamp(38px, 9vw, 96px);
+  font-size: clamp(32px, 7vw, 80px);
   font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  max-width: 92vw;
 }
 .gx-banner .gx-delta {
   font-size: clamp(20px, 4.5vw, 44px);

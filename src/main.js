@@ -445,8 +445,8 @@ function tick(raf) {
   const rerollsGained = (state.freeRerolls || 0) - rerollsBeforeDrip;
   if (rerollsGained > 0) {
     ui.showToast(rerollsGained === 1
-      ? 'A sweep token was riding the bleed.'
-      : `${rerollsGained} sweep tokens were riding the bleed.`);
+      ? 'A reroll-drop was riding the bleed.'
+      : `${rerollsGained} reroll-drops were riding the bleed.`);
   }
 
   const rate = effectiveRate(state, t);

@@ -347,11 +347,15 @@ export function costFor(upgrade, ctx) {
       return ctx.balance * upgrade.pctCost * tier;
     }
     case 'coil': {
-      // Same own-count exponential as drift — no category ramp, the cap on
-      // payoff is enforced by the log/pMax curve in coilDropChance, not by
-      // cost growth.
+      // Own-count exponential like drift — no category ramp. Optional
+      // rateCostSec rate-scales the base so the coil stays meaningful as
+      // production climbs (otherwise a billions/s player would cap a fixed-
+      // cost coil for pocket change). baseCost stays as an early-game floor.
       const n = ctx.owned[upgrade.id] || 0;
-      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
+      const base = upgrade.rateCostSec
+        ? Math.max(upgrade.baseCost, ctx.rate * upgrade.rateCostSec)
+        : upgrade.baseCost;
+      return base * Math.pow(upgrade.growth, n + (n * n) / 25);
     }
   }
   return 0;

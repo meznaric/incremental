@@ -1,16 +1,24 @@
-// Hail result drama. The reveal of WIN/LOSS is the loudest single moment in
-// the game. The cards in the row stay still — the centred banner is the
+// Hail result drama. The reveal banner is the loudest single moment in the
+// game. The cards in the row stay still — the centred banner is the
 // headline, and the falling 3D particles in the magnitude columns are pulled
 // toward screen-centre (handled by MagnitudeDisplay.triggerGambleFx via the
 // `onStart` callback) so the *world* reacts to the result, not the row of
-// cards. The card-anchored ring burst stays as a secondary flourish on wins
-// only — driven by the caller via fireWinBurst.
+// cards. The card-anchored ring burst stays as a secondary flourish on the
+// positive reveal only — driven by the caller via fireWinBurst.
 
 const OVERLAY_ID = 'gambleFxOverlay';
 
+// Lore: a Hail is Kalen pinging the dark and listening for the signal to
+// come back. Win = something answered. Loss = the dark stayed silent.
+// Picked randomly per reveal so repeat play stays alive. Keep these tight —
+// the label is set in a large font; short reads better.
+const WIN_LABELS  = ['ECHO', 'RETURN', 'ANSWER', 'CARRIER', 'CONTACT', 'REPLY'];
+const LOSS_LABELS = ['NO RESPONSE', 'SILENCE', 'NO REPLY', 'STATIC', 'NO ECHO'];
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 // Module-level lock so the shop can ignore further gamble taps while the
-// WIN/LOSS reveal is on screen. The flag covers the full lead-in + banner
-// hold + fade-out window, not just the in-animation.
+// reveal is on screen. The flag covers the full lead-in + banner hold +
+// fade-out window, not just the in-animation.
 let _active = false;
 export function isGambleFxActive() { return _active; }
 
@@ -32,8 +40,9 @@ function buildBanner(won, deltaText) {
   const banner = document.createElement('div');
   banner.className = `gx-banner ${won ? 'gx-win' : 'gx-loss'}`;
   const sign = won ? '+' : '−';
+  const label = pick(won ? WIN_LABELS : LOSS_LABELS);
   banner.innerHTML = `
-    <div class="gx-label">${won ? 'WIN' : 'LOSS'}</div>
+    <div class="gx-label">${label}</div>
     <div class="gx-delta"><span class="gx-sign">${sign}</span>${deltaText}</div>
   `;
   return banner;

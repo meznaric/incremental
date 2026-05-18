@@ -89,7 +89,7 @@ function buildBreakdown(state, savedAt, offline, extras) {
   }
   const sweep = Number(extras && extras.networkRerollsGained) || 0;
   if (sweep > 0) {
-    rows.push({ label: 'Sweep tokens', value: `+${sweep} re-roll${sweep === 1 ? '' : 's'}` });
+    rows.push({ label: 'Reroll-drops', value: `+${sweep} re-roll${sweep === 1 ? '' : 's'}` });
   }
   const losses = Number(extras && extras.networkLosses) || 0;
   if (losses > 0) {

@@ -9,6 +9,7 @@ import {
   reconcileOffline, tickNetwork, reconcileOfflineBleeds, tickBleedDrip,
   MAP_RADIUS, COVERAGE_BONUS_PER_SECTOR, CLUSTER_YIELD_PER_NEIGHBOR,
   coilDropChance, countOnlineRelays, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX,
+  vigilOfflineDiscoveryMul, VIGIL_ID, VIGIL_K, VIGIL_MAX_REDUCTION,
 } from '../src/network.js';
 
 function s() {
@@ -364,4 +365,52 @@ test('countOnlineRelays: counts only ripened relays', () => {
   st.network.relays[0].ripensAt = 0;
   st.network.relays[1].ripensAt = 1e9;
   assert.equal(countOnlineRelays(st, 1), 1);
+});
+
+test('vigilOfflineDiscoveryMul: 1 with no coils, monotone decreasing toward 1 - VIGIL_MAX_REDUCTION', () => {
+  const st = { owned: {} };
+  assert.equal(vigilOfflineDiscoveryMul(st), 1);
+  st.owned[VIGIL_ID] = 1;
+  const m1 = vigilOfflineDiscoveryMul(st);
+  st.owned[VIGIL_ID] = VIGIL_K;
+  const mHalf = vigilOfflineDiscoveryMul(st);
+  st.owned[VIGIL_ID] = 1000;
+  const mBig = vigilOfflineDiscoveryMul(st);
+  assert.ok(m1 < 1 && m1 > mHalf && mHalf > mBig, `expected monotone 1 > ${m1} > ${mHalf} > ${mBig}`);
+  // At n=K, exactly half the cap.
+  assert.ok(Math.abs(mHalf - (1 - VIGIL_MAX_REDUCTION / 2)) < 1e-9);
+  // Asymptote: stays above the floor.
+  assert.ok(mBig > 1 - VIGIL_MAX_REDUCTION);
+});
+
+test('reconcileOffline: Vigil Coil meaningfully reduces loss probability over a long window', () => {
+  // Same setup is rolled twice (with and without coils) under controlled RNG —
+  // the Bernoulli p drops, so a fixed Math.random() that loses without coils
+  // should sometimes survive with enough coils.
+  function place() {
+    const st = s();
+    const watch = getHexes().find((h) => h.sector === 'watch');
+    queueToken(st, 'common', 100);
+    placeRelay(st, watch, 0);
+    st.network.relays[0].ripensAt = 0;
+    return st;
+  }
+  // Common in Listener Watch, isolated: rate = 0.0038 × 4 × 0.1 = 0.00152/min.
+  // Over 12h (720 min): p ≈ 1 - exp(-1.094) ≈ 0.665.
+  // With 100 Vigils: mul ≈ 0.528 → p ≈ 1 - exp(-0.578) ≈ 0.439.
+  // A draw between those two values loses one but survives the other.
+  const orig = Math.random;
+  try {
+    Math.random = () => 0.55;
+    const noCoils = place();
+    reconcileOffline(noCoils, 12 * 3600, 1);
+    assert.equal(noCoils.network.relays.length, 0, 'baseline should lose at 0.55');
+
+    const withCoils = place();
+    withCoils.owned = { [VIGIL_ID]: 100 };
+    reconcileOffline(withCoils, 12 * 3600, 1);
+    assert.equal(withCoils.network.relays.length, 1, 'Vigil ×100 should survive at 0.55');
+  } finally {
+    Math.random = orig;
+  }
 });

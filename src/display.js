@@ -10,7 +10,7 @@ const SLOT_COUNT = GRID_W * GRID_H;
 const CELL_W = 0.55;
 const CELL_H = 0.5;
 const COLUMN_WIDTH = GRID_W * CELL_W;
-const COLUMN_SPACING = COLUMN_WIDTH + 1.6;
+const COLUMN_SPACING = COLUMN_WIDTH + 0.9;
 const COLUMN_TOP_Y = GRID_H * CELL_H - CELL_H * 0.6;
 const COLUMN_BOTTOM_Y = -CELL_H * 0.6;
 const SPAWN_DISTANCE = 8.0;
@@ -1018,6 +1018,13 @@ export class MagnitudeDisplay {
       this.columns.push(new Column(this.group, 0));
     }
     this.visibleColumns = COLUMN_COUNT;
+    // Per-column scale multiplier applied to the fade-in target (1 → _columnScale).
+    // Spacing multiplier shrinks the horizontal gap between columns in lockstep
+    // so a smaller column footprint also reads as a tighter row. Both default
+    // to 1; setMobileLayout drops them on phones where the column band would
+    // otherwise reach the top HUD and feel sparse on the narrow canvas.
+    this._columnScale = 1;
+    this._spacingMul = 1;
     // Global buff envelope — single source of truth so every column reads the
     // same boost and the ripple wavefront stays coherent across them.
     this._boost = 0;
@@ -1032,6 +1039,21 @@ export class MagnitudeDisplay {
   setVisibleColumns(n) {
     const clamped = Math.max(1, Math.min(COLUMN_COUNT, n | 0));
     this.visibleColumns = clamped;
+  }
+
+  // Phones get a tighter, shorter column row so the tops sit clear of the
+  // fixed-top HUD (Echoes + rate) on tall narrow viewports. Shrinking each
+  // column's fade-in target (instead of transforming the parent group) keeps
+  // ripple + gamble-FX math correct — those routines assume the group is
+  // identity and read each column.root.position/scale directly.
+  setMobileLayout(isMobile) {
+    this._columnScale = isMobile ? 0.7 : 1;
+    this._spacingMul = isMobile ? 0.78 : 1;
+    // Snap any already-assigned column to the new target so a viewport
+    // resize doesn't strand it at the old fade-in size.
+    for (const col of this.columns) {
+      if (col.assigned) col.scaleTarget = this._columnScale;
+    }
   }
 
   // Pull every alive particle across every column toward `attractorWorld`,
@@ -1079,25 +1101,27 @@ export class MagnitudeDisplay {
 
     const positioned = [];
     const freshAssigns = [];
+    const scaleMul = this._columnScale;
     for (const m of desired) {
       let col = byM.get(m);
       if (col) {
         col.assigned = true;
-        col.scaleTarget = 1;
+        col.scaleTarget = scaleMul;
       } else {
         col = this.columns.find((c) => c.m100 < 0 && !c.assigned);
         if (!col) col = this.columns.find((c) => !c.assigned);
         if (!col) continue;
         col.assigned = true;
-        col.scaleTarget = 1;
+        col.scaleTarget = scaleMul;
         freshAssigns.push({ col, m });
       }
       positioned.push(col);
     }
 
     const n = positioned.length;
+    const spacing = COLUMN_SPACING * this._spacingMul;
     for (let i = 0; i < n; i++) {
-      positioned[i].targetX = (i - (n - 1) / 2) * COLUMN_SPACING;
+      positioned[i].targetX = (i - (n - 1) / 2) * spacing;
     }
 
     for (const { col, m } of freshAssigns) {

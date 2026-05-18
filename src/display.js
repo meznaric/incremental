@@ -1018,12 +1018,8 @@ export class MagnitudeDisplay {
       this.columns.push(new Column(this.group, 0));
     }
     this.visibleColumns = COLUMN_COUNT;
-    // Per-column scale multiplier applied to the fade-in target (1 → _columnScale).
-    // Spacing multiplier shrinks the horizontal gap between columns in lockstep
-    // so a smaller column footprint also reads as a tighter row. Both default
-    // to 1; setMobileLayout drops them on phones where the column band would
-    // otherwise reach the top HUD and feel sparse on the narrow canvas.
-    this._columnScale = 1;
+    // Horizontal-gap multiplier between columns. Phones use a tighter row so
+    // three columns fit the narrow canvas without crowding the edges.
     this._spacingMul = 1;
     // Global buff envelope — single source of truth so every column reads the
     // same boost and the ripple wavefront stays coherent across them.
@@ -1041,19 +1037,8 @@ export class MagnitudeDisplay {
     this.visibleColumns = clamped;
   }
 
-  // Phones get a tighter, shorter column row so the tops sit clear of the
-  // fixed-top HUD (Echoes + rate) on tall narrow viewports. Shrinking each
-  // column's fade-in target (instead of transforming the parent group) keeps
-  // ripple + gamble-FX math correct — those routines assume the group is
-  // identity and read each column.root.position/scale directly.
   setMobileLayout(isMobile) {
-    this._columnScale = isMobile ? 0.7 : 1;
     this._spacingMul = isMobile ? 0.78 : 1;
-    // Snap any already-assigned column to the new target so a viewport
-    // resize doesn't strand it at the old fade-in size.
-    for (const col of this.columns) {
-      if (col.assigned) col.scaleTarget = this._columnScale;
-    }
   }
 
   // Pull every alive particle across every column toward `attractorWorld`,
@@ -1101,18 +1086,17 @@ export class MagnitudeDisplay {
 
     const positioned = [];
     const freshAssigns = [];
-    const scaleMul = this._columnScale;
     for (const m of desired) {
       let col = byM.get(m);
       if (col) {
         col.assigned = true;
-        col.scaleTarget = scaleMul;
+        col.scaleTarget = 1;
       } else {
         col = this.columns.find((c) => c.m100 < 0 && !c.assigned);
         if (!col) col = this.columns.find((c) => !c.assigned);
         if (!col) continue;
         col.assigned = true;
-        col.scaleTarget = scaleMul;
+        col.scaleTarget = 1;
         freshAssigns.push({ col, m });
       }
       positioned.push(col);

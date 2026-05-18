@@ -10,10 +10,24 @@ const OVERLAY_ID = 'gambleFxOverlay';
 
 // Lore: a Hail is Kalen pinging the dark and listening for the signal to
 // come back. Win = something answered. Loss = the dark stayed silent.
-// Picked randomly per reveal so repeat play stays alive. Keep these tight —
-// the label is set in a large font; short reads better.
-const WIN_LABELS  = ['ECHO', 'RETURN', 'ANSWER', 'CARRIER', 'CONTACT', 'REPLY'];
-const LOSS_LABELS = ['NO RESPONSE', 'SILENCE', 'NO REPLY', 'STATIC', 'NO ECHO'];
+// Picked randomly per reveal so repeat play stays alive. Phrased as short
+// verb sentences so the result reads instantly — "Echo Returned" is
+// unambiguously the positive one in a way "ECHO" never quite was.
+const WIN_LABELS = [
+  'Echo Returned',
+  'Someone Answered',
+  'Signal Came Back',
+  'Carrier Locked',
+  'Reply Received',
+  'Contact Made',
+];
+const LOSS_LABELS = [
+  'No Response',
+  'Silence Held',
+  'No Reply',
+  'Only Static',
+  'The Dark Stayed Quiet',
+];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Module-level lock so the shop can ignore further gamble taps while the

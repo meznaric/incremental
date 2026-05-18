@@ -97,7 +97,9 @@ export function makeNetworkUi(state, opts) {
   let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation (queue present)
   // Mobile-only view transform applied to the SVG (in CSS pixels for tx/ty,
   // unitless for scale). The map element is kept stable across renders so the
-  // drag-in-progress, pinch state and these listeners survive.
+  // drag-in-progress, pinch state and these listeners survive. `initialized`
+  // stays sticky once true — pan/zoom carries across opens so re-entering the
+  // modal lands the player back where they were looking last time.
   const view = { scale: 1, tx: 0, ty: 0, initialized: false };
   // Pinches release the second finger before the first; the trailing single
   // pointer would otherwise register as a tap on the underlying hex. Stamp a
@@ -108,7 +110,6 @@ export function makeNetworkUi(state, opts) {
   const open = () => {
     ensureNetwork(state);
     modalEl.classList.add('open');
-    view.initialized = false;
     render();
   };
   const close = () => {

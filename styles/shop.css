@@ -333,14 +333,45 @@
   .buff-group { display: none; }
 }
 
+/* Mobile buff rows. Primary holds one tile per active kind (combined when
+   count>1). Secondary floats above primary via absolute positioning when
+   a combined tile is expanded — its individual buffs. Desktop hides both
+   rows; .buff-group is the source of truth >640px. */
+.buff-row { display: none; }
+@media (max-width: 640px) {
+  /* #buffs flex-direction/overflow at <=640 is handled in interstitial.css
+     after the 820px tablet block — same specificity, later rule wins.
+     Both rows live in column flow there: secondary first in DOM stacks
+     above primary, and #buffs grows upward (bottom-anchored). Native
+     overflow-x on each row gives horizontal pan without fighting the
+     parent's overflow. */
+  .buff-row {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    /* Lock to horizontal pans only — vertical fall-through reaches the
+       canvas + shop behind without the row stealing the gesture. */
+    touch-action: pan-x;
+    pointer-events: auto;
+  }
+  .buff-row::-webkit-scrollbar { display: none; }
+  .buff-row .buff-tile { display: inline-flex; scroll-snap-align: start; }
+}
+
 /* Collapsed mobile-only tile. The progress bar fills the tile background
    left-to-right; glyph + multiplier overlay it. Visible only below 640px —
    the desktop card markup above stays the source of truth on wider HUDs. */
 .buff-tile {
   position: relative;
   flex: 0 0 auto;
-  width: 72px;
-  height: 44px;
+  width: 70px;
+  height: 36px;
   border-radius: 8px;
   background: rgba(20, 20, 40, 0.78);
   border: 1px solid rgba(120, 140, 255, 0.3);
@@ -376,13 +407,20 @@
   line-height: 1;
 }
 .buff-tile .buff-tile-glyph {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
 }
 .buff-tile .buff-tile-val {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+}
+/* Combined tile: dashed border signals a stack to drill into. The
+   .is-expanded flip to solid + lifted bg is the "this drawer is open" cue. */
+.buff-tile.is-combined { border-style: dashed; }
+.buff-tile.is-combined.is-expanded {
+  border-style: solid;
+  background: rgba(40, 40, 70, 0.92);
 }
 .buff-tile.kind-rate     { border-color: rgba(157, 110, 224, 0.4); }
 .buff-tile.kind-rate     .buff-tile-bar { background: #9d6ee0; }

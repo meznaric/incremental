@@ -513,7 +513,9 @@
   #buffs::-webkit-scrollbar { display: none; }
   #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
   /* On mobile #buffs is a horizontal strip at the bottom. Place metaBuffs
-     just above it — buff-tile height is 44px + gap, plus a small breath.
+     just above it — buff-tile height is 36px + gap, plus a small breath.
+     When body.buffs-expanded toggles (a combined tile drawer is open), lift
+     further to clear the absolutely-positioned secondary row above primary.
      Match the scrolling behaviour of #buffs so long meta-stacks feel native. */
   #metaBuffs {
     top: auto;
@@ -521,7 +523,7 @@
     right: 0;
     width: auto;
     /* +cp-h matches the lift applied to #buffs above. */
-    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 60px);
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 52px);
     flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
@@ -530,6 +532,10 @@
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x proximity;
+    transition: bottom 0.18s ease;
+  }
+  body.buffs-expanded #metaBuffs {
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 96px);
   }
   #metaBuffs::-webkit-scrollbar { display: none; }
   #metaBuffs .meta-pill { scroll-snap-align: start; }
@@ -541,8 +547,18 @@
 
 /* Phone-width: collapse buff cards into tappable tiles. The expanded
    cards still render but are hidden — the same DOM tree powers both
-   layouts and the tile carries the data-idx the modal looks up. */
+   layouts and the tile carries the data-idx the modal looks up. The
+   #buffs override here lives after the 820px block above so the cascade
+   resolves in our favour (same specificity, later rule wins): column
+   layout + 6px gap so the secondary row (first in DOM, rendered when a
+   combined tile is expanded) sits above primary with native scrolling. */
 @media (max-width: 640px) {
+  #buffs {
+    flex-direction: column;
+    overflow: visible;
+    padding: 0;
+    gap: 6px;
+  }
   #buffs .buff-card { display: none; }
   #buffs .buff-tile { display: inline-flex; scroll-snap-align: start; }
 }

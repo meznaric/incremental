@@ -77,7 +77,7 @@ export function initMainUi(state, deps) {
 
   // Echo glyph — broadcast-fill reads as concentric arcs (a signal returning).
   // Kept tagged `.cc-icon` (warm tungsten) so it pops against the cool UI.
-  const ECHO_ICON = '<i class="ri-broadcast-fill cc-icon"></i>';
+  const ECHO_ICON = '<i class="ri-voiceprint-fill cc-icon"></i>';
 
   function fmtPct(p) {
     const v = p * 100;
@@ -217,7 +217,7 @@ export function initMainUi(state, deps) {
   }
   function spawnEchoBurn(el) {
     const c = document.createElement('i');
-    c.className = 'ri-broadcast-fill echo-burn';
+    c.className = 'ri-voiceprint-fill echo-burn';
     el.appendChild(c);
     c.addEventListener('animationend', () => c.remove(), { once: true });
     // Safety fallback if animationend doesn't fire (reduced motion hides it).
@@ -255,7 +255,7 @@ export function initMainUi(state, deps) {
     }).join('');
     burst.innerHTML = `
       <span class="wb-flash"></span>
-      <i class="wb-glyph ri-broadcast-fill"></i>
+      <i class="wb-glyph ri-voiceprint-fill"></i>
       <span class="wb-ring wb-ring-1"></span>
       <span class="wb-ring wb-ring-2"></span>
       <span class="wb-ring wb-ring-3"></span>
@@ -797,6 +797,15 @@ export function initMainUi(state, deps) {
   installTap(buffsEl, (_e, target) => {
     if (target.closest('.buff-info')) { openBuffModal(); return; }
     if (target.closest('.buff-combined')) { openBuffModal(); return; }
+    // Mobile: a dashed combined tile toggles a secondary row of its
+    // individual buffs. Re-tapping the same kind (or another combined
+    // tile) collapses / switches. Renders pick up the new state next tick.
+    const combinedTile = target.closest('.buff-tile.is-combined');
+    if (combinedTile) {
+      const k = combinedTile.dataset.kind;
+      expandedBuffKind = (expandedBuffKind === k) ? null : k;
+      return;
+    }
     const hit = target.closest('.buff-tile, .buff-stack-card');
     if (!hit) return;
     const idx = Number(hit.dataset.idx);
@@ -827,7 +836,6 @@ export function initMainUi(state, deps) {
 
   function renderBuffs(now) {
     const items = [];
-    const tiles = [];
     // groups[kind] collects every active buff per kind so each stack
     // renders as one combined card + N individuals peeking underneath.
     const groups = { rate: [], luck: [], cushion: [], compound: [] };
@@ -839,15 +847,6 @@ export function initMainUi(state, deps) {
       const idx = items.length;
       items.push({ kind, value, duration, expiresAt: now + remain, title: name, desc });
       groups[kind].push({ idx, value, numeric, remain, duration, pct, icon, name });
-      tiles.push(`
-        <button type="button" class="buff-tile kind-${kind}" data-idx="${idx}" aria-label="${name} ${value}">
-          <div class="buff-tile-bar" style="transform: scaleX(${pct});"></div>
-          <div class="buff-tile-fg">
-            <i class="ri ri-fw ${icon} buff-tile-glyph"></i>
-            <span class="buff-tile-val">${value}</span>
-          </div>
-        </button>
-      `);
     };
     const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
     for (const x of active(b.rateMul))       push('rate',     `×${fmtMult(x.value)}`,                                  x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
@@ -902,6 +901,12 @@ export function initMainUi(state, deps) {
       return { kind, icon: list[0].icon, name: kindName(kind), value, remain: soon.remain, duration: soon.duration, pct: soon.pct, bars, count: list.length };
     };
 
+    // Drop expansion when the kind can't show a stack anymore — desktop
+    // hides the popup at count=1; mobile hides the secondary row likewise.
+    if (expandedBuffKind && groups[expandedBuffKind].length <= 1) {
+      expandedBuffKind = null;
+    }
+
     const groupHtml = [];
     for (const kind of ['rate', 'luck', 'cushion', 'compound']) {
       const list = groups[kind];
@@ -915,9 +920,50 @@ export function initMainUi(state, deps) {
         </div>
       `);
     }
+
+    // Mobile per-kind tile rows. Primary holds one tile per active kind —
+    // combined (dashed) when count>1, single otherwise. A tap on a combined
+    // tile sets expandedBuffKind; the matching secondary row renders below.
+    const tileMarkup = (kind, pct, icon, value, extra, attrs, aria) => `
+      <button type="button" class="buff-tile kind-${kind}${extra ? ' ' + extra : ''}" ${attrs} aria-label="${aria}">
+        <div class="buff-tile-bar" style="transform: scaleX(${pct});"></div>
+        <div class="buff-tile-fg">
+          <i class="ri ri-fw ${icon} buff-tile-glyph"></i>
+          <span class="buff-tile-val">${value}</span>
+        </div>
+      </button>
+    `;
+    const primaryTiles = [];
+    const secondaryByKind = {};
+    for (const kind of ['rate', 'luck', 'cushion', 'compound']) {
+      const list = groups[kind];
+      if (!list.length) continue;
+      if (list.length === 1) {
+        const g = list[0];
+        primaryTiles.push(tileMarkup(kind, g.pct, g.icon, g.value, '', `data-idx="${g.idx}"`, `${g.name} ${g.value}`));
+      } else {
+        const c = combine(kind, list);
+        const cls = expandedBuffKind === kind ? 'is-combined is-expanded' : 'is-combined';
+        primaryTiles.push(tileMarkup(kind, c.pct, c.icon, c.value, cls, `data-kind="${kind}"`, `${c.name} ×${c.count} combined ${c.value}`));
+        secondaryByKind[kind] = list.map((g) =>
+          tileMarkup(kind, g.pct, g.icon, g.value, '', `data-idx="${g.idx}"`, `${g.name} ${g.value}`)
+        ).join('');
+      }
+    }
+    const expandKind = expandedBuffKind && secondaryByKind[expandedBuffKind] ? expandedBuffKind : null;
+    const primaryHtml = primaryTiles.length
+      ? `<div class="buff-row buff-row-primary">${primaryTiles.join('')}</div>`
+      : '';
+    const secondaryHtml = expandKind
+      ? `<div class="buff-row buff-row-secondary kind-${expandKind}">${secondaryByKind[expandKind]}</div>`
+      : '';
+
     renderedBuffs = items;
     buffsEl.style.display = items.length ? 'flex' : 'none';
-    buffsEl.innerHTML = groupHtml.join('') + tiles.join('');
+    // Secondary first in DOM so column flow stacks it above primary.
+    buffsEl.innerHTML = groupHtml.join('') + secondaryHtml + primaryHtml;
+    // Body flag so #metaBuffs can lift to clear the secondary row when shown.
+    document.body.classList.toggle('buffs-expanded', !!expandKind);
     if (expandedBuffKind) {
       const g = buffsEl.querySelector(`.buff-group[data-kind="${expandedBuffKind}"]`);
       if (g) g.classList.add('is-expanded');

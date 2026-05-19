@@ -91,25 +91,33 @@ export function initContactProgressUi(state, deps = {}) {
   if (typeof openRig === 'function')   installTap(rightEl, openRig);
 
   // Desktop hover state. The cursor entering the strip OR the 32px slab
-  // directly above it sets body.cp-hovered, which CSS uses to lift the
-  // strip (--seg-size) and the mobile buff row, and which main.js's
-  // ResizeObserver checks to skip recomputing --cp-h (the canvas would
-  // otherwise resize and flash mid-hover). Single mousemove handler covers
-  // both the in-strip and pretrigger cases so the body flag is the one
-  // source of truth.
+  // directly above it sets body.cp-hovered (visual lift) AND body.cp-pin
+  // (the onResize gate in main.js). cp-pin stays live for an extra
+  // CP_LEAVE_GRACE_MS after the cursor leaves so the strip's 0.2s height
+  // transition can finish without onResize firing on every intermediate
+  // size and flashing the WebGL canvas.
   const PRETRIGGER_PX = 32;
+  const CP_LEAVE_GRACE_MS = 260;
   if (window.matchMedia('(hover: hover)').matches) {
-    document.addEventListener('mousemove', (e) => {
-      if (!root.classList.contains('cp-visible')) {
-        if (document.body.classList.contains('cp-hovered')) {
-          document.body.classList.remove('cp-hovered');
-        }
-        return;
+    let unpinTimer = 0;
+    const setHovered = (on) => {
+      const was = document.body.classList.contains('cp-hovered');
+      if (on === was) return;
+      document.body.classList.toggle('cp-hovered', on);
+      if (on) {
+        clearTimeout(unpinTimer);
+        document.body.classList.add('cp-pin');
+      } else {
+        clearTimeout(unpinTimer);
+        unpinTimer = setTimeout(() => document.body.classList.remove('cp-pin'), CP_LEAVE_GRACE_MS);
       }
+    };
+    document.addEventListener('mousemove', (e) => {
+      if (!root.classList.contains('cp-visible')) { setHovered(false); return; }
       const r = root.getBoundingClientRect();
       const near = e.clientX >= r.left && e.clientX <= r.right
         && e.clientY >= r.top - PRETRIGGER_PX && e.clientY <= r.bottom;
-      document.body.classList.toggle('cp-hovered', near);
+      setHovered(near);
     }, { passive: true });
   }
 

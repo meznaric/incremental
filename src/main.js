@@ -161,6 +161,12 @@ scene.add(hero.group);
 const shopEl = document.getElementById('shop');
 const progressEl = document.getElementById('contactProgress');
 function onResize() {
+  // The strip grows when the player hovers (or approaches from above). That
+  // grow fires the ResizeObserver attached to progressEl below — if we let
+  // it through, --cp-h jumps, the canvas resizes, and the column display
+  // flashes. Skip the strip-driven recompute while the hover state is on;
+  // the rest size is recomputed the moment the cursor leaves.
+  if (document.body.classList.contains('cp-hovered')) return;
   const shopRect = shopEl.getBoundingClientRect();
   const shopTop = shopRect.height ? shopRect.top : window.innerHeight;
   document.documentElement.style.setProperty('--shop-h', shopRect.height + 'px');

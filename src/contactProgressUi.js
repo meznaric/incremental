@@ -90,6 +90,29 @@ export function initContactProgressUi(state, deps = {}) {
   if (typeof openCycle === 'function') installTap(trackEl, openCycle);
   if (typeof openRig === 'function')   installTap(rightEl, openRig);
 
+  // Desktop hover state. The cursor entering the strip OR the 32px slab
+  // directly above it sets body.cp-hovered, which CSS uses to lift the
+  // strip (--seg-size) and the mobile buff row, and which main.js's
+  // ResizeObserver checks to skip recomputing --cp-h (the canvas would
+  // otherwise resize and flash mid-hover). Single mousemove handler covers
+  // both the in-strip and pretrigger cases so the body flag is the one
+  // source of truth.
+  const PRETRIGGER_PX = 32;
+  if (window.matchMedia('(hover: hover)').matches) {
+    document.addEventListener('mousemove', (e) => {
+      if (!root.classList.contains('cp-visible')) {
+        if (document.body.classList.contains('cp-hovered')) {
+          document.body.classList.remove('cp-hovered');
+        }
+        return;
+      }
+      const r = root.getBoundingClientRect();
+      const near = e.clientX >= r.left && e.clientX <= r.right
+        && e.clientY >= r.top - PRETRIGGER_PX && e.clientY <= r.bottom;
+      document.body.classList.toggle('cp-hovered', near);
+    }, { passive: true });
+  }
+
   const travelerEl = root.querySelector('.cp-traveler');
   const travelerImg = root.querySelector('.cp-traveler-img');
   const travelerFallback = root.querySelector('.cp-traveler-fallback');

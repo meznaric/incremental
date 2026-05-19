@@ -509,9 +509,16 @@
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x proximity;
+    transition: bottom 0.2s ease;
   }
   #buffs::-webkit-scrollbar { display: none; }
   #buffs .buff-card { flex: 0 0 160px; scroll-snap-align: start; }
+  /* contactProgress hover lifts the strip by 16px (32→48). --cp-h does not
+     refresh while hovered (see main.js onResize gate), so push the buff
+     row + metaBuffs up by the same delta when body.cp-hovered. */
+  body.cp-hovered #buffs {
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 24px);
+  }
   /* On mobile #buffs is a horizontal strip at the bottom. Place metaBuffs
      just above it — buff-tile height is 36px + gap, plus a small breath.
      When body.buffs-expanded toggles (a combined tile drawer is open), lift
@@ -536,6 +543,12 @@
   }
   body.buffs-expanded #metaBuffs {
     bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 96px);
+  }
+  body.cp-hovered #metaBuffs {
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 68px);
+  }
+  body.cp-hovered.buffs-expanded #metaBuffs {
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 112px);
   }
   #metaBuffs::-webkit-scrollbar { display: none; }
   #metaBuffs .meta-pill { scroll-snap-align: start; }

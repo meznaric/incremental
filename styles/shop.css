@@ -740,7 +740,7 @@
    delay and the tap-highlight flash that occasionally swallows first taps
    on iOS Chrome. Mirrors what the slot cards already do. */
 .bm-card button,
-.cl-tab, .diag-tab,
+.diag-tab,
 .cl-entry, .cl-eng-btn, .cl-close-btn, .cl-cancel-btn,
 .bm-close, .bm-link {
   touch-action: manipulation;

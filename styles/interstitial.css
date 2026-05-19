@@ -540,9 +540,8 @@
   #metaBuffs::-webkit-scrollbar { display: none; }
   #metaBuffs .meta-pill { scroll-snap-align: start; }
   #menu { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
-  #contactLogBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
-  #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); }
-  #networkChip   { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 96px); padding: 0 10px; font-size: 12px; }
+  #diagnosticBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+  #networkChip   { top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 48px); padding: 0 10px; font-size: 12px; }
 }
 
 /* Phone-width: collapse buff cards into tappable tiles. The expanded

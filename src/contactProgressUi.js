@@ -23,6 +23,7 @@
 
 import { worldFor } from './contactLog.js';
 import { nextContactMilestone, currentMilestones } from './interstitial.js';
+import { installTap } from './tap.js';
 
 // voice: Kalen. Single line, italic. Rotated per session so a player who lingers
 // on the closed cycle for hours sees the rig speak once, not every poll.
@@ -33,23 +34,25 @@ const FINALE_COPY = [
   'The catalogue for this cycle is shut. Close it. What carries forward, carries.',
 ];
 
+const AMPLITUDE_SCALE = 0.5;       // 1 means it goes to the edge of the canvas
 // Wave/signal tuning. Constants live next to the code per CLAUDE.md.
-const STRING_NODES = 110;           // resolution of the rendered polyline
+const STRING_NODES = 100;           // resolution of the rendered polyline
 // Guitar-string envelope: bumped hard every frame the player's peak is growing,
 // decays exponentially when idle. Tuned so active climbing saturates near 1.0
 // and a stall settles to a flat line in ~2s.
 const ENERGY_DECAY = 1.8;
-const ENERGY_GAIN_PER_GROWTH_FRAME = 0.12;
+const ENERGY_GAIN_PER_GROWTH_FRAME = 0.02;
 // Traveling-wave shape. Temporal × spatial frequency mix gives the wave its
 // motion: cycles_per_sec advances phase in time, spatial_freq sets how many
 // wavelengths fit across the strip. Bigger spatial_freq → reads more clearly
 // as a wave passing through, less as a single bump.
-const WAVE_CYCLES_PER_SEC = 1.8;
-const WAVE_SPATIAL_FREQ = 4.0;
+const WAVE_CYCLES_PER_SEC = 1.66;
+const WAVE_SPATIAL_FREQ = 24.0;
 const CHARGE_PERIOD = 1.55;         // seconds between sparks while energising
-const CHARGE_TRAVEL = 1.30;         // seconds for a spark to cross the line
+const CHARGE_TRAVEL = 1.20;         // seconds for a spark to cross the line
 
-export function initContactProgressUi(state) {
+export function initContactProgressUi(state, deps = {}) {
+  const { openNames, openCycle, openRig, getAffordance } = deps;
   let root = document.getElementById('contactProgress');
   if (!root) {
     root = document.createElement('div');
@@ -57,27 +60,35 @@ export function initContactProgressUi(state) {
     document.body.appendChild(root);
   }
   root.className = 'cp-root';
-  root.setAttribute('aria-hidden', 'true');
+  // The strip's three segments are interactive tab targets — drop the
+  // aria-hidden so screen readers can reach them via the named buttons.
+  root.removeAttribute('aria-hidden');
   root.innerHTML = `
-    <div class="cp-edge cp-edge-left" aria-hidden="true">
+    <button type="button" class="cp-edge cp-edge-left" aria-label="Open Names">
       <div class="cp-edge-glow"></div>
       <i class="ri ri-planet-line"></i>
-    </div>
-    <div class="cp-track">
+    </button>
+    <button type="button" class="cp-track" aria-label="Open Cycle">
       <canvas class="cp-wave" aria-hidden="true"></canvas>
-      <div class="cp-traveler">
+      <div class="cp-traveler" aria-hidden="true">
         <div class="cp-traveler-bob">
           <img class="cp-traveler-img" alt="" />
           <div class="cp-traveler-fallback" aria-hidden="true"></div>
         </div>
       </div>
       <div class="cp-finale" aria-hidden="true"></div>
-    </div>
-    <div class="cp-edge cp-edge-right" aria-hidden="true">
+    </button>
+    <button type="button" class="cp-edge cp-edge-right" aria-label="Open Rig">
       <div class="cp-edge-glow"></div>
       <i class="ri ri-radar-line"></i>
-    </div>
+    </button>
   `;
+  const leftEl = root.querySelector('.cp-edge-left');
+  const trackEl = root.querySelector('.cp-track');
+  const rightEl = root.querySelector('.cp-edge-right');
+  if (typeof openNames === 'function') installTap(leftEl, openNames);
+  if (typeof openCycle === 'function') installTap(trackEl, openCycle);
+  if (typeof openRig === 'function')   installTap(rightEl, openRig);
 
   const travelerEl = root.querySelector('.cp-traveler');
   const travelerImg = root.querySelector('.cp-traveler-img');
@@ -182,7 +193,7 @@ export function initContactProgressUi(state) {
     // The canvas is intentionally taller than the strip (see contactProgress.css)
     // so the wave can swing well past the strip's box. Amplitude caps just
     // shy of the canvas half-height so peaks never clip.
-    const amp = Math.min(H * 0.46, 22 * dpr);
+    const amp = H * 0.25 * AMPLITUDE_SCALE;
 
     // Single stroke — keep the wave line simple so the sparks read as the
     // brighter element. shadowBlur gives the warm bloom around the line.
@@ -251,6 +262,15 @@ export function initContactProgressUi(state) {
     const visible = shouldShow();
     root.classList.toggle('cp-visible', visible);
     if (!visible) return;
+
+    // Affordance pulse states pulled fresh per tick from contactLogUi.
+    // cycleReady drives the center wave pulse; namesUnread drives the left
+    // planet pulse. Missing affordance source = silent strip, no pulses.
+    if (typeof getAffordance === 'function') {
+      const a = getAffordance() || {};
+      trackEl.classList.toggle('is-ready', !!a.cycleReady);
+      leftEl.classList.toggle('is-unread', !!a.namesUnread);
+    }
 
     const next = nextContactMilestone(state);
     if (!next) {

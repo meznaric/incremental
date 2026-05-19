@@ -80,7 +80,7 @@
   <div id="topHud" class="top-hud" aria-hidden="true">
     <div class="th-amount">
       <div class="th-amount-main">
-        <i class="ri-broadcast-fill th-amount-icon"></i><span class="th-amount-num">0</span>
+        <i class="ri-voiceprint-fill th-amount-icon"></i><span class="th-amount-num">0</span>
       </div>
       <div class="th-amount-period"></div>
     </div>
@@ -107,7 +107,7 @@
       <div class="menu-view" data-view="debug">
         <div class="menu-back"><button type="button" class="back-btn" data-action="back"><i class="ri ri-arrow-left-line"></i></button>Debug</div>
         <div class="row">
-          <label for="amountInput"><i class="ri-broadcast-fill cc-icon"></i> Echoes</label>
+          <label for="amountInput"><i class="ri-voiceprint-fill cc-icon"></i> Echoes</label>
           <input id="amountInput" type="text" autocomplete="off" spellcheck="false" />
         </div>
         <div class="row">
@@ -181,10 +181,6 @@
     <i class="ri ri-pulse-line"></i>
   </button>
 
-  <button id="contactLogBtn" class="panel cl-btn" type="button" aria-label="Open Contact Log">
-    <i class="ri ri-radar-line"></i>
-  </button>
-
   <button id="networkChip" class="panel net-chip" type="button" aria-label="Open Seed Relay network" style="display:none">
     <i class="ri ri-share-circle-line"></i>
     <span class="net-chip-label">0</span>
@@ -231,14 +227,10 @@
   <div id="contactLogModal" role="dialog" aria-modal="true" aria-label="Contact Log">
     <div class="bm-card">
       <div class="bm-head">
+        <span class="bm-title">Cycle</span>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body">
-        <div class="cl-tabs" role="tablist">
-          <button type="button" class="cl-tab is-active" data-tab="cycle" role="tab" aria-selected="true">Cycle</button>
-          <button type="button" class="cl-tab" data-tab="names" role="tab" aria-selected="false">Names</button>
-          <button type="button" class="cl-tab" data-tab="rig" role="tab" aria-selected="false">Rig</button>
-        </div>
         <div class="cl-panel is-active" data-panel="cycle" role="tabpanel">
           <div class="cl-intro"></div>
           <div class="cl-progress"></div>

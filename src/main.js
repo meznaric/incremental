@@ -105,6 +105,9 @@ const contactLogUi = initContactLogUi(state, {
     checkEngraving(state, id);
     saveContactLog(state.contactLog);
   },
+  // Persist after opening the Names panel — that hop clears the unread
+  // counter so the planet pulse doesn't fire forever after first read.
+  onLogPersist() { saveContactLog(state.contactLog); },
 });
 const breakdownUi = initBreakdownUi(state);
 const achievementsUi = initAchievementsUi(state);
@@ -211,7 +214,12 @@ const debugUi = initDebugUi(state, {
   refreshShop: () => ui.renderShop(),
   refreshNetwork: () => networkUi.refresh(),
 });
-const contactProgressUi = initContactProgressUi(state);
+const contactProgressUi = initContactProgressUi(state, {
+  openNames: () => contactLogUi.openPanel('names'),
+  openCycle: () => contactLogUi.openPanel('cycle'),
+  openRig:   () => contactLogUi.openPanel('rig'),
+  getAffordance: () => contactLogUi.getAffordance(),
+});
 
 const loaded = loadState(state);
 // Back-fill the Contact Log from any milestones already marked shown by an
@@ -462,9 +470,8 @@ function tick(raf) {
   if (Number.isFinite(accrual)) state.amount += accrual;
   else console.warn('integrateRate produced non-finite value', accrual);
   checkAmount(state, state.amount);
-  // Reflect cycle-complete on the top-right contact-log button. Cheap; just
-  // a class toggle. Drives the green pulse + the "ready" hint inside the modal.
-  contactLogUi.updateAffordance();
+  // contactProgressUi.update pulls cycleReady / namesUnread from
+  // contactLogUi.getAffordance every tick — no separate affordance call needed.
 
   let buffCount = 0;
   const bs = state.buffs;

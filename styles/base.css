@@ -204,7 +204,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   line-height: 1.45;
   max-width: 220px;
 }
-#contactLogBtn, #diagnosticBtn {
+#diagnosticBtn {
   top: 16px;
   padding: 0;
   width: 40px;
@@ -218,9 +218,8 @@ input[type="text"]:focus { border-color: #6688ff; }
   z-index: 50;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  right: 16px;
 }
-#contactLogBtn { right: 16px; }
-#diagnosticBtn { right: 64px; }
 #networkChip {
   top: 16px;
   right: 112px;
@@ -292,7 +291,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   15%  { opacity: 1; }
   100% { transform: translateX(-50%) translateY(-26px); opacity: 0; }
 }
-#contactLogBtn:hover, #diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
+#diagnosticBtn:hover { color: #8aa0ff; border-color: #8aa0ff; }
 /* Anomaly counter — deliberately ugly. Top-right, under the buttons.
    No background, no border, no glow. Dirty red, low opacity, monospace.
    The player should be able to ignore it for a long time, then notice. */
@@ -315,34 +314,7 @@ input[type="text"]:focus { border-color: #6688ff; }
 @media (max-width: 820px) {
   .anomaly-count { top: max(54px, calc(env(safe-area-inset-top) + 46px)); right: max(8px, env(safe-area-inset-right)); font-size: 9px; }
 }
-#contactLogBtn .ri, #diagnosticBtn .ri { line-height: 1; }
-/* Green pulse on the contact-log button once every contact of the
-   current EP has been logged. The player is invited to close the cycle; the
-   pulse is the only out-of-modal hint. Subtle by design — a soft glow
-   breathing on a slow loop, not a hard blink. */
-#contactLogBtn.is-ready {
-  color: #6fe8a1;
-  border-color: rgba(111, 232, 161, 0.55);
-  animation: cl-btn-pulse 2.4s ease-in-out infinite;
-}
-#contactLogBtn.is-ready::after {
-  content: '';
-  position: absolute;
-  top: -3px; right: -3px;
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  background: #6fe8a1;
-  box-shadow: 0 0 8px rgba(111, 232, 161, 0.9);
-  animation: cl-dot-pulse 1.6s ease-in-out infinite;
-}
-@keyframes cl-btn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(111, 232, 161, 0.0); }
-  50%      { box-shadow: 0 0 14px 2px rgba(111, 232, 161, 0.45); }
-}
-@keyframes cl-dot-pulse {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(1.25); }
-}
+#diagnosticBtn .ri { line-height: 1; }
 .top-hud {
   position: fixed;
   /* env() clears the iOS notch when installed as a PWA (viewport-fit=cover
@@ -811,53 +783,6 @@ input[type="text"]:focus { border-color: #6688ff; }
 .cl-ep-meaning.s-collapsed { color: #d96675; }
 .cl-ep-meaning.s-shifted   { color: #9d8edc; }
 .cl-ep-meaning.s-missing   { color: #6aa3d8; }
-.cl-tabs {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid rgba(120, 140, 255, 0.18);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: rgba(20, 20, 40, 0.95);
-  backdrop-filter: blur(6px);
-  margin-left: -16px;
-  margin-right: -16px;
-  padding: 0 16px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  /* Lock the strip to horizontal pans only — vertical swipes fall through to
-     .bm-body so the panel content keeps scrolling normally when the user
-     drags down on the tab row. */
-  touch-action: pan-x;
-  /* Cover the 14px margin-bottom gap so panel content scrolling up doesn't
-     show through underneath the sticky strip. */
-  box-shadow: 0 14px 0 0 rgba(20, 20, 40, 0.95);
-}
-.cl-tabs::-webkit-scrollbar { display: none; }
-.cl-tab {
-  background: transparent;
-  border: 0;
-  color: #8a8ac0;
-  font-family: inherit;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  padding: 9px 14px 10px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  white-space: nowrap;
-  transition: color 0.12s ease, border-color 0.12s ease;
-}
-.cl-tab:hover { color: #d49a55; }
-.cl-tab.is-active {
-  color: #d49a55;
-  border-bottom-color: #d49a55;
-}
 .cl-panel { display: none; }
 .cl-panel.is-active { display: block; }
 .cl-legend {
@@ -1133,7 +1058,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   display: flex;
   flex-wrap: nowrap;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 8px 10px 0;
   justify-content: flex-start;
   overflow-x: auto;
   scrollbar-width: none;

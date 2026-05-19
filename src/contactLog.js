@@ -111,6 +111,10 @@ const fresh = () => ({
   run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
   pattern: null, pendingPatternChoice: false, patternUsed: {}, patternCompleted: {},
   loopMode: false, loopCycles: 0,
+  // Count of worlds the player had on the log the last time they opened the
+  // Names panel. hasUnreadNames(log) flips true when worlds.length exceeds it,
+  // which the contact-progress strip surfaces as a pulse on the left planet.
+  lastNamesSeenCount: 0,
 });
 
 // Returns a plain object always — never null. Defensive against corrupted or
@@ -166,12 +170,19 @@ export function loadContactLog() {
   const loopCycles = Number.isFinite(s.loopCycles) && s.loopCycles >= 0
     ? Math.floor(s.loopCycles)
     : 0;
+  // Migrate legacy saves with no acknowledgement counter to the current count
+  // so the unread pulse doesn't fire retroactively for names they already saw
+  // before this feature shipped.
+  const lastNamesSeenCount = Number.isFinite(s.lastNamesSeenCount) && s.lastNamesSeenCount >= 0
+    ? Math.floor(s.lastNamesSeenCount)
+    : worlds.length;
   return {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     introSeen, pickedName,
     pattern, pendingPatternChoice, patternUsed, patternCompleted,
     loopMode, loopCycles,
+    lastNamesSeenCount,
   };
 }
 
@@ -251,6 +262,21 @@ export function sortedWorlds(log) {
 
 export function getRun(log) {
   return (log && log.run) || 1;
+}
+
+// True when at least one world has been added to the log since the player last
+// opened the Names panel. Drives the pulse on the contactProgress left planet.
+export function hasUnreadNames(log) {
+  if (!log || !Array.isArray(log.worlds)) return false;
+  const seen = Number.isFinite(log.lastNamesSeenCount) ? log.lastNamesSeenCount : 0;
+  return log.worlds.length > seen;
+}
+
+// Acknowledge every world currently on the log. Called when the player opens
+// the Names panel — clears hasUnreadNames(log) until a fresh world lands.
+export function markNamesSeen(log) {
+  if (!log || !Array.isArray(log.worlds)) return;
+  log.lastNamesSeenCount = log.worlds.length;
 }
 
 // Called by the cycle-close action ("Close the Cycle") to start the next run.

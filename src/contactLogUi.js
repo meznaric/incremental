@@ -6,21 +6,26 @@ import {
   worldDetail, STATUS_MEANING,
   echoLoopLevel, isLoopMode,
   ALL_WORLDS,
+  hasUnreadNames, markNamesSeen,
 } from './contactLog.js';
 import { nextContactMilestone, currentMilestones, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
 import { getPattern } from './cyclePatterns.js';
 import { installTap } from './tap.js';
 
-// The Contact Log is the only player-facing surface for the cycle-close loop.
-// Header strip shows cycle/contacts/memory. The "Close the Cycle" action
-// reveals a two-stage confirm — first click arms it, second click commits.
-// The list groups worlds by the cycle that recorded them so the player can
-// see their history layer by layer.
+// The Contact Log is the player-facing surface for the cycle-close loop.
+// Three panels — Cycle / Names / Rig — each opened by tapping its segment on
+// the contactProgress strip. The visible tab strip was retired with that
+// rewire; only one panel is shown at a time, driven by openPanel(name).
+// The "Close the Cycle" action reveals a two-stage confirm — first click arms
+// it, second click commits. The Names panel groups worlds by the cycle that
+// recorded them so the player can see their history layer by layer.
+const PANEL_TITLES = { cycle: 'Cycle', names: 'Names', rig: 'Rig' };
+
 export function initContactLogUi(state, opts = {}) {
-  const btn = document.getElementById('contactLogBtn');
   const modal = document.getElementById('contactLogModal');
   const body = modal.querySelector('.cl-body');
+  const titleEl = modal.querySelector('.bm-title');
   const introEl = modal.querySelector('.cl-intro');
   const progressEl = modal.querySelector('.cl-progress');
   const hookEl = modal.querySelector('.cl-hook');
@@ -31,7 +36,6 @@ export function initContactLogUi(state, opts = {}) {
   const namesHeadEl = modal.querySelector('.cl-names-head');
   const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
-  const tabEls = Array.from(modal.querySelectorAll('.cl-tab'));
   const panelEls = Array.from(modal.querySelectorAll('.cl-panel'));
   let armed = false;
   let activeTab = 'cycle';
@@ -45,11 +49,8 @@ export function initContactLogUi(state, opts = {}) {
 
   function setActiveTab(name) {
     activeTab = name;
-    for (const t of tabEls) {
-      const on = t.dataset.tab === name;
-      t.classList.toggle('is-active', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    }
+    if (titleEl) titleEl.textContent = PANEL_TITLES[name] || '';
+    modal.dataset.panel = name;
     for (const p of panelEls) {
       p.classList.toggle('is-active', p.dataset.panel === name);
     }
@@ -484,26 +485,35 @@ export function initContactLogUi(state, opts = {}) {
     renderPending();
   }
 
-  const open = () => { armed = false; statusFilter = 'all'; setActiveTab('cycle'); render(); modal.classList.add('open'); };
+  const openPanel = (panel) => {
+    const name = PANEL_TITLES[panel] ? panel : 'cycle';
+    armed = false;
+    statusFilter = 'all';
+    setActiveTab(name);
+    if (name === 'names') {
+      // Opening the panel counts as acknowledging every world currently logged.
+      markNamesSeen(state.contactLog);
+      if (typeof opts.onLogPersist === 'function') opts.onLogPersist();
+    }
+    render();
+    modal.classList.add('open');
+  };
   const close = () => { armed = false; modal.classList.remove('open'); };
 
-  // Reflect cycle-complete on the top-right contact-log button so the player
-  // notices the cycle close is available without having to open the modal first.
-  // main.js calls this from the tick loop after checkAmount runs. In Loop
-  // mode the button stays pulsing as long as the close is legal — the player
-  // can close the cycle whenever they like.
-  const updateAffordance = () => {
+  // Affordance state surfaced to the contactProgress strip. cycleReady drives
+  // the pulse on the center wave segment; namesUnread drives the pulse on the
+  // left planet. In Loop mode the close is always legal — the pulse stays on
+  // as long as canCloseCycle agrees.
+  const getAffordance = () => {
     const log = state.contactLog;
-    const ready = canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state));
-    btn.classList.toggle('is-ready', ready);
+    return {
+      cycleReady: canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state)),
+      namesUnread: hasUnreadNames(log),
+    };
   };
-
-  installTap(btn, open);
 
   function handleModalAction(_e, target) {
     if (target === modal || target.closest('.bm-close')) { close(); return; }
-    const tab = target.closest('.cl-tab');
-    if (tab && tab.dataset.tab) { setActiveTab(tab.dataset.tab); return; }
     const t = target.closest('[data-act]');
     const act = t?.dataset.act;
     if (!act) return;
@@ -537,24 +547,9 @@ export function initContactLogUi(state, opts = {}) {
     }
   }
   installTap(modal, handleModalAction);
-  // Desktop only: translate vertical wheel into horizontal scroll on the tab
-  // strip. Touch devices already pan natively; trackpad horizontal deltas
-  // pass through untouched.
-  const tabsEl = modal.querySelector('.cl-tabs');
-  if (tabsEl && !window.matchMedia('(pointer: coarse)').matches) {
-    tabsEl.addEventListener('wheel', (e) => {
-      if (e.deltaY === 0 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-      tabsEl.scrollLeft += e.deltaY;
-      e.preventDefault();
-    }, { passive: false });
-  }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) close();
   });
 
-  // First paint of the affordance state in case the player loads into a
-  // cycle they had already finished.
-  updateAffordance();
-
-  return { open, close, render, updateAffordance };
+  return { openPanel, close, render, getAffordance };
 }

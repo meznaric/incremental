@@ -879,11 +879,22 @@ class Column {
       gfxT = (now - gfx.startedAt) / gfx.durationS;
       if (gfxT >= 1) { this._clearGambleFx(); }
     }
+    let dirty = false;
     for (const p of this.particles) {
       if (p.state === 'idle') {
-        im.setMatrixAt(p.index, _hiddenMat);
+        // The hidden matrix is constant — once we've written it for this
+        // particle we never need to write it again until the particle leaves
+        // the idle pool. Pool size is 320 per column and most are idle most
+        // of the time; this skips the bulk of the per-frame instance writes.
+        if (!p._idleWritten) {
+          im.setMatrixAt(p.index, _hiddenMat);
+          p._idleWritten = true;
+          dirty = true;
+        }
         continue;
       }
+      p._idleWritten = false;
+      dirty = true;
       let px = p.x, py = p.y, pz = p.z || 0;
       let opacity = p.opacity;
       let scaleMul = 1;
@@ -1005,8 +1016,14 @@ class Column {
       _color.r *= tintR; _color.g *= tintG; _color.b *= tintB;
       im.setColorAt(p.index, _color);
     }
-    im.instanceMatrix.needsUpdate = true;
-    im.instanceColor.needsUpdate = true;
+    // Skip the GPU upload flag when no instance actually changed this frame —
+    // every active column otherwise re-uploads its whole instance buffer per
+    // frame. A column with all particles idle (e.g. mid-fade-out, or briefly
+    // between fills) now contributes zero GPU work.
+    if (dirty) {
+      im.instanceMatrix.needsUpdate = true;
+      im.instanceColor.needsUpdate = true;
+    }
   }
 }
 

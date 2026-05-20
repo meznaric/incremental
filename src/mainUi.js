@@ -961,7 +961,13 @@ export function initMainUi(state, deps) {
     renderedBuffs = items;
     buffsEl.style.display = items.length ? 'flex' : 'none';
     // Secondary first in DOM so column flow stacks it above primary.
-    buffsEl.innerHTML = groupHtml.join('') + secondaryHtml + primaryHtml;
+    // setHtmlIfChanged is the same diff-then-write helper renderMetaBuffs
+    // uses — when the buff signature (kinds × counts × rounded bar %) lands
+    // on the same string, we skip the DOM teardown entirely. Saves 10 full
+    // innerHTML rewrites/sec when no buffs are active, and culls a healthy
+    // share of redundant rewrites when buffs are active but bar widths
+    // round identically across ticks.
+    setHtmlIfChanged(buffsEl, groupHtml.join('') + secondaryHtml + primaryHtml);
     // Body flag so #metaBuffs can lift to clear the secondary row when shown.
     document.body.classList.toggle('buffs-expanded', !!expandKind);
     if (expandedBuffKind) {

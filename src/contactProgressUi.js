@@ -166,13 +166,33 @@ export function initContactProgressUi(state, deps = {}) {
     return hasWorlds || !!log.firstContactSeen;
   }
 
-  // Canvas backing-store sync — read CSS box, scale by DPR for crisp lines.
+  // Canvas backing-store sync. Canvas CSS box only changes on layout events
+  // (window resize, hover bump that re-flows --seg-size, shop height tween),
+  // not per frame — so a ResizeObserver feeds the latest size into a cached
+  // pair and syncCanvas just reads it. Eliminates a forced layout read every
+  // frame the strip is visible.
+  let cssW = 0;
+  let cssH = 0;
+  const canvasObserver = new ResizeObserver((entries) => {
+    for (const e of entries) {
+      const r = e.contentRect;
+      cssW = r.width;
+      cssH = r.height;
+    }
+  });
+  canvasObserver.observe(canvas);
   function syncCanvas() {
-    const r = canvas.getBoundingClientRect();
-    if (!r.width || !r.height) return false;
+    if (!cssW || !cssH) {
+      // First frame before the observer has fired. One bounding read primes
+      // the cache; subsequent frames hit the cached path.
+      const r = canvas.getBoundingClientRect();
+      cssW = r.width;
+      cssH = r.height;
+      if (!cssW || !cssH) return false;
+    }
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(r.width * dpr));
-    const h = Math.max(1, Math.round(r.height * dpr));
+    const w = Math.max(1, Math.round(cssW * dpr));
+    const h = Math.max(1, Math.round(cssH * dpr));
     if (w !== canvas.width || h !== canvas.height) {
       canvas.width = w;
       canvas.height = h;

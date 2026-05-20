@@ -412,7 +412,11 @@ export function initBreakdownUi(state) {
   }
 
   function renderAll() {
-    // Static panels render once on open; Pulse re-renders on its own timer.
+    // Kept for external callers / debug — renders every panel up-front. The
+    // open path no longer uses it; setActiveTab already renders the tab the
+    // player lands on, and each later tab switch renders the newly-activated
+    // tab. Hidden tabs stay un-rendered until first visit, saving five
+    // DOM-building passes on every modal open.
     renderPulse();
     renderConsole();
     renderWindows();
@@ -424,7 +428,6 @@ export function initBreakdownUi(state) {
   const open = (initialTab) => {
     const tab = (initialTab && renderers[initialTab]) ? initialTab : 'pulse';
     setActiveTab(tab);
-    renderAll();
     modal.classList.add('open');
     if (timer == null) timer = setInterval(() => {
       if (activeTab === 'pulse') renderPulse();

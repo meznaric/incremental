@@ -477,46 +477,38 @@ export function initContactLogUi(state, opts = {}) {
     `;
   }
 
-  function renderMemoryInfo() {
-    if (!memoryInfoEl) return;
-    memoryInfoEl.innerHTML = `
-      <div class="faq-block kind-memory">
-        <div class="faq-head"><i class="ri ri-database-2-line"></i>How Echo Memory works</div>
-        <div class="faq-body">
-          <p><strong>Earn:</strong> one shard per name on the log. Across every cycle, every episode. Eighty-plus shards if I log every contact.</p>
-          <p><strong>What it does:</strong> each shard adds <strong>+10%</strong> to base Echoes/s, applied <em>before</em> every other multiplier.</p>
-          <p><strong>Never lost.</strong> The names stay. This number only ever climbs.</p>
-        </div>
+  // Static FAQ panels — hardcoded HTML, no state interpolation. Rendered once
+  // at init so the modal's render() pass doesn't rebuild three identical
+  // innerHTMLs on every open / entry toggle / engraving buy.
+  if (memoryInfoEl) memoryInfoEl.innerHTML = `
+    <div class="faq-block kind-memory">
+      <div class="faq-head"><i class="ri ri-database-2-line"></i>How Echo Memory works</div>
+      <div class="faq-body">
+        <p><strong>Earn:</strong> one shard per name on the log. Across every cycle, every episode. Eighty-plus shards if I log every contact.</p>
+        <p><strong>What it does:</strong> each shard adds <strong>+10%</strong> to base Echoes/s, applied <em>before</em> every other multiplier.</p>
+        <p><strong>Never lost.</strong> The names stay. This number only ever climbs.</p>
       </div>
-    `;
-  }
-
-  function renderMassInfo() {
-    if (!massInfoEl) return;
-    massInfoEl.innerHTML = `
-      <div class="faq-block kind-mass">
-        <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Carrier Mass works</div>
-        <div class="faq-body">
-          <p><strong>Earn:</strong> banked at cycle close from the cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
-          <p><strong>Spend:</strong> Engravings above — permanent cuts to the rig.</p>
-          <p><strong>Tip:</strong> peak is what counts, not the closing balance. Spike the rate before I close.</p>
-        </div>
+    </div>
+  `;
+  if (massInfoEl) massInfoEl.innerHTML = `
+    <div class="faq-block kind-mass">
+      <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Carrier Mass works</div>
+      <div class="faq-body">
+        <p><strong>Earn:</strong> banked at cycle close from the cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
+        <p><strong>Spend:</strong> Engravings above — permanent cuts to the rig.</p>
+        <p><strong>Tip:</strong> peak is what counts, not the closing balance. Spike the rate before I close.</p>
       </div>
-    `;
-  }
-
-  function renderCloseInfo() {
-    if (!closeInfoEl) return;
-    closeInfoEl.innerHTML = `
-      <div class="faq-block">
-        <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
-        <div class="faq-body">
-          <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
-          <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
-        </div>
+    </div>
+  `;
+  if (closeInfoEl) closeInfoEl.innerHTML = `
+    <div class="faq-block">
+      <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
+      <div class="faq-body">
+        <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
+        <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
       </div>
-    `;
-  }
+    </div>
+  `;
 
   function render() {
     renderIntro();
@@ -529,9 +521,6 @@ export function initContactLogUi(state, opts = {}) {
     renderNamesHead();
     renderList();
     renderPending();
-    renderMemoryInfo();
-    renderMassInfo();
-    renderCloseInfo();
   }
 
   const openPanel = (panel) => {
@@ -558,13 +547,16 @@ export function initContactLogUi(state, opts = {}) {
   // the pulse on the center wave segment; namesUnread drives the pulse on the
   // left planet. In Loop mode the close is always legal — the pulse stays on
   // as long as canCloseCycle agrees.
+  // Reuse the same object instance every call — getAffordance is invoked from
+  // the strip's per-frame update(), so a fresh literal each tick was 60 GC'd
+  // throwaway objects per second.
+  const _affordance = { cycleReady: false, namesUnread: false, rigUnread: false };
   const getAffordance = () => {
     const log = state.contactLog;
-    return {
-      cycleReady: canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state)),
-      namesUnread: hasUnreadNames(log),
-      rigUnread: hasUnreadRig(log),
-    };
+    _affordance.cycleReady = canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state));
+    _affordance.namesUnread = hasUnreadNames(log);
+    _affordance.rigUnread = hasUnreadRig(log);
+    return _affordance;
   };
 
   function handleModalAction(_e, target) {

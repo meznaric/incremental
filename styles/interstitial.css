@@ -499,7 +499,7 @@
     /* +cp-h so the mobile horizontal buff row clears the Contact Progress
        icons that overflow upward out of the thin strip below. cp-h is 0
        when the strip is hidden. */
-    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) + 8px);
+    bottom: calc(var(--shop-h, 200px) + var(--cp-h, 0px) - 8px);
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;

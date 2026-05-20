@@ -222,7 +222,7 @@ input[type="text"]:focus { border-color: #6688ff; }
 }
 #networkChip {
   top: 16px;
-  right: 112px;
+  right: 64px;
   padding: 0 12px;
   height: 40px;
   min-width: 40px;
@@ -545,7 +545,7 @@ input[type="text"]:focus { border-color: #6688ff; }
   align-items: baseline;
   padding: 8px 0 6px;
   position: sticky;
-  top: 41px;
+  top: -8px;
   z-index: 1;
   background: rgba(20, 20, 40, 0.95);
   backdrop-filter: blur(6px);
@@ -748,8 +748,9 @@ input[type="text"]:focus { border-color: #6688ff; }
 .cl-group-list li:first-child { border-top: none; }
 .cl-name {
   font-size: 13px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   color: #e8e8f0;
+  font-weight: 600;
 }
 .cl-ep {
   font-size: 10px;
@@ -775,9 +776,10 @@ input[type="text"]:focus { border-color: #6688ff; }
 .cl-status.s-missing   { color: #4ea8ff; background: rgba(78, 168, 255, 0.10); }
 .cl-ep-meaning {
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
   color: #8a8ac0;
-  margin-top: 3px;
 }
 .cl-ep-meaning.s-triggered { color: #d9803a; }
 .cl-ep-meaning.s-collapsed { color: #d96675; }
@@ -835,36 +837,6 @@ input[type="text"]:focus { border-color: #6688ff; }
 .cl-summary .s-collapsed { color: #d96675; }
 .cl-summary .s-shifted   { color: #9d8edc; }
 .cl-summary .s-missing   { color: #6aa3d8; }
-.cl-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.cl-filter {
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-weight: 600;
-  padding: 5px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(120, 140, 255, 0.25);
-  background: rgba(20, 20, 40, 0.55);
-  color: #aab0d0;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.cl-filter:hover { color: #e8e8f0; border-color: rgba(120, 140, 255, 0.5); }
-.cl-filter.is-active {
-  color: #e8e8f0;
-  border-color: rgba(212, 154, 85, 0.7);
-  background: rgba(212, 154, 85, 0.12);
-}
-.cl-filter.s-triggered.is-active { border-color: rgba(255, 138, 58, 0.7); background: rgba(255, 138, 58, 0.12); color: #ff8a3a; }
-.cl-filter.s-collapsed.is-active { border-color: rgba(255, 90, 110, 0.7); background: rgba(255, 90, 110, 0.12); color: #ff5a6e; }
-.cl-filter.s-shifted.is-active   { border-color: rgba(157, 110, 224, 0.7); background: rgba(157, 110, 224, 0.12); color: #9d6ee0; }
-.cl-filter.s-missing.is-active   { border-color: rgba(78, 168, 255, 0.7); background: rgba(78, 168, 255, 0.12); color: #4ea8ff; }
 .cl-hook {
   font-size: 12px;
   color: #aab0d0;
@@ -877,11 +849,9 @@ input[type="text"]:focus { border-color: #6688ff; }
 .cl-hook:empty { display: none; }
 .cl-entry {
   width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 4px;
+  position: relative;
+  display: block;
+  padding: 10px 30px 12px 12px;
   background: transparent;
   border: 0;
   color: inherit;
@@ -891,15 +861,42 @@ input[type="text"]:focus { border-color: #6688ff; }
   letter-spacing: inherit;
 }
 .cl-entry:hover { background: rgba(76, 208, 125, 0.06); }
-.cl-entry-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.cl-entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.cl-entry-body {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.cl-entry-text > * { margin: 0; }
+.cl-entry-text > * + * { margin-top: 4px; }
+.cl-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(212, 154, 85, 0.45);
+  background: rgba(20, 20, 40, 0.6);
+  margin-top: 2px;
 }
 .cl-entry-chev {
+  position: absolute;
+  right: 10px;
+  top: 12px;
   color: #6a6a90;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
+}
+.cl-consequence {
+  font-size: 11px;
+  color: #aab0d0;
+  line-height: 1.5;
 }
 .cl-group-list li.contacted {
   background: rgba(20, 20, 40, 0.4);
@@ -973,11 +970,17 @@ input[type="text"]:focus { border-color: #6688ff; }
 }
 .cl-detail-row dd { margin: 0; color: #aab0d0; }
 .cl-detail-note {
-  margin: 10px 0 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 13px;
   color: #d49a55;
   line-height: 1.5;
 }
+.cl-memory-info,
+.cl-mass-info,
+.cl-close-info { margin-top: 16px; }
+.cl-memory-info:empty,
+.cl-mass-info:empty,
+.cl-close-info:empty { display: none; }
 .cl-detail-empty {
   margin: 4px 0 0;
   font-size: 11px;

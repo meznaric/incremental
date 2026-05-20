@@ -1,6 +1,7 @@
 import { INTERSTITIALS, FIRST_CONTACT_ID, VOICE_META, resolveStepVoice } from './interstitial.js';
 import { worldFor } from './contactLog.js';
 import { installTap } from './tap.js';
+import { isGambleFxActive } from './gambleFx.js';
 
 const TYPE_MS_PER_CHAR = 22;
 // Text-driven dwell: auto-advance time for a non-final step is computed from
@@ -416,9 +417,10 @@ export function makeInterstitialUi(state, onShown) {
 
   // Called when the typewriter for the current step finishes (either naturally
   // or because the user skipped it). The final step ALWAYS waits for input —
-  // it never receives an autoTimer. Earlier steps get a text-length-based
-  // dwell. This is the *only* place autoTimer is set, which keeps the "no
-  // timer can call close()" contract trivial to verify.
+  // it never receives an autoTimer. Earlier steps wait for input too, except
+  // in the year-stamped intro transcript pages, which auto-flow so the
+  // cinematic page-turn reads as one beat. This is the *only* place autoTimer
+  // is set, which keeps the "no timer can call close()" contract trivial.
   function finishStepDwell() {
     if (!active) return;
     const step = active.def.steps[active.stepIdx];
@@ -428,7 +430,11 @@ export function makeInterstitialUi(state, onShown) {
     const def = active.def;
     const inputDef = def && def.input;
     const ownsInput = !!(inputDef && (inputDef.onStep ?? def.steps.length - 1) === active.stepIdx);
-    if (isLast || ownsInput) {
+    // Only intro transcript pages (the ones stamped with the in-world year)
+    // auto-advance. Every other interstitial waits for a tap so contact notes
+    // and Hail beats don't out-pace the player's reading.
+    const autoFlows = !!(def && def.introStamp);
+    if (isLast || ownsInput || !autoFlows) {
       waitingInput = true;
       autoTimer = 0;
       return;
@@ -439,6 +445,10 @@ export function makeInterstitialUi(state, onShown) {
 
   function drain() {
     if (active) return;
+    // A Hail reveal banner is on screen — let it land before any queued
+    // interstitial (first_gamble, all_in_zero, tenth_loss) overlays it. The
+    // banner's fade-out clears _active; the next rAF will retry the drain.
+    if (isGambleFxActive()) return;
     const next = state.messages.queue[0];
     if (next) open(next);
   }

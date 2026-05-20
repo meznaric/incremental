@@ -12,15 +12,17 @@ import {
 } from './network.js';
 import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS } from './shop.js';
 
-// Signal Diagnostic — seven tabs:
+// Signal Diagnostic — six tabs:
 //   Pulse     — live rate factorisation (the original content)
 //   Console   — Re-roll and Lock Bands — how the bands behave
 //   Windows   — four buff kinds with stacking rules + provenance
 //   Hail      — gamble loop in plain language
 //   Network   — Seed Relay placement system: sectors, clustering, discovery, drip
-//   Persist   — Echo Memory + Carrier Mass + what survives close
 //   Glossary  — lore label → mechanic bridge for every shop kind
-// Voice: Sera (procedural, second person). She narrates the rig.
+// The Echo Memory / Carrier Mass / cycle-close explainers used to live here
+// under a "Names & Mass" tab — those moved to the Names, Rig, and Cycle
+// panels of the Contact Log so the explanation sits next to the thing it
+// describes. Voice: Sera (procedural, second person). She narrates the rig.
 export function initBreakdownUi(state) {
   const btn = document.getElementById('diagnosticBtn');
   const modal = document.getElementById('diagnosticModal');
@@ -73,7 +75,7 @@ export function initBreakdownUi(state) {
       <tr>
         <td>Lock Bands ${['I','II','III','IV','V'][i]}</td>
         <td>${i + 1} lock${i === 0 ? '' : 's'}</td>
-        <td><i class="ri ri-broadcast-fill cc-icon"></i>${fmtCost(c)}</td>
+        <td><i class="ri ri-voiceprint-fill cc-icon"></i>${fmtCost(c)}</td>
       </tr>
     `).join('');
     const pctLabel = `${(REROLL_PCT_PER_SLOT * 100).toFixed(1)}%`;
@@ -164,7 +166,7 @@ export function initBreakdownUi(state) {
     p.innerHTML = `
       <p class="diag-intro">A Hail is a wager. You spend Echoes for a roll. It is the only way to land a sudden balance jump that compounds the rest of your cycle.</p>
       <div class="faq-block kind-hail">
-        <div class="faq-head"><i class="ri ri-broadcast-line"></i>The loop</div>
+        <div class="faq-head"><i class="ri ri-voiceprint-line"></i>The loop</div>
         <div class="faq-body">
           <p><strong>Wager.</strong> On purchase you pay the listed % of your current balance.</p>
           <p><strong>Roll.</strong> A random check against the Carry chance shown on the card.</p>
@@ -306,7 +308,7 @@ export function initBreakdownUi(state) {
       </div>
 
       <div class="faq-block">
-        <div class="faq-head"><i class="ri ri-broadcast-line"></i>Coverage — the global multiplier</div>
+        <div class="faq-head"><i class="ri ri-voiceprint-line"></i>Coverage — the global multiplier</div>
         <div class="faq-body">
           <p>For every distinct sector that has ≥1 online relay, the mesh's combined yield is multiplied by +${(COVERAGE_BONUS_PER_SECTOR * 100).toFixed(0)}%. Stack the bonus by spreading: 1 sector → ${coveragePct(1)}. 3 sectors → ${coveragePct(3)}. All six → ${coveragePct(6)}.</p>
           <p>This is the reason to plant in Listener Watch even though you know you'll lose it — one short-lived relay there opens a global +6% across every relay you own.</p>
@@ -342,38 +344,6 @@ export function initBreakdownUi(state) {
     `;
   }
 
-  function renderPersist() {
-    const p = panel('persist');
-    if (!p) return;
-    p.innerHTML = `
-      <p class="diag-intro">Two currencies survive a cycle close. Everything in the shop does not.</p>
-      <div class="faq-block kind-memory">
-        <div class="faq-head"><i class="ri ri-database-2-line"></i>Echo Memory</div>
-        <div class="faq-body">
-          <p><strong>Earn:</strong> one shard per name on the Contact Log. Across all eight episodes, that's 80+ shards if you log every contact.</p>
-          <p><strong>What it does:</strong> each shard adds +10% to base Echoes/s. Applied <strong>before</strong> every other multiplier.</p>
-          <p><strong>Never lost.</strong> The names stay on the log forever. This number only ever climbs.</p>
-        </div>
-      </div>
-      <div class="faq-block kind-mass">
-        <div class="faq-head"><i class="ri ri-scales-3-line"></i>Carrier Mass</div>
-        <div class="faq-body">
-          <p><strong>Earn:</strong> banked at cycle close from this cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
-          <p><strong>Spend:</strong> Carrier Engravings — permanent cuts to the rig — in the Contact Log <strong>Rig tab</strong>.</p>
-          <p><strong>Tip:</strong> peak is what counts, not your closing balance. Spike the rate before you close.</p>
-        </div>
-      </div>
-      <div class="faq-block">
-        <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
-        <div class="faq-body">
-          <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
-          <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
-        </div>
-      </div>
-      <p class="faq-foot">Cycle Patterns (free re-rolls, surge buff, etc.) are picked once per cycle and hold until you close it. Engravings are bought with Mass and cut once.</p>
-    `;
-  }
-
   function renderGlossary() {
     const p = panel('glossary');
     if (!p) return;
@@ -392,7 +362,7 @@ export function initBreakdownUi(state) {
         <div class="faq-body">A timed effect. Four kinds: Carrier (×rate), Carry (Hail luck), Buffer (Hail cushion), Resonance (compounding). See the Windows tab.</div>
       </div>
       <div class="faq-block kind-hail">
-        <div class="faq-head"><i class="ri ri-broadcast-line"></i>Hail <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(gamble)</span></div>
+        <div class="faq-head"><i class="ri ri-voiceprint-line"></i>Hail <span style="color:#7a7a9a;font-weight:400;margin-left:6px;">(gamble)</span></div>
         <div class="faq-body">A wager. Spend Echoes for a roll. Win → multi-X payout. Miss → wager lost, Buffer refunds slice. See the Hail tab.</div>
       </div>
       <div class="faq-block">
@@ -424,7 +394,6 @@ export function initBreakdownUi(state) {
     windows: renderWindows,
     hail: renderHail,
     network: renderNetwork,
-    persist: renderPersist,
     glossary: renderGlossary,
   };
 
@@ -449,7 +418,6 @@ export function initBreakdownUi(state) {
     renderWindows();
     renderHail();
     renderNetwork();
-    renderPersist();
     renderGlossary();
   }
 

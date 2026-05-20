@@ -15,11 +15,15 @@
 // glyph as the intro-gate sweep) periodically traverse the line while energy
 // is non-zero, giving a sense of movement from world to rig.
 //
-// Visibility gate: only shown after the player has made their first contact
-// in EP1 (state.contactLog.worlds.length > 0 || contactLog.firstContactSeen).
-// Once every contact-bearing milestone in the current EP has been crossed
-// (nextContactMilestone(state) === null) the strip swaps the traveler for a
-// lore line nudging the player toward Close the Cycle.
+// Visibility gate: requires (a) the Console (shop) has appeared this run
+// — i.e., state.amount has crossed 100 since the last cycle close — AND
+// (b) the player has made their first contact in EP1 (worlds.length > 0
+// || contactLog.firstContactSeen). The Console gate prevents the strip from
+// hanging in space on a fresh post-close session before the player has
+// climbed back into shop territory. Once every contact-bearing milestone in
+// the current EP has been crossed (nextContactMilestone(state) === null)
+// the strip swaps the traveler for a lore line nudging the player toward
+// Close the Cycle.
 
 import { worldFor } from './contactLog.js';
 import { nextContactMilestone, currentMilestones } from './interstitial.js';
@@ -146,9 +150,18 @@ export function initContactProgressUi(state, deps = {}) {
   // relative to the high-water mark the traveller represents.
   let currentPct = 0;
 
+  // Console-appeared latch. Mirrors mainUi.js SHOP_UNLOCK_AT — flips true the
+  // first frame state.amount crosses 100 and never flips back, so a brief dip
+  // (offline cost, all-in) doesn't yank the strip. Reset on page reload, which
+  // is what cycle close does, so a fresh post-close run hides the strip until
+  // the Console has come back too.
+  const SHOP_UNLOCK_AT = 100;
+  let consoleSeen = state.amount > SHOP_UNLOCK_AT;
   function shouldShow() {
     const log = state.contactLog;
     if (!log) return false;
+    if (!consoleSeen && state.amount > SHOP_UNLOCK_AT) consoleSeen = true;
+    if (!consoleSeen) return false;
     const hasWorlds = Array.isArray(log.worlds) && log.worlds.length > 0;
     return hasWorlds || !!log.firstContactSeen;
   }
@@ -296,11 +309,13 @@ export function initContactProgressUi(state, deps = {}) {
 
     // Affordance pulse states pulled fresh per tick from contactLogUi.
     // cycleReady drives the center wave pulse; namesUnread drives the left
-    // planet pulse. Missing affordance source = silent strip, no pulses.
+    // planet pulse; rigUnread drives the right radar pulse. Missing
+    // affordance source = silent strip, no pulses.
     if (typeof getAffordance === 'function') {
       const a = getAffordance() || {};
       trackEl.classList.toggle('is-ready', !!a.cycleReady);
       leftEl.classList.toggle('is-unread', !!a.namesUnread);
+      rightEl.classList.toggle('is-unread', !!a.rigUnread);
     }
 
     const next = nextContactMilestone(state);

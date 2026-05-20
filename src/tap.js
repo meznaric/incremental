@@ -57,6 +57,14 @@ function findScrollableAncestor(el) {
 }
 
 export function installTap(el, handler) {
+  // Defensive guard: a missing element (HTML stripped, query mistyped, init
+  // race) used to throw inside addEventListener and take down the rest of the
+  // boot sequence — including downstream taps like the Signal Diagnostic open.
+  // Warn instead so one missing button doesn't blank the chrome.
+  if (!el) {
+    console.warn('installTap: missing element; skipping bind');
+    return;
+  }
   let tap = null;
   function start(e) {
     if (e.button !== undefined && e.button !== 0) return;

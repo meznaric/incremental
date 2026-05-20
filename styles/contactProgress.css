@@ -152,8 +152,10 @@
   }
 }
 @keyframes cp-ready-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 1px rgba(111, 232, 161, 0.40), 0 0 0 0 rgba(111, 232, 161, 0); }
-  50%      { box-shadow: inset 0 0 0 1px rgba(111, 232, 161, 0.65), 0 0 14px 1px rgba(111, 232, 161, 0.35); }
+  0% { box-shadow: inset 0 0 8px 0px transparent; }
+  25% { box-shadow: inset 0 0 8px 16px #c3894433; }
+  50%      { box-shadow: inset 0 0 0 2px #d49a55; }
+  100% { box-shadow: inset 0 0 8px 0px transparent; }
 }
 
 /* New-name pulse — warm amber glow on the left planet when at least one
@@ -182,6 +184,31 @@
 @keyframes cp-dot-pulse {
   0%, 100% { opacity: 0.85; transform: scale(1); }
   50%      { opacity: 1;    transform: scale(1.25); }
+}
+
+/* Banked-mass pulse — cool blue glow on the right radar segment when Carrier
+   Mass has accreted but the player hasn't opened the Rig panel since. Same
+   chip-in-the-corner notification shape as the left planet, palette tuned to
+   the radar's existing blue accent. */
+.cp-edge-right.is-unread {
+  border-color: #8aa0ff;
+  animation: cp-rig-unread-pulse 2.2s ease-in-out infinite;
+}
+.cp-edge-right.is-unread::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b9c1ff;
+  box-shadow: 0 0 8px rgba(138, 160, 255, 0.9);
+  animation: cp-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cp-rig-unread-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(138, 160, 255, 0); }
+  50%      { box-shadow: 0 0 14px 2px rgba(138, 160, 255, 0.6); }
 }
 
 /* Signal line — a <canvas> that fills the track. The pixel content is the
@@ -258,7 +285,6 @@
   font-style: italic;
   letter-spacing: 0.02em;
   text-shadow: 0 0 12px rgba(212, 154, 85, 0.4);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -115,6 +115,10 @@ const fresh = () => ({
   // Names panel. hasUnreadNames(log) flips true when worlds.length exceeds it,
   // which the contact-progress strip surfaces as a pulse on the left planet.
   lastNamesSeenCount: 0,
+  // Mass kg the player had banked the last time they opened the Rig panel.
+  // hasUnreadRig(log) flips true when mass > this counter so the right radar
+  // segment pulses the first time the player has Carrier Mass to spend.
+  lastRigSeenMass: 0,
 });
 
 // Returns a plain object always — never null. Defensive against corrupted or
@@ -176,13 +180,19 @@ export function loadContactLog() {
   const lastNamesSeenCount = Number.isFinite(s.lastNamesSeenCount) && s.lastNamesSeenCount >= 0
     ? Math.floor(s.lastNamesSeenCount)
     : worlds.length;
+  // Same migration shape for the Rig pulse — legacy saves with banked mass
+  // don't get a retroactive pulse on first load; pulse only fires for mass
+  // that arrived after the feature shipped.
+  const lastRigSeenMass = Number.isFinite(s.lastRigSeenMass) && s.lastRigSeenMass >= 0
+    ? Math.floor(s.lastRigSeenMass)
+    : mass;
   return {
     run, worlds, mass, engravings, bestPeak,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     introSeen, pickedName,
     pattern, pendingPatternChoice, patternUsed, patternCompleted,
     loopMode, loopCycles,
-    lastNamesSeenCount,
+    lastNamesSeenCount, lastRigSeenMass,
   };
 }
 
@@ -277,6 +287,23 @@ export function hasUnreadNames(log) {
 export function markNamesSeen(log) {
   if (!log || !Array.isArray(log.worlds)) return;
   log.lastNamesSeenCount = log.worlds.length;
+}
+
+// True when the player has banked Carrier Mass they haven't yet seen on the
+// Rig panel. Drives the pulse on the contactProgress right radar segment so
+// the first kg of mass is impossible to miss.
+export function hasUnreadRig(log) {
+  if (!log) return false;
+  const mass = Number.isFinite(log.mass) ? log.mass : 0;
+  const seen = Number.isFinite(log.lastRigSeenMass) ? log.lastRigSeenMass : 0;
+  return mass > seen;
+}
+
+// Acknowledge the player's current Carrier Mass. Called when the Rig panel
+// opens — clears hasUnreadRig(log) until more mass accretes at the next close.
+export function markRigSeen(log) {
+  if (!log) return;
+  log.lastRigSeenMass = Number.isFinite(log.mass) ? log.mass : 0;
 }
 
 // Called by the cycle-close action ("Close the Cycle") to start the next run.

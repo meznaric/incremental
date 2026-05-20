@@ -7,6 +7,7 @@ import {
   echoLoopLevel, isLoopMode,
   ALL_WORLDS,
   hasUnreadNames, markNamesSeen,
+  hasUnreadRig, markRigSeen,
 } from './contactLog.js';
 import { nextContactMilestone, currentMilestones, isCycleComplete } from './interstitial.js';
 import { formatAbbrev } from './bignum.js';
@@ -22,6 +23,22 @@ import { installTap } from './tap.js';
 // recorded them so the player can see their history layer by layer.
 const PANEL_TITLES = { cycle: 'Cycle', names: 'Names', rig: 'Rig' };
 
+// Episode titles. Pulled inline rather than importing from achievements-data
+// (which keeps them as part of an achievement description string) — the Names
+// modal is the only other place that needs them and inlining keeps coupling low.
+const EP_TITLES = {
+  1: 'Discovery',
+  2: 'The Sea Choir',
+  3: 'Sky Language',
+  4: 'Fire Given',
+  5: 'Perfect Garden',
+  6: 'Missing World',
+  7: 'Echoes',
+  8: 'Finale',
+};
+
+const KALEN_PORTRAIT = './docs/lore/images/kalen-portrait.png';
+
 export function initContactLogUi(state, opts = {}) {
   const modal = document.getElementById('contactLogModal');
   const body = modal.querySelector('.cl-body');
@@ -36,15 +53,15 @@ export function initContactLogUi(state, opts = {}) {
   const namesHeadEl = modal.querySelector('.cl-names-head');
   const pendingEl = modal.querySelector('.cl-pending');
   const engravingsEl = modal.querySelector('.cl-engravings');
+  const memoryInfoEl = modal.querySelector('.cl-memory-info');
+  const massInfoEl = modal.querySelector('.cl-mass-info');
+  const closeInfoEl = modal.querySelector('.cl-close-info');
   const panelEls = Array.from(modal.querySelectorAll('.cl-panel'));
   let armed = false;
   let activeTab = 'cycle';
   // Which logged contact (by world id) has its lore panel expanded. Held in
   // closure rather than state — a session-level UI detail, not save data.
   let expandedId = null;
-  // Status lens for the Names tab. 'all' shows every cycle; a specific status
-  // hides cycles that have no matching contact.
-  let statusFilter = 'all';
   const STATUS_ORDER = ['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'];
 
   function setActiveTab(name) {
@@ -358,42 +375,18 @@ export function initContactLogUi(state, opts = {}) {
     for (const s of STATUS_ORDER) {
       if (counts[s] > 0) parts.push(`<span class="s-${s.toLowerCase()}"><strong>${counts[s]}</strong> ${s.toLowerCase()}</span>`);
     }
-    // Filter chips: an All chip plus one per present status. Chip for the
-    // current filter gets is-active so the lens is obvious. Tapping the active
-    // chip falls back to All (no second tap needed).
-    const chips = [
-      `<button type="button" class="cl-filter${statusFilter === 'all' ? ' is-active' : ''}" data-act="filter-status" data-status="all">All</button>`,
-    ];
-    for (const s of STATUS_ORDER) {
-      if (counts[s] === 0) continue;
-      const cls = `s-${s.toLowerCase()}`;
-      const on = statusFilter === s ? ' is-active' : '';
-      chips.push(`<button type="button" class="cl-filter ${cls}${on}" data-act="filter-status" data-status="${s}">${s}</button>`);
-    }
-    namesHeadEl.innerHTML = `
-      <div class="cl-summary">${parts.join(' · ')}</div>
-      <div class="cl-filters">${chips.join('')}</div>
-    `;
+    namesHeadEl.innerHTML = `<div class="cl-summary">${parts.join(' · ')}</div>`;
   }
 
   function renderList() {
     const log = state.contactLog;
-    const allWorlds = sortedWorlds(log);
-    if (!allWorlds.length) {
+    const worlds = sortedWorlds(log);
+    if (!worlds.length) {
       body.classList.add('is-empty');
       listEl.innerHTML = '';
       return;
     }
     body.classList.remove('is-empty');
-    const worlds = statusFilter === 'all'
-      ? allWorlds
-      : allWorlds.filter((w) => w.status === statusFilter);
-    if (!worlds.length) {
-      // Filter matched nothing in the current log — should be impossible if we
-      // only show chips for present statuses, but be defensive.
-      listEl.innerHTML = `<li class="cl-group"><div class="cl-group-head">No contacts match this lens.</div></li>`;
-      return;
-    }
     // Group by run, newest cycle first. Within a cycle, sortedWorlds already
     // gives newest contact first.
     const groups = new Map();
@@ -414,50 +407,63 @@ export function initContactLogUi(state, opts = {}) {
     `).join('');
   }
 
-  // A single entry — collapsed row plus, when expanded, an in-place lore panel.
-  // The row itself is a button so it's keyboard-reachable and touch-friendly.
+  // A single Name entry, framed around Kalen's note. The collapsed card leads
+  // with his portrait + the note, status meaning, and consequence — the four
+  // most dramatic facts about a contact. Expanding reveals the rest (image,
+  // method, world, politics, episode). Designed to read like a log story
+  // rather than a sortable table.
   function renderEntry(w) {
     const open = expandedId === w.id;
     const detail = worldDetail(w.id);
+    const def = ALL_WORLDS[w.id];
     const sCls = `s-${w.status.toLowerCase()}`;
     const meaning = STATUS_MEANING[w.status] || '';
+    const note = detail && detail.note ? detail.note : (def && def.flavor ? def.flavor : '');
+    const consequence = detail && detail.cost ? detail.cost : '';
     return `
       <li class="contacted ${sCls}${open ? ' is-open' : ''}">
         <button type="button" class="cl-entry"
           data-act="toggle-entry" data-id="${w.id}"
           aria-expanded="${open ? 'true' : 'false'}">
-          <div>
+          <div class="cl-entry-head">
             <div class="cl-name">${w.name}</div>
-            <div class="cl-ep">ep ${w.ep}</div>
-            ${meaning ? `<div class="cl-ep-meaning ${sCls}">${meaning}</div>` : ''}
-          </div>
-          <div class="cl-entry-right">
             <span class="cl-status ${sCls}">${w.status}</span>
-            <i class="ri ${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} cl-entry-chev" aria-hidden="true"></i>
           </div>
+          <div class="cl-entry-body">
+            <img class="cl-avatar" alt="Kalen" src="${KALEN_PORTRAIT}" loading="lazy" />
+            <div class="cl-entry-text">
+              ${note ? `<p class="cl-detail-note"><em>${note}</em></p>` : ''}
+              ${meaning ? `<div class="cl-ep-meaning ${sCls}">${meaning}</div>` : ''}
+              ${consequence ? `<p class="cl-consequence">${consequence}</p>` : ''}
+            </div>
+          </div>
+          <i class="ri ${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} cl-entry-chev" aria-hidden="true"></i>
         </button>
-        ${open ? renderEntryDetail(w, detail) : ''}
+        ${open ? renderEntryDetail(w, detail, def) : ''}
       </li>
     `;
   }
 
-  function renderEntryDetail(w, detail) {
-    const def = ALL_WORLDS[w.id];
+  function renderEntryDetail(w, detail, def) {
     const img = def && def.image;
     const portrait = img
       ? `<img class="cl-detail-img" loading="lazy" alt="${w.name}" src="${img}"
             onerror="this.style.display='none';var f=this.nextElementSibling;if(f)f.style.display='flex';" />
          <div class="cl-detail-fallback" aria-hidden="true" style="display:none"></div>`
       : `<div class="cl-detail-fallback" aria-hidden="true"></div>`;
+    const epTitle = EP_TITLES[w.ep];
+    const epLabel = epTitle ? `Episode ${w.ep} — ${epTitle}` : `Episode ${w.ep}`;
     if (!detail) {
       return `
         <div class="cl-detail">
           ${portrait}
+          <dl class="cl-detail-rows">
+            <div class="cl-detail-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
+          </dl>
           <p class="cl-detail-empty">The folder is thin. The recordings remain.</p>
         </div>
       `;
     }
-    // Order: method → biology → politics → cost. Kalen's note last, italic.
     return `
       <div class="cl-detail">
         ${portrait}
@@ -465,9 +471,49 @@ export function initContactLogUi(state, opts = {}) {
           <div class="cl-detail-row"><dt>Method</dt><dd>${detail.method}</dd></div>
           <div class="cl-detail-row"><dt>World</dt><dd>${detail.biology}</dd></div>
           <div class="cl-detail-row"><dt>Politics</dt><dd>${detail.politics}</dd></div>
-          <div class="cl-detail-row"><dt>Consequence</dt><dd>${detail.cost}</dd></div>
+          <div class="cl-detail-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
         </dl>
-        <p class="cl-detail-note"><em>${detail.note}</em></p>
+      </div>
+    `;
+  }
+
+  function renderMemoryInfo() {
+    if (!memoryInfoEl) return;
+    memoryInfoEl.innerHTML = `
+      <div class="faq-block kind-memory">
+        <div class="faq-head"><i class="ri ri-database-2-line"></i>How Echo Memory works</div>
+        <div class="faq-body">
+          <p><strong>Earn:</strong> one shard per name on the log. Across every cycle, every episode. Eighty-plus shards if I log every contact.</p>
+          <p><strong>What it does:</strong> each shard adds <strong>+10%</strong> to base Echoes/s, applied <em>before</em> every other multiplier.</p>
+          <p><strong>Never lost.</strong> The names stay. This number only ever climbs.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMassInfo() {
+    if (!massInfoEl) return;
+    massInfoEl.innerHTML = `
+      <div class="faq-block kind-mass">
+        <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Carrier Mass works</div>
+        <div class="faq-body">
+          <p><strong>Earn:</strong> banked at cycle close from the cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
+          <p><strong>Spend:</strong> Engravings above — permanent cuts to the rig.</p>
+          <p><strong>Tip:</strong> peak is what counts, not the closing balance. Spike the rate before I close.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCloseInfo() {
+    if (!closeInfoEl) return;
+    closeInfoEl.innerHTML = `
+      <div class="faq-block">
+        <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
+        <div class="faq-body">
+          <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
+          <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
+        </div>
       </div>
     `;
   }
@@ -483,16 +529,24 @@ export function initContactLogUi(state, opts = {}) {
     renderNamesHead();
     renderList();
     renderPending();
+    renderMemoryInfo();
+    renderMassInfo();
+    renderCloseInfo();
   }
 
   const openPanel = (panel) => {
     const name = PANEL_TITLES[panel] ? panel : 'cycle';
     armed = false;
-    statusFilter = 'all';
     setActiveTab(name);
     if (name === 'names') {
       // Opening the panel counts as acknowledging every world currently logged.
       markNamesSeen(state.contactLog);
+      if (typeof opts.onLogPersist === 'function') opts.onLogPersist();
+    }
+    if (name === 'rig') {
+      // Same acknowledgement for Carrier Mass — opening the Rig panel clears
+      // the right-radar pulse until the next cycle close banks more mass.
+      markRigSeen(state.contactLog);
       if (typeof opts.onLogPersist === 'function') opts.onLogPersist();
     }
     render();
@@ -509,6 +563,7 @@ export function initContactLogUi(state, opts = {}) {
     return {
       cycleReady: canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state)),
       namesUnread: hasUnreadNames(log),
+      rigUnread: hasUnreadRig(log),
     };
   };
 
@@ -534,14 +589,6 @@ export function initContactLogUi(state, opts = {}) {
     if (act === 'toggle-entry') {
       const id = t.dataset.id;
       expandedId = expandedId === id ? null : id;
-      renderList();
-      return;
-    }
-    if (act === 'filter-status') {
-      const next = t.dataset.status || 'all';
-      // Tapping the active chip clears the filter — saves a hop back to All.
-      statusFilter = (statusFilter === next) ? 'all' : next;
-      renderNamesHead();
       renderList();
       return;
     }

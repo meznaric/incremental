@@ -7,7 +7,7 @@
 // cycle once the EP is fully recorded.
 import {
   worldDetail, STATUS_MEANING, getRun,
-  isEpComplete, activeEp, markNamesSeen,
+  isEpComplete, activeEp, getCycleEp, markNamesSeen,
   ECHO_MEMORY_PER_SHARD, memoryShards,
 } from './contactLog.js';
 import { WORLDS_BY_EP } from './worlds-data.js';
@@ -75,11 +75,14 @@ export function initNamesModalUi(state, opts = {}) {
 
   function renderGate() {
     const log = state.contactLog;
-    const ep = activeEp(log);
-    if (ep == null) {
+    if (activeEp(log) == null) {
       gateEl.innerHTML = `<div class="cl-gate is-loop">Every episode is logged. The Loop is open — close the cycle to compound the resonance.</div>`;
       return;
     }
+    // The gate speaks for the cycle's locked EP, not whatever the lowest
+    // incomplete EP happens to be. Mid-cycle they're usually the same; they
+    // diverge for one beat after the cycle's EP fills.
+    const ep = getCycleEp(log);
     const block = WORLDS_BY_EP[ep];
     if (!block) { gateEl.innerHTML = ''; return; }
     const contactedIds = new Set((log.worlds || []).map((w) => w.id));
@@ -98,13 +101,17 @@ export function initNamesModalUi(state, opts = {}) {
     gateEl.innerHTML = `
       <div class="cl-gate">
         <strong>${left}</strong> name${left === 1 ? '' : 's'} left in <strong>Episode ${ep} · ${epTitle}</strong>.
-        Record them, then close the cycle to step into <strong>Episode ${nextEp}${EP_TITLES[nextEp] ? ` · ${EP_TITLES[nextEp]}` : ''}</strong>.
+        Record them — the next episode opens once you close the cycle.
       </div>`;
   }
 
   function renderEpisodes() {
     const log = state.contactLog;
-    const active = activeEp(log);
+    // The "active" highlight follows the cycle's locked EP — that's the one
+    // the current run can still record names against. Anything past it is
+    // locked even if the worlds happen to be reachable, because the cycle
+    // can only fire milestones for cycleEp.
+    const active = getCycleEp(log);
     const contactedById = new Map((log.worlds || []).map((w) => [w.id, w]));
     const eps = Object.keys(WORLDS_BY_EP).map(Number).sort((a, b) => a - b);
     const sections = [];
@@ -115,7 +122,9 @@ export function initNamesModalUi(state, opts = {}) {
       const total = slots.length;
       const found = slots.filter((def) => contactedById.has(def.id)).length;
       const done = isEpComplete(log, ep);
-      const isActive = active === ep;
+      const isActive = active === ep && !done;
+      // Anything after the cycle's locked EP is locked — including the EP
+      // that would become active next if the player closed right now.
       const isLockedFuture = active != null && ep > active;
       const epTitle = EP_TITLES[ep] || `Episode ${ep}`;
       const cls = ['cl-ep-block'];

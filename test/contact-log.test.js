@@ -10,6 +10,7 @@ import {
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount,
   ASCENT_PER_LEVEL, BONE_MEMORY_PER_LEVEL, FIRST_LIGHT_AMOUNT,
   echoLoopLevel, isLoopMode, activeEp, allEpsComplete, isEpComplete,
+  getCycleEp,
 } from '../src/contactLog.js';
 import { WORLDS_BY_EP } from '../src/worlds-data.js';
 
@@ -98,6 +99,41 @@ test('recordContact: continuation cycle keeps the same EP active until full', ()
   assert.equal(added, true);
   assert.equal(log.worlds[1].id, 'belnesh');
   assert.equal(log.worlds[1].run, getRun(log), 'tagged with the current run');
+});
+
+test('cycleEp: cycle stays locked on its EP after the EP fills mid-run', () => {
+  // Player fills every EP1 world in a single cycle. The cycle should not roll
+  // over into EP2 — that requires a close. Confirm that subsequent milestone
+  // resolution returns EP1 worlds (already logged → no new entry), not EP2.
+  const log = { run: 1, worlds: [], cycleEp: 1 };
+  for (const k of Object.keys(WORLDS_BY_EP[1])) recordContact(log, k, 1);
+  assert.equal(log.worlds.length, 10, 'EP1 filled');
+  assert.equal(activeEp(log), 2, 'activeEp advances to EP2 (lowest incomplete)');
+  assert.equal(getCycleEp(log), 1, 'cycleEp stays locked on EP1 until close');
+  // Trying to record any EP1 slot now is a no-op — the world is already logged
+  // and the slot does not roll over into EP2.
+  for (const k of Object.keys(WORLDS_BY_EP[1])) {
+    assert.equal(recordContact(log, k, 1), false, `${k} should not roll over`);
+  }
+  assert.equal(log.worlds.length, 10, 'no EP2 worlds logged this cycle');
+});
+
+test('cycleEp: closeCycle advances the lock to the next incomplete EP', () => {
+  const log = { run: 1, worlds: [], cycleEp: 1 };
+  for (const k of Object.keys(WORLDS_BY_EP[1])) recordContact(log, k, 1);
+  closeCycle(log, 1e12);
+  assert.equal(getCycleEp(log), 2, 'cycleEp moves to EP2 after a clean close');
+  // First milestone of the new cycle records an EP2 world.
+  const added = recordContact(log, 'milestone_1k', 2);
+  assert.equal(added, true);
+  assert.equal(log.worlds[log.worlds.length - 1].ep, 2, 'next cycle records EP2');
+});
+
+test('cycleEp: closeCycle on a partial EP keeps the lock in place', () => {
+  const log = { run: 1, worlds: [], cycleEp: 1 };
+  recordContact(log, 'milestone_1k', 1);
+  closeCycle(log, 1e3);
+  assert.equal(getCycleEp(log), 1, 'partial close keeps cycleEp on the same EP');
 });
 
 test('WORLDS_BY_EP: every entry has the required shape', () => {

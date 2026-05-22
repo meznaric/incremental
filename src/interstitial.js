@@ -1,6 +1,6 @@
 import {
   worldFor, recordContact, saveContactLog, getRun,
-  activeEp, allEpsComplete,
+  activeEp, allEpsComplete, getCycleEp,
 } from './contactLog.js';
 import { WORLDS_BY_EP } from './worlds-data.js';
 import { EP_INTERSTITIALS } from './episodes.js';
@@ -366,7 +366,9 @@ export function bindEpisode(log) {
     INTERSTITIALS.cycle_open = LOOP_CYCLE_OPEN;
     return;
   }
-  const ep = activeEp(log);
+  // Use the cycle's locked EP so the cycle_open / filler beats stay on the
+  // EP this run started in, even after the log fills it mid-cycle.
+  const ep = getCycleEp(log);
   const block = EP_INTERSTITIALS[ep] || {};
   for (const k of ROTATING_KEYS) {
     if (block[k]) INTERSTITIALS[k] = block[k];
@@ -411,9 +413,11 @@ export function thresholdsForEp(ep) {
 
 // Active EP's thresholds — what the player actually has on the climb right
 // now. Loop mode (no active EP) returns an empty list so the contact-log UI
-// renders no progress / pending entries.
+// renders no progress / pending entries. Sourced from the cycle's locked EP
+// (cycleEp) so the milestone ladder doesn't shift inside one run.
 export function currentMilestones(log) {
-  const ep = activeEp(log);
+  if (allEpsComplete(log)) return [];
+  const ep = getCycleEp(log);
   return ep == null ? [] : thresholdsForEp(ep);
 }
 

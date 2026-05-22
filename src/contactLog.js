@@ -62,11 +62,29 @@ export function allEpsComplete(log) {
   return activeEp(log) === null;
 }
 
-// Resolve the world definition for a given milestone id, scoped to the log's
-// active EP. The active EP is the first incomplete EP in the log, so an early
-// close re-binds the same EP next cycle until its 10 worlds are all logged.
+// The EP locked for the *current cycle*. Set at cycle start (and at close
+// for the next cycle); does not advance mid-run even if the cycle fills its
+// EP early. Falls back to activeEp(log) for saves migrated before this
+// field existed, and ultimately to 1 for a fresh log.
+//
+// WHY this is separate from activeEp: activeEp answers "what's the lowest
+// incomplete EP on the log?" which can shift inside a single cycle (the
+// moment the 10th world of EP6 lands, activeEp flips to 7). That made it
+// possible to log "1 of 10 in EP7" before the player closed the cycle —
+// the next milestone-cross resolved to the newly-active EP. cycleEp pins
+// the cycle to one EP so closing is the only thing that advances it.
+export function getCycleEp(log) {
+  if (!log) return 1;
+  if (Number.isInteger(log.cycleEp) && log.cycleEp >= 1) return log.cycleEp;
+  return activeEp(log) ?? 1;
+}
+
+// Resolve the world definition for a given milestone id, scoped to the
+// cycle's locked EP. An early close keeps cycleEp on the same EP next cycle
+// (closeCycle re-reads activeEp, which is still the same EP if it wasn't
+// filled), so the remaining names are still available.
 export function worldFor(log, milestoneId) {
-  const ep = activeEp(log);
+  const ep = getCycleEp(log);
   if (ep == null) return null;
   return WORLDS_BY_EP[ep]?.[milestoneId] || null;
 }
@@ -109,6 +127,8 @@ export const STATUS_MEANING = {
 
 const fresh = () => ({
   run: 1, worlds: [], mass: 0, engravings: {}, bestPeak: 0,
+  // Locked EP for this cycle — only advances on cycle close. See getCycleEp().
+  cycleEp: 1,
   pattern: null, pendingPatternChoice: false, patternUsed: {}, patternCompleted: {},
   loopMode: false, loopCycles: 0,
   // Count of worlds the player had on the log the last time they opened the
@@ -186,8 +206,15 @@ export function loadContactLog() {
   const lastRigSeenMass = Number.isFinite(s.lastRigSeenMass) && s.lastRigSeenMass >= 0
     ? Math.floor(s.lastRigSeenMass)
     : mass;
+  // Migrate saves predating cycleEp: lock the cycle's EP to whatever activeEp
+  // resolves to from the loaded worlds. Players mid-cycle keep going on the
+  // same EP; nothing rolls over without a close from here on.
+  const cycleEpRaw = Number(s.cycleEp);
+  const cycleEp = Number.isInteger(cycleEpRaw) && cycleEpRaw >= 1
+    ? cycleEpRaw
+    : (activeEp({ run, worlds }) ?? 1);
   return {
-    run, worlds, mass, engravings, bestPeak,
+    run, worlds, mass, engravings, bestPeak, cycleEp,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
     introSeen, pickedName,
     pattern, pendingPatternChoice, patternUsed, patternCompleted,
@@ -393,6 +420,11 @@ export function closeCycle(log, peakAmount) {
   if (log.loopMode) log.loopCycles = (log.loopCycles || 0) + 1;
   if (allEpsComplete(log)) log.loopMode = true;
   advanceRun(log);
+  // Lock the next cycle's EP — whatever's lowest-incomplete on the log right
+  // now. If this close just filled the EP, activeEp returns the next one; if
+  // the cycle was closed early with the EP still partial, activeEp returns
+  // the same EP and the remaining worlds carry over.
+  log.cycleEp = activeEp(log) ?? log.cycleEp ?? 1;
   // Patterns are per-cycle. Record the completion for the just-finished cycle
   // (badge + all-patterns achievement), clear the previous pick, and flag the
   // next run as owing the player a fresh choice. The chooser modal in main.js

@@ -193,10 +193,18 @@ function applyAscent(rate, exp) {
 // permanents and multiplier stacks both compound past trillion into runaway.
 // Tunable: dropping ALPHA tightens the cap; raising AT delays its bite.
 export const DAMPEN_AT = 1e12;
-export const DAMPEN_ALPHA = 0.85;
+export const DAMPEN_ALPHA = 0.92;
 export function applyDampening(rate) {
   if (!(rate > DAMPEN_AT)) return rate;
   return DAMPEN_AT * Math.pow(rate / DAMPEN_AT, DAMPEN_ALPHA);
+}
+
+// Cost-side half-relief: super-exponential card ladders (permanent/drift/coil)
+// don't see dampening at all, so balance growth lagging by f doubles their wall.
+// sqrt(f) gives back half of that compression so DDc+ stays buyable.
+export function dampeningCostMul(rate) {
+  if (!(rate > DAMPEN_AT)) return 1;
+  return Math.pow(rate / DAMPEN_AT, (DAMPEN_ALPHA - 1) / (2 * DAMPEN_ALPHA));
 }
 
 // Seed-Relay yield folds into the additive base, same place as flatBonus,
@@ -309,15 +317,17 @@ export function integrateRate(state, t0, t1) {
 }
 
 export function rollContext(state, now) {
+  const rate = effectiveRate(state, now);
   return {
     balance: state.amount,
-    rate: effectiveRate(state, now),
+    rate,
     baseAdditive: (state.basePerSecond || 0) + state.flatBonus,
     permMul: state.permMul || 1,
     owned: state.owned,
     // Number of currently-online Seed Relays. Used by isEligible to gate
     // mesh-aware upgrades (Patient Coil) until the mesh actually exists.
     meshOnline: countOnlineRelays(state, now),
+    costRelief: dampeningCostMul(rate),
   };
 }
 
@@ -478,13 +488,16 @@ export function tryBuy(state, slotIdx, now) {
   return { ok: false, reason: 'unknown' };
 }
 
-// After buying, replace the slot. The pinned slot also rerolls on purchase
-// (since the bought upgrade is gone); we keep the pin pointing at the same
-// index so the new upgrade lands pre-pinned.
+// After buying, replace the slot and clear any pin on it — purchasing frees
+// the slot so the replacement card lands unpinned (player request: a used pin
+// shouldn't keep locking the next random roll).
 function replaceSlot(state, slotIdx, now) {
   const ctx = rollContext(state, now);
   state.shop.slots[slotIdx] = rerollSlot(state.shop.slots, slotIdx, ctx);
   state.shop.offeredRate = ctx.rate;
+  if (Array.isArray(state.shop.pinnedSlots)) {
+    state.shop.pinnedSlots = state.shop.pinnedSlots.filter((i) => i !== slotIdx);
+  }
 }
 
 export function pruneBuffs(state, now) {

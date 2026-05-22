@@ -327,7 +327,7 @@ export function costFor(upgrade, ctx) {
       // own-count only. Keeps early picks cheap so the line of progression is
       // legible: buy one, see the offline mul move on the next welcomeBack.
       const n = ctx.owned[upgrade.id] || 0;
-      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25);
+      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25) * (ctx.costRelief ?? 1);
     }
     case 'permanent': {
       const n = ctx.owned[upgrade.id] || 0;
@@ -336,7 +336,7 @@ export function costFor(upgrade, ctx) {
         const N = totalMulOwned(ctx.owned);
         c *= Math.pow(MUL_CATEGORY_GROWTH, N + (N * N) / 40);
       }
-      return c;
+      return c * (ctx.costRelief ?? 1);
     }
     case 'convert': {
       // Gambling-style: a percentage of balance, scaled up per rarity tier.
@@ -355,7 +355,7 @@ export function costFor(upgrade, ctx) {
       const base = upgrade.rateCostSec
         ? Math.max(upgrade.baseCost, ctx.rate * upgrade.rateCostSec)
         : upgrade.baseCost;
-      return base * Math.pow(upgrade.growth, n + (n * n) / 25);
+      return base * Math.pow(upgrade.growth, n + (n * n) / 25) * (ctx.costRelief ?? 1);
     }
   }
   return 0;

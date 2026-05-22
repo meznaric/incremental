@@ -328,6 +328,19 @@ test('tryTogglePin: toggles only when at least one pin tier is unlocked', () => 
   assert.equal(isSlotPinned(s, 0), false);
 });
 
+test('tryBuy: purchasing a pinned slot clears the pin', () => {
+  const s = freshState({ amount: 1000 });
+  s.shop.pinSlots = 1;
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 1000, owned: {} }, 100);
+  tryTogglePin(s, 0);
+  assert.equal(isSlotPinned(s, 0), true);
+  const res = tryBuy(s, 0, 0);
+  assert.ok(res.ok);
+  assert.equal(s.owned[u.id], 1);
+  assert.equal(isSlotPinned(s, 0), false);
+  assert.deepEqual(s.shop.pinnedSlots, []);
+});
+
 test('tryUnlockPinTier: walks the cost ladder and respects the cap', () => {
   // Enough Echoes to buy every tier.
   const total = PIN_TIER_COSTS.reduce((a, b) => a + b, 0);

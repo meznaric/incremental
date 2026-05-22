@@ -35,20 +35,19 @@ export function initCycleModalUi(state, opts = {}) {
     const loop = echoLoopLevel(log);
     const n = (log && Array.isArray(log.worlds)) ? log.worlds.length : 0;
     if (loop > 0) {
-      introEl.innerHTML = `<em>Echo Loop ${loop}. Season closed. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log; the carrier keeps the warmth.</em>`;
+      introEl.innerHTML = `<em>Echo Loop ${loop}. Season closed. The carrier keeps the warmth.</em>`;
       return;
     }
     if (n === 0) {
       introEl.innerHTML = `<em>Cycle ${run}. The notebook is open. No names yet.</em>`;
       return;
     }
-    introEl.innerHTML = `<em>Cycle ${run}. <strong>${n}</strong> name${n === 1 ? '' : 's'} on the log. I read them again before I sleep.</em>`;
+    introEl.innerHTML = `<em>Cycle ${run}. I read the log again before I sleep.</em>`;
   }
 
   function renderTiles() {
     const log = state.contactLog;
     const loop = echoLoopLevel(log);
-    const run = getRun(log);
     const ms = currentMilestones(log);
     const contactedIds = new Set((log && log.worlds || []).map((w) => w.id));
     let foundInEp = 0;
@@ -60,31 +59,29 @@ export function initCycleModalUi(state, opts = {}) {
       else leftInEp++;
     }
     const cycleFound = cycleContactCount(log);
+    const totalNames = (log && Array.isArray(log.worlds)) ? log.worlds.length : 0;
     const peak = peakAmount();
     const projected = massForPeak(peak);
 
-    // In Loop mode the EP catalogue is exhausted — show only what matters:
-    // loop level, contacts this run (0 by definition), projected mass.
-    const headTile = loop > 0
-      ? `<div class="cl-stat">
-          <div class="cl-stat-label">Echo Loop</div>
-          <div class="cl-stat-value">${loop}</div>
-        </div>`
-      : `<div class="cl-stat">
-          <div class="cl-stat-label">Cycle</div>
-          <div class="cl-stat-value">${run}</div>
-        </div>`;
-
+    // Tile order: contacts logged this cycle, names ever, then this episode's
+    // remainder. The cycle/loop counter is in the intro line above so it's
+    // not duplicated here.
     const foundTile = `
       <div class="cl-stat">
         <div class="cl-stat-label">This Cycle</div>
         <div class="cl-stat-value">${cycleFound} contact${cycleFound === 1 ? '' : 's'}</div>
       </div>`;
 
+    const totalTile = `
+      <div class="cl-stat">
+        <div class="cl-stat-label">On the log</div>
+        <div class="cl-stat-value">${totalNames} name${totalNames === 1 ? '' : 's'}</div>
+      </div>`;
+
     const epTile = loop > 0
       ? `<div class="cl-stat">
           <div class="cl-stat-label">Episode</div>
-          <div class="cl-stat-value">Season complete</div>
+          <div class="cl-stat-value">Season · loop ${loop}</div>
         </div>`
       : `<div class="cl-stat">
           <div class="cl-stat-label">This Episode</div>
@@ -98,7 +95,7 @@ export function initCycleModalUi(state, opts = {}) {
         <p class="cl-stat-hint">Carrier Mass banked from this cycle's peak Echo balance.</p>
       </div>`;
 
-    tilesEl.innerHTML = `${headTile}${foundTile}${epTile}${massTile}`;
+    tilesEl.innerHTML = `${foundTile}${totalTile}${epTile}${massTile}`;
   }
 
   function renderProgress() {

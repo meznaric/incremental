@@ -1,14 +1,17 @@
-// Names modal — the cumulative roster of every world Kalen has ever logged.
-// Each EP renders as a row of 10 circular slots. Found worlds reveal as
-// portraits; unfound active-EP slots show as locked discs; future EPs render
-// entirely locked. Tapping a found circle expands an inline detail card.
+// Names modal — cumulative roster of every world Kalen has ever logged.
+// Two tabs: Names (the EP grid) and Info (lore + status legend).
 //
-// Episode-gate line under the active EP nudges the player toward closing the
-// cycle once the EP is fully recorded.
+// The grid is per-episode, 10 circular slots each. Found worlds reveal as
+// portraits; unfound active-EP slots show locked discs; future EPs render
+// entirely locked. The episode-gate line under the grid tells the player
+// how many names are left in the active EP and the next episode opens
+// once the cycle closes.
+//
+// Tapping a found tile opens the separate #nameDetailModal so the detail
+// view feels like a destination rather than an expansion under the grid.
 import {
   worldDetail, STATUS_MEANING, getRun,
   isEpComplete, activeEp, getCycleEp, markNamesSeen,
-  ECHO_MEMORY_PER_SHARD, memoryShards,
 } from './contactLog.js';
 import { WORLDS_BY_EP } from './worlds-data.js';
 import { MILESTONE_SLOT_IDS } from './interstitial.js';
@@ -26,51 +29,59 @@ const EP_TITLES = {
   9: 'After',
   10: 'Cascade',
 };
-const STATUS_ORDER = ['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'];
 const KALEN_PORTRAIT = './docs/lore/images/kalen-portrait.png';
 
 export function initNamesModalUi(state, opts = {}) {
   const modal = document.getElementById('namesModal');
-  const summaryEl  = modal.querySelector('.cl-names-summary');
-  const gateEl     = modal.querySelector('.cl-names-gate');
-  const epsEl      = modal.querySelector('.cl-names-episodes');
-  const detailEl   = modal.querySelector('.cl-names-detail');
-  const memoryInfoEl = modal.querySelector('.cl-memory-info');
-  // Which world id is expanded in the detail card. Session-only — not saved.
-  let expandedId = null;
+  const loreEl = modal.querySelector('.cl-lore-line');
+  const gateEl = modal.querySelector('.cl-names-gate');
+  const epsEl = modal.querySelector('.cl-names-episodes');
+  const infoEl = modal.querySelector('.cl-names-info');
+  const tabs = Array.from(modal.querySelectorAll('.cl-tab'));
+  const panels = Array.from(modal.querySelectorAll('.cl-tab-panel'));
+  let activeTab = 'names';
 
-  // Static FAQ — same content as the old Contact Log Memory block, in the
-  // panel that now owns name-counting.
-  memoryInfoEl.innerHTML = `
-    <div class="faq-block kind-memory">
-      <div class="faq-head"><i class="ri ri-database-2-line"></i>How Echo Memory works</div>
-      <div class="faq-body">
-        <p><strong>Earn:</strong> one shard per name on the log. Across every cycle, every episode.</p>
-        <p><strong>What it does:</strong> each shard adds <strong>+10%</strong> to base Echoes/s, applied <em>before</em> every other multiplier.</p>
-        <p><strong>Never lost.</strong> The names stay. This number only ever climbs.</p>
+  const detailModal = document.getElementById('nameDetailModal');
+  const detailTitle = detailModal.querySelector('#nameDetailTitle');
+  const detailBody = detailModal.querySelector('.nd-body');
+
+  // Voice: Kalen, ambient first person. Single sentence — frames what the
+  // grid represents without becoming a tooltip wall.
+  loreEl.textContent =
+    'Every world I have ever spoken into. The names stay on the log; nothing on this page can be lost.';
+
+  // Static info-tab content. Rendered once at init.
+  infoEl.innerHTML = `
+    <div class="cl-info-block">
+      <h4>What this is</h4>
+      <p>The Contact Log. Every world that has answered the carrier, in the cycle that recorded it. Once a name lands here it never leaves — across save resets, across cycle closes, across the Loop.</p>
+    </div>
+    <div class="cl-info-block">
+      <h4>Status colours</h4>
+      <div class="cl-info-statuses">
+        <span class="s-label s-triggered">TRIGGERED</span><span class="s-meaning">The contact set off a cascade. Something big happened because of the call.</span>
+        <span class="s-label s-collapsed">COLLAPSED</span><span class="s-meaning">The world ended sometime after the contact. Cause unclear, correlation total.</span>
+        <span class="s-label s-shifted">SHIFTED</span><span class="s-meaning">The trajectory bent. The civilisation kept moving — somewhere different from where it had been heading.</span>
+        <span class="s-label s-missing">MISSING</span><span class="s-meaning">Gone from records. Not destroyed. Just absent on the next pass.</span>
       </div>
+    </div>
+    <div class="cl-info-block">
+      <h4>How to find more</h4>
+      <p>Each episode has ten contacts at increasingly higher Echo thresholds. Climb past the threshold and the contact lands on the log automatically.</p>
+      <p>One episode per cycle. Close the cycle to step into the next.</p>
     </div>
   `;
 
-  function renderSummary() {
-    const log = state.contactLog;
-    const worlds = (log && log.worlds) || [];
-    const shards = memoryShards(log);
-    const memPct = Math.round(ECHO_MEMORY_PER_SHARD * 100 * shards);
-    if (!worlds.length) {
-      summaryEl.innerHTML = `<div class="cl-summary"><em>The log is empty. The dark is still listening.</em></div>`;
-      return;
+  function setTab(name) {
+    activeTab = name;
+    for (const t of tabs) {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
     }
-    const counts = { TRIGGERED: 0, COLLAPSED: 0, SHIFTED: 0, MISSING: 0 };
-    for (const w of worlds) if (counts[w.status] != null) counts[w.status]++;
-    const parts = [`<strong>${worlds.length}</strong> name${worlds.length === 1 ? '' : 's'}`];
-    for (const s of STATUS_ORDER) {
-      if (counts[s] > 0) parts.push(`<span class="s-${s.toLowerCase()}"><strong>${counts[s]}</strong> ${s.toLowerCase()}</span>`);
+    for (const p of panels) {
+      p.classList.toggle('is-active', p.dataset.tab === name);
     }
-    summaryEl.innerHTML = `
-      <div class="cl-summary">${parts.join(' · ')}</div>
-      <div class="cl-summary-mem"><span class="cl-memory">+${memPct}%</span> Echo Memory</div>
-    `;
   }
 
   function renderGate() {
@@ -107,10 +118,8 @@ export function initNamesModalUi(state, opts = {}) {
 
   function renderEpisodes() {
     const log = state.contactLog;
-    // The "active" highlight follows the cycle's locked EP — that's the one
-    // the current run can still record names against. Anything past it is
-    // locked even if the worlds happen to be reachable, because the cycle
-    // can only fire milestones for cycleEp.
+    // Active highlight follows the cycle's locked EP. Anything past it is
+    // locked, because the cycle can only fire milestones for cycleEp.
     const active = getCycleEp(log);
     const contactedById = new Map((log.worlds || []).map((w) => [w.id, w]));
     const eps = Object.keys(WORLDS_BY_EP).map(Number).sort((a, b) => a - b);
@@ -123,8 +132,6 @@ export function initNamesModalUi(state, opts = {}) {
       const found = slots.filter((def) => contactedById.has(def.id)).length;
       const done = isEpComplete(log, ep);
       const isActive = active === ep && !done;
-      // Anything after the cycle's locked EP is locked — including the EP
-      // that would become active next if the player closed right now.
       const isLockedFuture = active != null && ep > active;
       const epTitle = EP_TITLES[ep] || `Episode ${ep}`;
       const cls = ['cl-ep-block'];
@@ -138,17 +145,14 @@ export function initNamesModalUi(state, opts = {}) {
           : `<span class="cl-ep-count">${found} / ${total}</span>`;
       const tiles = slots.map((def) => {
         const known = contactedById.get(def.id);
-        // Locked tile for unknown worlds (active or future EP). The locked
-        // glyph is rendered via CSS pseudo-element on .cl-tile.is-locked.
         if (!known) {
           return `<button type="button" class="cl-tile is-locked"
               aria-label="Unrecorded" data-act="locked-tile" disabled></button>`;
         }
         const sCls = `s-${(known.status || '').toLowerCase()}`;
-        const isOpen = expandedId === known.id;
-        return `<button type="button" class="cl-tile is-found ${sCls}${isOpen ? ' is-open' : ''}"
-            data-act="toggle-entry" data-id="${known.id}"
-            aria-label="${known.name}" aria-expanded="${isOpen ? 'true' : 'false'}">
+        return `<button type="button" class="cl-tile is-found ${sCls}"
+            data-act="open-detail" data-id="${known.id}"
+            aria-label="${known.name}">
             ${def.image
               ? `<img class="cl-tile-img" loading="lazy" alt="" src="${def.image}"
                    onerror="this.style.display='none';" />`
@@ -169,75 +173,72 @@ export function initNamesModalUi(state, opts = {}) {
     epsEl.innerHTML = sections.join('');
   }
 
-  function renderDetail() {
-    if (!expandedId) { detailEl.innerHTML = ''; return; }
-    const log = state.contactLog;
-    const w = (log.worlds || []).find((x) => x.id === expandedId);
-    if (!w) { detailEl.innerHTML = ''; expandedId = null; return; }
-    // Find the world's definition across any EP.
-    let def = null;
+  function findWorldDef(worldId) {
     for (const block of Object.values(WORLDS_BY_EP)) {
-      if (block && Object.values(block).some((d) => d.id === w.id)) {
-        def = Object.values(block).find((d) => d.id === w.id);
-        break;
+      if (!block) continue;
+      for (const def of Object.values(block)) {
+        if (def.id === worldId) return def;
       }
     }
-    const detail = worldDetail(w.id);
+    return null;
+  }
+
+  function openDetail(worldId) {
+    const log = state.contactLog;
+    const w = (log.worlds || []).find((x) => x.id === worldId);
+    if (!w) return;
+    const def = findWorldDef(worldId);
+    const detail = worldDetail(worldId);
     const sCls = `s-${(w.status || '').toLowerCase()}`;
     const meaning = STATUS_MEANING[w.status] || '';
     const note = detail && detail.note ? detail.note : (def && def.flavor ? def.flavor : '');
     const consequence = detail && detail.cost ? detail.cost : '';
     const img = def && def.image;
-    const portrait = img
-      ? `<img class="cl-detail-img" loading="lazy" alt="${w.name}" src="${img}"
-            onerror="this.style.display='none';var f=this.nextElementSibling;if(f)f.style.display='flex';" />
-         <div class="cl-detail-fallback" aria-hidden="true" style="display:none"></div>`
-      : `<div class="cl-detail-fallback" aria-hidden="true"></div>`;
     const epTitle = EP_TITLES[w.ep];
     const epLabel = epTitle ? `Episode ${w.ep} — ${epTitle}` : `Episode ${w.ep}`;
+    const portrait = img
+      ? `<img class="nd-portrait" loading="lazy" alt="${w.name}" src="${img}"
+            onerror="this.style.display='none'" />`
+      : '';
     const rows = detail ? `
-      <dl class="cl-detail-rows">
-        <div class="cl-detail-row"><dt>Method</dt><dd>${detail.method}</dd></div>
-        <div class="cl-detail-row"><dt>World</dt><dd>${detail.biology}</dd></div>
-        <div class="cl-detail-row"><dt>Politics</dt><dd>${detail.politics}</dd></div>
-        <div class="cl-detail-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
+      <dl class="nd-rows">
+        <div class="nd-row"><dt>Method</dt><dd>${detail.method}</dd></div>
+        <div class="nd-row"><dt>World</dt><dd>${detail.biology}</dd></div>
+        <div class="nd-row"><dt>Politics</dt><dd>${detail.politics}</dd></div>
+        <div class="nd-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
       </dl>` : `
-      <dl class="cl-detail-rows">
-        <div class="cl-detail-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
+      <dl class="nd-rows">
+        <div class="nd-row"><dt>Episode</dt><dd>${epLabel}</dd></div>
       </dl>`;
-    detailEl.innerHTML = `
-      <div class="cl-detail cl-detail-card ${sCls}">
-        <div class="cl-detail-head">
-          <div class="cl-name">${w.name}</div>
-          <span class="cl-status ${sCls}">${w.status}</span>
-          <button type="button" class="cl-detail-close" data-act="close-detail" aria-label="Close">
-            <i class="ri ri-close-line"></i>
-          </button>
-        </div>
-        ${meaning ? `<div class="cl-ep-meaning ${sCls}">${meaning}</div>` : ''}
-        <div class="cl-detail-body">
-          <img class="cl-avatar" alt="Kalen" src="${KALEN_PORTRAIT}" loading="lazy" />
-          <div class="cl-detail-text">
-            ${note ? `<p class="cl-detail-note"><em>${note}</em></p>` : ''}
-            ${consequence ? `<p class="cl-consequence">${consequence}</p>` : ''}
-          </div>
-        </div>
-        ${portrait}
-        ${rows}
+    detailTitle.textContent = w.name;
+    detailBody.innerHTML = `
+      <div class="nd-status-row">
+        <span class="cl-status ${sCls}">${w.status}</span>
+        ${meaning ? `<span class="nd-meaning ${sCls}">${meaning}</span>` : ''}
       </div>
+      ${portrait}
+      ${note ? `
+        <div class="nd-kalen-row">
+          <img class="nd-avatar" alt="Kalen" src="${KALEN_PORTRAIT}" loading="lazy" />
+          <p class="nd-note"><em>${note}</em></p>
+        </div>` : ''}
+      ${consequence ? `<p class="nd-consequence">${consequence}</p>` : ''}
+      ${rows}
     `;
+    detailModal.classList.add('open');
   }
 
+  const closeDetail = () => detailModal.classList.remove('open');
+
   function render() {
-    renderSummary();
     renderGate();
     renderEpisodes();
-    renderDetail();
   }
 
   const open = () => {
     markNamesSeen(state.contactLog);
     if (typeof opts.onLogPersist === 'function') opts.onLogPersist();
+    setTab(activeTab);
     render();
     modal.classList.add('open');
   };
@@ -245,34 +246,27 @@ export function initNamesModalUi(state, opts = {}) {
 
   installTap(modal, (_e, target) => {
     if (target === modal || target.closest('.bm-close')) { close(); return; }
-    const t = target.closest('[data-act]');
-    const act = t?.dataset.act;
-    if (!act) return;
-    if (act === 'toggle-entry') {
-      const id = t.dataset.id;
-      expandedId = expandedId === id ? null : id;
-      renderEpisodes();
-      renderDetail();
-      // Smooth-scroll the detail card into view for tap on a tile that lives
-      // far above the panel's viewport. Falls back gracefully if behavior:smooth
-      // isn't supported.
-      if (expandedId) {
-        requestAnimationFrame(() => detailEl.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-      }
+    const t = target.closest('[data-act], [data-tab]');
+    if (!t) return;
+    if (t.dataset.tab && t.classList.contains('cl-tab')) {
+      setTab(t.dataset.tab);
       return;
     }
-    if (act === 'close-detail') {
-      expandedId = null;
-      renderEpisodes();
-      renderDetail();
+    const act = t.dataset.act;
+    if (act === 'open-detail') {
+      openDetail(t.dataset.id);
       return;
     }
   });
+
+  installTap(detailModal, (_e, target) => {
+    if (target === detailModal || target.closest('.bm-close')) { closeDetail(); return; }
+  });
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('open')) {
-      if (expandedId) { expandedId = null; renderEpisodes(); renderDetail(); return; }
-      close();
-    }
+    if (e.key !== 'Escape') return;
+    if (detailModal.classList.contains('open')) { closeDetail(); return; }
+    if (modal.classList.contains('open')) close();
   });
 
   return { open, close, render };

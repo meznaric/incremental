@@ -1,6 +1,9 @@
-// Rig modal — the persistence layer. Surfaces Echo Memory (shards × +10%),
-// Carrier Mass (banked + projected for this cycle), and the Engravings shop
-// that converts Mass into permanent rig cuts.
+// Rig modal — the persistence layer. Three tabs:
+//
+//   Rig  → Echo Memory + Carrier Mass tiles, plus the "accreting this cycle"
+//          projection that the player is about to bank on close.
+//   Shop → Carrier Engravings, the only place to spend Carrier Mass.
+//   Info → How Echo Memory and Carrier Mass work, what a cycle close does.
 import {
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
   getMass, getEngraving, massForPeak, memoryShards, memoryMul,
@@ -13,19 +16,50 @@ export function initRigModalUi(state, opts = {}) {
   const tilesEl       = modal.querySelector('.cl-rig-tiles');
   const projectionEl  = modal.querySelector('.cl-rig-projection');
   const engravingsEl  = modal.querySelector('.cl-engravings');
-  const massInfoEl    = modal.querySelector('.cl-mass-info');
+  const infoEl        = modal.querySelector('.cl-rig-info');
+  const tabs = Array.from(modal.querySelectorAll('.cl-tab'));
+  const panels = Array.from(modal.querySelectorAll('.cl-tab-panel'));
+  let activeTab = 'rig';
 
-  // Static FAQ — banked vs. accreting Mass mechanics. Rendered once at init.
-  massInfoEl.innerHTML = `
+  // Static info-tab content — rendered once. All three FAQs live here so the
+  // Rig/Shop tabs stay on the live numbers and the shop list.
+  infoEl.innerHTML = `
+    <div class="faq-block kind-memory">
+      <div class="faq-head"><i class="ri ri-database-2-line"></i>How Echo Memory works</div>
+      <div class="faq-body">
+        <p><strong>Earn:</strong> one shard per name on the log. Across every cycle, every episode.</p>
+        <p><strong>What it does:</strong> each shard adds <strong>+${Math.round(ECHO_MEMORY_PER_SHARD * 100)}%</strong> to base Echoes/s, applied <em>before</em> every other multiplier.</p>
+        <p><strong>Never lost.</strong> The names stay. This number only ever climbs.</p>
+      </div>
+    </div>
     <div class="faq-block kind-mass">
       <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Carrier Mass works</div>
       <div class="faq-body">
         <p><strong>Earn:</strong> banked at cycle close from the cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
-        <p><strong>Spend:</strong> Engravings above — permanent cuts to the rig.</p>
-        <p><strong>Tip:</strong> peak is what counts, not the closing balance. Spike the rate before I close.</p>
+        <p><strong>Spend:</strong> Engravings in the Shop tab — permanent cuts to the rig.</p>
+        <p><strong>Tip:</strong> peak is what counts, not the closing balance. Spike the rate before closing.</p>
+      </div>
+    </div>
+    <div class="faq-block">
+      <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
+      <div class="faq-body">
+        <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
+        <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
       </div>
     </div>
   `;
+
+  function setTab(name) {
+    activeTab = name;
+    for (const t of tabs) {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+    for (const p of panels) {
+      p.classList.toggle('is-active', p.dataset.tab === name);
+    }
+  }
 
   function peakAmount() {
     return (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
@@ -117,6 +151,7 @@ export function initRigModalUi(state, opts = {}) {
   const open = () => {
     markRigSeen(state.contactLog);
     if (typeof opts.onLogPersist === 'function') opts.onLogPersist();
+    setTab(activeTab);
     render();
     modal.classList.add('open');
   };
@@ -124,10 +159,13 @@ export function initRigModalUi(state, opts = {}) {
 
   installTap(modal, (_e, target) => {
     if (target === modal || target.closest('.bm-close')) { close(); return; }
-    const t = target.closest('[data-act]');
-    const act = t?.dataset.act;
-    if (!act) return;
-    if (act === 'buy-engraving') {
+    const t = target.closest('[data-act], [data-tab]');
+    if (!t) return;
+    if (t.dataset.tab && t.classList.contains('cl-tab')) {
+      setTab(t.dataset.tab);
+      return;
+    }
+    if (t.dataset.act === 'buy-engraving') {
       const id = t.dataset.id;
       if (buyEngraving(state.contactLog, id)) {
         if (typeof opts.onBuyEngraving === 'function') opts.onBuyEngraving(id);

@@ -244,31 +244,67 @@
 
   <div id="namesModal" role="dialog" aria-modal="true" aria-label="Names">
     <div class="bm-card">
-      <div class="bm-head">
-        <span class="bm-title">Names</span>
+      <div class="bm-head cl-tab-head">
+        <nav class="cl-tabs" role="tablist" aria-label="Names sections">
+          <button type="button" class="cl-tab is-active" role="tab" data-tab="names" aria-selected="true">
+            <i class="ri ri-planet-line" aria-hidden="true"></i><span>Names</span>
+          </button>
+          <button type="button" class="cl-tab" role="tab" data-tab="info" aria-selected="false">
+            <i class="ri ri-information-line" aria-hidden="true"></i><span>Info</span>
+          </button>
+        </nav>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body cl-names-body">
-        <div class="cl-names-summary"></div>
-        <div class="cl-names-gate"></div>
-        <div class="cl-names-episodes"></div>
-        <div class="cl-names-detail"></div>
-        <div class="cl-memory-info"></div>
+        <section class="cl-tab-panel is-active" data-tab="names" role="tabpanel">
+          <p class="cl-lore-line"></p>
+          <div class="cl-names-gate"></div>
+          <div class="cl-names-episodes"></div>
+        </section>
+        <section class="cl-tab-panel" data-tab="info" role="tabpanel">
+          <div class="cl-names-info"></div>
+        </section>
       </div>
+    </div>
+  </div>
+
+  <div id="nameDetailModal" role="dialog" aria-modal="true" aria-label="Contact detail">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title" id="nameDetailTitle">Contact</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body nd-body"></div>
     </div>
   </div>
 
   <div id="rigModal" role="dialog" aria-modal="true" aria-label="Rig">
     <div class="bm-card">
-      <div class="bm-head">
-        <span class="bm-title">Rig</span>
+      <div class="bm-head cl-tab-head">
+        <nav class="cl-tabs" role="tablist" aria-label="Rig sections">
+          <button type="button" class="cl-tab is-active" role="tab" data-tab="rig" aria-selected="true">
+            <i class="ri ri-radar-line" aria-hidden="true"></i><span>Rig</span>
+          </button>
+          <button type="button" class="cl-tab" role="tab" data-tab="shop" aria-selected="false">
+            <i class="ri ri-hammer-line" aria-hidden="true"></i><span>Shop</span>
+          </button>
+          <button type="button" class="cl-tab" role="tab" data-tab="info" aria-selected="false">
+            <i class="ri ri-information-line" aria-hidden="true"></i><span>Info</span>
+          </button>
+        </nav>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
       <div class="bm-body cl-body cl-rig-body">
-        <div class="cl-rig-tiles"></div>
-        <div class="cl-rig-projection"></div>
-        <div class="cl-engravings"></div>
-        <div class="cl-mass-info"></div>
+        <section class="cl-tab-panel is-active" data-tab="rig" role="tabpanel">
+          <div class="cl-rig-tiles"></div>
+          <div class="cl-rig-projection"></div>
+        </section>
+        <section class="cl-tab-panel" data-tab="shop" role="tabpanel">
+          <div class="cl-engravings"></div>
+        </section>
+        <section class="cl-tab-panel" data-tab="info" role="tabpanel">
+          <div class="cl-rig-info"></div>
+        </section>
       </div>
     </div>
   </div>

@@ -719,7 +719,7 @@
   .gx-mote-win, .gx-mote-loss { display: none; }
 }
 
-#buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal, #gameLogModal {
+#buffModal, #slotModal, #cycleModal, #namesModal, #rigModal, #diagnosticModal, #buffDetailModal, #networkModal, #gameLogModal {
   position: fixed;
   inset: 0;
   display: none;
@@ -735,7 +735,7 @@
     max(20px, env(safe-area-inset-left));
   box-sizing: border-box;
 }
-#buffModal.open, #slotModal.open, #contactLogModal.open, #diagnosticModal.open, #buffDetailModal.open, #networkModal.open, #gameLogModal.open { display: flex; }
+#buffModal.open, #slotModal.open, #cycleModal.open, #namesModal.open, #rigModal.open, #diagnosticModal.open, #buffDetailModal.open, #networkModal.open, #gameLogModal.open { display: flex; }
 /* Cover every interactive surface inside a modal: skips iOS's 300ms tap
    delay and the tap-highlight flash that occasionally swallows first taps
    on iOS Chrome. Mirrors what the slot cards already do. */
@@ -749,7 +749,7 @@
 /* On phones the modal overlay's 20px padding eats real estate. Drop it to
    8px so the body has room and the close button stays in the viewport. */
 @media (max-width: 520px) {
-  #buffModal, #slotModal, #contactLogModal, #diagnosticModal, #buffDetailModal, #networkModal, #gameLogModal {
+  #buffModal, #slotModal, #cycleModal, #namesModal, #rigModal, #diagnosticModal, #buffDetailModal, #networkModal, #gameLogModal {
     padding:
       max(8px, env(safe-area-inset-top))
       max(8px, env(safe-area-inset-right))

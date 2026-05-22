@@ -10,7 +10,7 @@ import { loadState, saveState, clearSave, nowSeconds } from './save.js';
 import {
   checkStart, checkAmount, checkEngraving, enqueueFirstCloseBeat,
   scheduleTutorialIfEligible, bindEpisode, enqueueSeasonCompleteBeat,
-  enqueue as enqueueInterstitial,
+  enqueue as enqueueInterstitial, isCycleComplete,
 } from './interstitial.js';
 import { makeInterstitialUi } from './interstitialUi.js';
 import { runIntroSequence } from './introUi.js';
@@ -18,8 +18,11 @@ import { initMenu } from './menu.js';
 import {
   loadContactLog, saveContactLog, backfillFromShown, closeCycle, memoryMul,
   ascentExp, boneMemoryBonus, quickWakeMul, firstLightAmount, getEngraving, QUICK_WAKE_DURATION,
+  canCloseCycle, isLoopMode, hasUnreadNames, hasUnreadRig,
 } from './contactLog.js';
-import { initContactLogUi } from './contactLogUi.js';
+import { initCycleModalUi } from './cycleModalUi.js';
+import { initNamesModalUi } from './namesModalUi.js';
+import { initRigModalUi } from './rigModalUi.js';
 import { recordCycleClose } from './gameLog.js';
 import { initGameLogUi } from './gameLogUi.js';
 import { showWelcomeBack } from './welcomeBack.js';
@@ -93,8 +96,18 @@ function closeCycleNow() {
   return true;
 }
 
-const contactLogUi = initContactLogUi(state, {
-  onCloseCycle: closeCycleNow,
+// Three modal surfaces, one per area of the cycle-close loop. They share the
+// same cl-* CSS prefix and bm-card scaffold but each owns its own DOM element
+// and render lifecycle. The contactProgress strip below dispatches its three
+// segments to the matching open() call.
+const cycleModalUi = initCycleModalUi(state, { onCloseCycle: closeCycleNow });
+const namesModalUi = initNamesModalUi(state, {
+  // Opening the Names modal acknowledges every world currently on the log,
+  // which clears the unread-pulse counter; persist so the pulse doesn't fire
+  // again on the next refresh.
+  onLogPersist() { saveContactLog(state.contactLog); },
+});
+const rigModalUi = initRigModalUi(state, {
   onBuyEngraving(id) {
     // Live updates for engravings whose effect should bite immediately rather
     // than wait for the next cycle. Ascent applies to the rate pipeline now;
@@ -105,10 +118,19 @@ const contactLogUi = initContactLogUi(state, {
     checkEngraving(state, id);
     saveContactLog(state.contactLog);
   },
-  // Persist after opening the Names panel — that hop clears the unread
-  // counter so the planet pulse doesn't fire forever after first read.
+  // Same persistence hook as Names — opening Rig clears hasUnreadRig.
   onLogPersist() { saveContactLog(state.contactLog); },
 });
+// Reuse one object every call — affordance is read per-frame from the strip's
+// update(), so a fresh literal each tick was 60 GC'd objects per second.
+const _affordance = { cycleReady: false, namesUnread: false, rigUnread: false };
+function getContactAffordance() {
+  const log = state.contactLog;
+  _affordance.cycleReady = canCloseCycle(log) && (isLoopMode(log) || isCycleComplete(state));
+  _affordance.namesUnread = hasUnreadNames(log);
+  _affordance.rigUnread = hasUnreadRig(log);
+  return _affordance;
+}
 const breakdownUi = initBreakdownUi(state);
 const achievementsUi = initAchievementsUi(state);
 ensureNetwork(state);
@@ -222,10 +244,10 @@ const debugUi = initDebugUi(state, {
   refreshNetwork: () => networkUi.refresh(),
 });
 const contactProgressUi = initContactProgressUi(state, {
-  openNames: () => contactLogUi.openPanel('names'),
-  openCycle: () => contactLogUi.openPanel('cycle'),
-  openRig:   () => contactLogUi.openPanel('rig'),
-  getAffordance: () => contactLogUi.getAffordance(),
+  openNames: () => namesModalUi.open(),
+  openCycle: () => cycleModalUi.open(),
+  openRig:   () => rigModalUi.open(),
+  getAffordance: getContactAffordance,
 });
 
 const loaded = loadState(state);
@@ -477,8 +499,8 @@ function tick(raf) {
   if (Number.isFinite(accrual)) state.amount += accrual;
   else console.warn('integrateRate produced non-finite value', accrual);
   checkAmount(state, state.amount);
-  // contactProgressUi.update pulls cycleReady / namesUnread from
-  // contactLogUi.getAffordance every tick — no separate affordance call needed.
+  // contactProgressUi.update pulls cycleReady / namesUnread / rigUnread from
+  // getContactAffordance every tick — no separate affordance call needed.
 
   let buffCount = 0;
   const bs = state.buffs;

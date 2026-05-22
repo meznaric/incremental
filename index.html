@@ -224,33 +224,51 @@
     </div>
   </div>
 
-  <div id="contactLogModal" role="dialog" aria-modal="true" aria-label="Contact Log">
+  <div id="cycleModal" role="dialog" aria-modal="true" aria-label="Cycle">
     <div class="bm-card">
       <div class="bm-head">
         <span class="bm-title">Cycle</span>
         <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
       </div>
-      <div class="bm-body cl-body">
-        <div class="cl-panel is-active" data-panel="cycle" role="tabpanel">
-          <div class="cl-intro"></div>
-          <div class="cl-progress"></div>
-          <div class="cl-hook"></div>
-          <div class="cl-stats"></div>
-          <div class="cl-action"></div>
-          <div class="cl-close-info"></div>
-        </div>
-        <div class="cl-panel" data-panel="names" role="tabpanel">
-          <div class="cl-legend"></div>
-          <div class="cl-names-head"></div>
-          <ul class="cl-list"></ul>
-          <div class="cl-empty">The log is empty. The dark is still listening.</div>
-          <div class="cl-pending"></div>
-          <div class="cl-memory-info"></div>
-        </div>
-        <div class="cl-panel" data-panel="rig" role="tabpanel">
-          <div class="cl-engravings"></div>
-          <div class="cl-mass-info"></div>
-        </div>
+      <div class="bm-body cl-body cl-cycle-body">
+        <div class="cl-intro"></div>
+        <div class="cl-cycle-tiles"></div>
+        <div class="cl-cycle-progress"></div>
+        <div class="cl-cycle-next"></div>
+        <div class="cl-cycle-upcoming"></div>
+        <div class="cl-action"></div>
+        <div class="cl-close-info"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="namesModal" role="dialog" aria-modal="true" aria-label="Names">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Names</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body cl-body cl-names-body">
+        <div class="cl-names-summary"></div>
+        <div class="cl-names-gate"></div>
+        <div class="cl-names-episodes"></div>
+        <div class="cl-names-detail"></div>
+        <div class="cl-memory-info"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rigModal" role="dialog" aria-modal="true" aria-label="Rig">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Rig</span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body cl-body cl-rig-body">
+        <div class="cl-rig-tiles"></div>
+        <div class="cl-rig-projection"></div>
+        <div class="cl-engravings"></div>
+        <div class="cl-mass-info"></div>
       </div>
     </div>
   </div>

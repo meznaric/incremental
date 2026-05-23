@@ -124,10 +124,9 @@ const BASE_INTERSTITIALS = {
     bgImage: './docs/lore/images/console-dark.png',
     steps: [
       { voice: 'K', text: 'The beginning, then.' },
-      { voice: 'K', text: 'A rig like this one. A channel I was not supposed to touch.' },
-      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them — even when the desk is empty.' },
-      { voice: 'K', text: 'At a hundred Echoes the Console opens. Yield first. Hails when I am brave.' },
-      { voice: 'K', text: 'The green bands first — Relays, then Decodes. Each one I patch in lifts the floor.' },
+      { voice: 'K', text: 'A console like this one. A channel I was not supposed to touch.' },
+      { voice: 'K', text: 'Every signal that comes back is an Echo. The rig counts them. Even when the desk is empty.' },
+      { voice: 'K', text: 'At a hundred Echoes the Console opens. Yield first. Hails when I am brave.' }
     ],
   },
 
@@ -215,13 +214,18 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
-  // voice: Kalen. First cycle close.
+  // voice: Kalen. First cycle close. Kalen is still in his own past here —
+  // he has not been arrested, has not met Sera. The earlier draft attributed
+  // the accretion concept to her, which broke the past-recounting frame.
+  // The observation is his own; the lore's *word* for it ("accretion") is
+  // Sera's later coinage, but he is allowed to discover the thing without
+  // having a name for it.
   first_cycle_close: {
     bgImage: './docs/lore/images/rig-with-weight.png',
     steps: [
       { voice: 'K', text: 'The rig has weight now. It did not before.' },
-      { voice: 'K', text: 'Sera once told me a carrier accretes — every push leaves a little of itself on the hardware.' },
-      { voice: 'K', text: 'I did not believe her. The numbers on the bench say I should.' },
+      { voice: 'K', text: 'Something about a carrier accretes. Every push leaves a little of itself on the hardware.' },
+      { voice: 'K', text: 'I read a paper that said as much years ago. I did not believe it. The numbers on the bench say I should.' },
       { voice: 'K', text: 'I can cut this weight into the frame. The next cycle will remember.' },
     ],
   },

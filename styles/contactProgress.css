@@ -158,57 +158,48 @@
   100% { box-shadow: inset 0 0 8px 0px transparent; }
 }
 
-/* New-name pulse — warm amber glow on the left planet when at least one
+/* New-name pulse — warm amber light inside the left planet when at least one
    world has been logged since the player last opened the Names panel. The
-   chip in the corner reads as a notification dot. */
+   planet's interior gradient pulses; there is no corner dot. The whole disc
+   reads as "there is something inside this." */
 .cp-edge-left.is-unread {
   border-color: #d49a55;
-  animation: cp-unread-pulse 2.2s ease-in-out infinite;
+  background: #1a1208;
+  animation: cp-edge-left-unread 2.4s ease-in-out infinite;
 }
-.cp-edge-left.is-unread::after {
-  content: '';
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #f0c080;
-  box-shadow: 0 0 8px rgba(240, 192, 128, 0.9);
-  animation: cp-dot-pulse 1.6s ease-in-out infinite;
+.cp-edge-left.is-unread .cp-edge-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(240, 192, 128, 0.85) 0%, rgba(212, 154, 85, 0.30) 55%, rgba(212, 154, 85, 0) 80%);
+  animation: cp-edge-glow-pulse 2.4s ease-in-out infinite;
 }
-@keyframes cp-unread-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 154, 85, 0); }
-  50%      { box-shadow: 0 0 14px 2px rgba(212, 154, 85, 0.55); }
-}
-@keyframes cp-dot-pulse {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50%      { opacity: 1;    transform: scale(1.25); }
+@keyframes cp-edge-left-unread {
+  0%, 100% { background: #1a1208; }
+  50%      { background: #2c1c0b; }
 }
 
-/* Banked-mass pulse — cool blue glow on the right radar segment when Carrier
-   Mass has accreted but the player hasn't opened the Rig panel since. Same
-   chip-in-the-corner notification shape as the left planet, palette tuned to
-   the radar's existing blue accent. */
+/* Banked-mass pulse — cool blue light inside the right radar segment when
+   Console Mass has accreted but the player hasn't opened the Rig panel
+   since. Same interior-pulse shape as the left planet, palette tuned to the
+   radar's existing blue accent. */
 .cp-edge-right.is-unread {
   border-color: #8aa0ff;
-  animation: cp-rig-unread-pulse 2.2s ease-in-out infinite;
+  background: #0d1130;
+  animation: cp-edge-right-unread 2.4s ease-in-out infinite;
 }
-.cp-edge-right.is-unread::after {
-  content: '';
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #b9c1ff;
-  box-shadow: 0 0 8px rgba(138, 160, 255, 0.9);
-  animation: cp-dot-pulse 1.6s ease-in-out infinite;
+.cp-edge-right.is-unread .cp-edge-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(185, 193, 255, 0.85) 0%, rgba(138, 160, 255, 0.30) 55%, rgba(138, 160, 255, 0) 80%);
+  animation: cp-edge-glow-pulse 2.4s ease-in-out infinite;
 }
-@keyframes cp-rig-unread-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(138, 160, 255, 0); }
-  50%      { box-shadow: 0 0 14px 2px rgba(138, 160, 255, 0.6); }
+@keyframes cp-edge-right-unread {
+  0%, 100% { background: #0d1130; }
+  50%      { background: #161d52; }
+}
+
+/* Shared interior-glow tempo for both unread states. The gradient itself is
+   colour-tuned in each .is-unread .cp-edge-glow block above; this animates
+   opacity + scale so the centre breathes. */
+@keyframes cp-edge-glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50%      { opacity: 1;    transform: scale(1.06); }
 }
 
 /* Signal line — a <canvas> that fills the track. The pixel content is the

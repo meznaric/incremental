@@ -289,6 +289,9 @@ export function makeNetworkUi(state, opts) {
       const sel = r.id === selectedRelayId;
       const labelY = y + HEX_SIZE * 0.85;
       const sector = SECTORS[r.sector] || SECTORS.frontier;
+      // Tier is baked into the relay-mark class so CSS can paint the frame,
+      // brackets, core, and outer glow per rarity. See network.css → rar-*.
+      const rarCls = `rar-${r.tier || 'common'}`;
       if (online) {
         const adj = adjacentOnlineCount(net, r, now);
         const isolated = adj === 0;
@@ -297,7 +300,7 @@ export function makeNetworkUi(state, opts) {
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\n${yLabel}/s${isolated ? ' · isolated' : ` · ${adj} neighbour${adj === 1 ? '' : 's'}`}`;
         const ret = reticle(x, y, 1);
         relayNodes.push(`
-          <g class="relay-mark ${isolated ? 'isolated' : 'clustered'} ${sel ? 'selected' : ''}" data-relay="${r.id}">
+          <g class="relay-mark ${rarCls} ${isolated ? 'isolated' : 'clustered'} ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
             <polygon class="r-frame" points="${ret.framePts}" />
             ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
@@ -315,7 +318,7 @@ export function makeNetworkUi(state, opts) {
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\nRipens in ${tLabel}`;
         const ret = reticle(x, y, 1);
         relayNodes.push(`
-          <g class="relay-mark ripening ${sel ? 'selected' : ''}" data-relay="${r.id}">
+          <g class="relay-mark ${rarCls} ripening ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
             <polygon class="r-frame" points="${ret.framePts}" />
             <circle class="ripe-base" cx="${x}" cy="${y}" r="${ringR}" />
@@ -330,7 +333,8 @@ export function makeNetworkUi(state, opts) {
     }
 
     // Ghost reticle on the staged hex — same shape as a real relay frame but
-    // dashed/pulsing so the player sees it's a preview.
+    // dashed/pulsing so the player sees it's a preview. Tinted by the tier of
+    // the queued token that would land there.
     let ghostNode = '';
     if (pendingPlacement) {
       const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
@@ -338,8 +342,9 @@ export function makeNetworkUi(state, opts) {
       if (ph && !alreadyOccupied) {
         const { x, y } = hexCenterFromBounds(ph.q, ph.r, bounds);
         const ret = reticle(x, y, 1);
+        const nextTier = (net.queued && net.queued[0] && net.queued[0].tier) || 'common';
         ghostNode = `
-          <g class="relay-mark pending">
+          <g class="relay-mark pending rar-${nextTier}">
             <polygon class="r-frame" points="${ret.framePts}" />
             ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
             <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
@@ -355,6 +360,34 @@ export function makeNetworkUi(state, opts) {
         ${relayNodes.join('')}
         ${ghostNode}
       </svg>
+    `;
+  }
+
+  // Mobile-only strip rendered between the map and the side panel. Compact
+  // horizontal chip list of upcoming tokens so the player can see what they
+  // are about to place without scrolling past status/summary. Hidden on
+  // desktop via CSS — the full Placement queue in renderSidePanel still owns
+  // the canonical view there.
+  function renderUpNext() {
+    const net = ensureNetwork(state);
+    const queued = (net && net.queued) || [];
+    if (queued.length === 0) {
+      return `
+        <div class="net-upnext-head">Up next</div>
+        <div class="net-upnext-empty">No tokens queued. Buy a Seed Relay in the shop.</div>
+      `;
+    }
+    const chips = queued.map((t, i) => `
+      <div class="net-upnext-chip rar-${t.tier}">
+        <span class="net-upnext-pos">${i === 0 ? 'next' : `#${i + 1}`}</span>
+        <span class="net-token-dot rar-${t.tier}"></span>
+        <span class="net-upnext-tier">${TIER_LABEL[t.tier] || t.tier}</span>
+        <span class="net-upnext-yield">+${formatAbbrev(t.baseYield)}/s</span>
+      </div>
+    `).join('');
+    return `
+      <div class="net-upnext-head">Up next · ${queued.length}</div>
+      <div class="net-upnext-strip">${chips}</div>
     `;
   }
 
@@ -768,6 +801,7 @@ export function makeNetworkUi(state, opts) {
     bodyEl.innerHTML = `
       <div class="net-layout">
         <div class="net-map"></div>
+        <div class="net-upnext"></div>
         <div class="net-side"></div>
       </div>
     `;
@@ -796,8 +830,10 @@ export function makeNetworkUi(state, opts) {
       : 'Network';
     ensureSkeleton();
     const mapEl = bodyEl.querySelector('.net-map');
+    const upNextEl = bodyEl.querySelector('.net-upnext');
     const sideEl = bodyEl.querySelector('.net-side');
     mapEl.innerHTML = renderHexSvg(now) + renderHexBar(now);
+    if (upNextEl) upNextEl.innerHTML = renderUpNext();
     sideEl.innerHTML = renderSidePanel(now);
     if (!view.initialized) {
       requestAnimationFrame(() => {

@@ -56,6 +56,61 @@
   flex-direction: column;
   gap: 12px;
 }
+/* Mobile-only "up next" strip — rendered between the map and the side panel
+   so the player can see queued tokens without scrolling past status tiles.
+   Hidden on desktop; the full Placement queue in the side panel owns the
+   canonical view there. */
+.net-upnext { display: none; }
+.net-upnext-head {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+  margin-bottom: 6px;
+}
+.net-upnext-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.net-upnext-strip::-webkit-scrollbar { display: none; }
+.net-upnext-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  background: rgba(20, 20, 40, 0.65);
+  border: 1px solid rgba(120, 140, 255, 0.22);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.net-upnext-chip.rar-common    { border-color: rgba(138, 160, 255, 0.55); box-shadow: 0 0 10px rgba(138, 160, 255, 0.20); }
+.net-upnext-chip.rar-uncommon  { border-color: rgba(111, 184, 140, 0.65); box-shadow: 0 0 10px rgba(111, 184, 140, 0.22); }
+.net-upnext-chip.rar-rare      { border-color: rgba(200, 156, 92, 0.70);  box-shadow: 0 0 10px rgba(200, 156, 92, 0.28); }
+.net-upnext-chip.rar-legendary { border-color: rgba(216, 100, 156, 0.75); box-shadow: 0 0 12px rgba(216, 100, 156, 0.30); }
+.net-upnext-chip.rar-mythic    { border-color: rgba(255, 216, 107, 0.85); box-shadow: 0 0 14px rgba(255, 216, 107, 0.40); }
+.net-upnext-chip .net-token-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.net-upnext-pos {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a8ac0;
+}
+.net-upnext-chip:first-child .net-upnext-pos { color: #ffe082; }
+.net-upnext-tier { color: #e8e8f0; }
+.net-upnext-yield { color: #4ade80; font-size: 10px; }
+.net-upnext-empty {
+  font-size: 11px;
+  color: #6a6a90;
+  font-style: italic;
+}
 .netmap-svg {
   width: 100%;
   height: auto;
@@ -499,6 +554,7 @@
 @media (max-width: 640px) {
   .net-layout { flex-direction: column; }
   .net-side   { flex: 1 1 auto; }
+  .net-upnext { display: block; }
   /* Cover-fit on the map. The SVG is visually scaled and translated via CSS
      vars set in JS (see attachInteractions in networkUi.js) — one-finger drag
      pans, two-finger pinch zooms, both clamped to the map content. */
@@ -514,4 +570,40 @@
     left: 10px; right: 10px; bottom: 10px;
   }
 }
+
+/* --- Map node rarity tinting.
+   The reticle's frame/core color already carries semantic meaning (clustered
+   vs isolated vs ripening) so rarity rides on a separate visual channel: an
+   outer glow + a small inset ring drawn around the relay core. Higher rarity
+   = brighter, warmer glow; mythic adds a slow pulse so it pops at a glance.
+   Pending (placement-preview) ghosts also get the queued tier's color so the
+   player sees what they are about to commit. */
+.relay-mark.rar-common              { filter: drop-shadow(0 0 3px rgba(138, 160, 255, 0.50)); }
+.relay-mark.rar-uncommon            { filter: drop-shadow(0 0 5px rgba(111, 184, 140, 0.60)); }
+.relay-mark.rar-rare                { filter: drop-shadow(0 0 7px rgba(200, 156, 92, 0.70)); }
+.relay-mark.rar-legendary           { filter: drop-shadow(0 0 9px rgba(216, 100, 156, 0.78)); }
+.relay-mark.rar-mythic              { filter: drop-shadow(0 0 12px rgba(255, 216, 107, 0.95)); }
+
+/* Inset rarity ring drawn on the core — a thin stroke in the tier color so
+   even when the cluster/isolated frame is yellow or cyan the rarity reads. */
+.relay-mark.rar-common .r-core    { stroke: rgba(138, 160, 255, 0.85); stroke-width: 1.2; }
+.relay-mark.rar-uncommon .r-core  { stroke: rgba(111, 184, 140, 0.95); stroke-width: 1.4; }
+.relay-mark.rar-rare .r-core      { stroke: rgba(200, 156, 92, 1);    stroke-width: 1.6; }
+.relay-mark.rar-legendary .r-core { stroke: rgba(216, 100, 156, 1);   stroke-width: 1.8; }
+.relay-mark.rar-mythic .r-core    { stroke: rgba(255, 216, 107, 1);   stroke-width: 2.0; }
+
+/* Mythic reads as the apex tier — gentle pulse on the inset ring. */
+.relay-mark.rar-mythic .r-core { animation: rar-mythic-pulse 2.2s ease-in-out infinite; }
+@keyframes rar-mythic-pulse {
+  0%, 100% { stroke-opacity: 0.85; }
+  50%      { stroke-opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .relay-mark.rar-mythic .r-core { animation: none; }
+}
+
+/* Ripening nodes dim their inset ring so the not-yet-online state still
+   reads, but the rarity glow on the whole mark stays so the player can tell
+   a rare seed from a common seed even before it ripens. */
+.relay-mark.ripening .r-core { stroke-opacity: 0.6; }
 

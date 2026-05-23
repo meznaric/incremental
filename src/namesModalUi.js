@@ -59,9 +59,10 @@ export function initNamesModalUi(state, opts = {}) {
     <div class="cl-info-block">
       <h4>Status colours</h4>
       <div class="cl-info-statuses">
+        <span class="s-label s-prospered">PROSPERED</span><span class="s-meaning">The contact landed well. The culture absorbed the signal and is still itself — restraint, timing, luck.</span>
+        <span class="s-label s-shifted">SHIFTED</span><span class="s-meaning">The trajectory bent. The civilisation kept moving — somewhere different from where it had been heading.</span>
         <span class="s-label s-triggered">TRIGGERED</span><span class="s-meaning">The contact set off a cascade. Something big happened because of the call.</span>
         <span class="s-label s-collapsed">COLLAPSED</span><span class="s-meaning">The world ended sometime after the contact. Cause unclear, correlation total.</span>
-        <span class="s-label s-shifted">SHIFTED</span><span class="s-meaning">The trajectory bent. The civilisation kept moving — somewhere different from where it had been heading.</span>
         <span class="s-label s-missing">MISSING</span><span class="s-meaning">Gone from records. Not destroyed. Just absent on the next pass.</span>
       </div>
     </div>

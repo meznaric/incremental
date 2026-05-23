@@ -48,10 +48,11 @@ export const EP_INTERSTITIALS = {
       { voice: 'S', text: 'Three city-states heard the same sentence.', autoMs: 1400 },
       { voice: 'S', text: 'They built a treaty around it. The treaty cites a witness.', autoMs: 2200 },
     ] },
-    // K. Halun-Veth — they were already listening; he answered.
+    // K. Halun-Veth — PROSPERED. He answered carefully and then stopped.
     milestone_1b: { steps: [
-      { voice: 'K', text: 'They had been listening for forty years.', autoMs: 1400 },
-      { voice: 'K', text: 'I answered. They rebuilt their academy around the answer.', autoMs: 2200 },
+      { voice: 'K', text: 'Forty years they had been listening for life.' },
+      { voice: 'K', text: 'I said one sentence. Then I stopped.' },
+      { voice: 'K', text: 'They are still arguing about it. The argument is gentle. One of mine landed well.' },
     ] },
     // K. Voun — the word "salt" he did not say.
     milestone_10b: { steps: [
@@ -120,10 +121,11 @@ export const EP_INTERSTITIALS = {
       { voice: 'S', text: 'A test pulse you sent to yourself.', autoMs: 1400 },
       { voice: 'S', text: 'They built a faith on it. They have not lapsed.', autoMs: 2200 },
     ] },
-    // K. Quel-Sin — one polite verse, twelve thousand dead.
+    // K. Quel-Sin — PROSPERED. He matched their scale and went home.
     milestone_100m: { steps: [
-      { voice: 'K', text: 'I sang one verse back. Politely.', autoMs: 1400 },
-      { voice: 'K', text: 'Twelve thousand monks have died about the verse.', autoMs: 2200 },
+      { voice: 'K', text: 'I sang one verse back. Politely.' },
+      { voice: 'K', text: 'They are still singing to me. Forty years now.' },
+      { voice: 'K', text: 'I do not deserve this. They do.' },
     ] },
     // K. Eolun — Solunn's moon. He tipped a schism.
     milestone_1b: { steps: [
@@ -192,10 +194,11 @@ export const EP_INTERSTITIALS = {
       { voice: 'K', text: 'I had not said hello yet.', autoMs: 1400 },
       { voice: 'K', text: 'They introduced me thirty-seven times.', autoMs: 2200 },
     ] },
-    // K. Pellan-Toth — kept from original.
+    // K. Pellan-Toth — PROSPERED. The law they wrote held; the law is gentle.
     milestone_10m: { steps: [
-      { voice: 'K', text: 'They wrote my cadence into law.', autoMs: 1400 },
-      { voice: 'K', text: 'I had not written a constitution.', autoMs: 2000 },
+      { voice: 'K', text: 'They wrote my cadence into law.' },
+      { voice: 'K', text: 'I had not written a constitution. I would not have written one this gentle.' },
+      { voice: 'K', text: 'Three of mine have landed well. I want to remember the three.' },
     ] },
     // S. Norr-Halen — their missile system read the aurora as a launch.
     milestone_100m: { steps: [

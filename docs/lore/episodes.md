@@ -4,6 +4,33 @@ Eight episodes. Each = one forbidden contact in flashback + one interrogation in
 
 ---
 
+## Kalen's arc, in one paragraph
+
+He started with luck and good intentions. The first few contacts landed well — gentle, lateral, restrained — and a few of the worlds *prospered*. He took the right lesson (it can be done) and the wrong one (he can do it). What began as careful experimentation became method, then habit, then addiction. The honest worry that he might hurt someone curdled, slowly, into the belief that he was the *careful* version of the people who hurt people, and therefore the exception. Across eleven years he played god for civilisations he never set foot on, convinced each new contact would be the one where being careful was enough. By the time he understood that being careful had stopped meaning anything, six thousand Ahn-Tarsi were dead and his voice was being amplified onto worlds without his knowing.
+
+### The arc, per episode
+
+Each episode should sit one step further along this curve. The in-game beats (cycle_open, filler, milestone, climax) should feel like Kalen at the version of himself he was *during that contact*. He is not the same narrator across the season.
+
+1. **Discovery.** Lucky. Genuinely curious. The early successes are doing the talking; he half-believes the Law is wrong and harm-reduction is a story old people tell.
+2. **Sea Choir.** Confident. He has a *method* now. The Solunni rearrange themselves around him and he calls that proof of concept. First time he hears a sentence he doesn't remember sending — he files it as fatigue.
+3. **Sky Language.** Performing. He is teaching now, not whispering. The Vehrnese name him. He likes being named.
+4. **Fire Given.** Crashed. Eighteen million dead in eight seconds. He does not stop. The not-stopping is the season's pivot; he tells himself the next one will balance the books.
+5. **Perfect Garden.** Quiet. Two years of restraint. He thinks he has solved the problem. Then the Lehlan recording lands wrong, and the recording *the Lehlan elder heard* contains a sentence he did not write. The addiction's denial breaks; he keeps going anyway, because what is the alternative.
+6. **Missing World.** Paranoid. The world he was talking to is *gone* from the maps. Sera shows him surveillance of his own apartment with a second silhouette in it. He stops sleeping.
+7. **Echoes.** Lucid. The pattern is the route; he is being amplified; the prospered worlds were filtered out of the Quiet Law dataset on purpose. He is not innocent. He is also not the only voice on his own signal.
+8. **Finale.** Beyond denial. The relay grid is older than the Union and is running a subsystem the Union does not control. Hundreds of young worlds reach outward at once. Kalen sees that what he thought was his career was tributary to something else, and that the something else has been waiting for him to be loud enough.
+
+The interstitials must carry this. A cycle 1 beat should sound like a man who still thinks he is helping. A cycle 4 beat should sound like a man who has watched a city die. A cycle 7 beat should sound like a man who has just understood that *someone has been writing the second half of his sentences for years.*
+
+### Where the prospered worlds live
+
+A small number of worlds across S1 — *not* the climactic ones — should be tagged `PROSPERED` in `worlds-data.js`. They are the contacts that landed well: restraint, timing, a culture that had room to absorb. The Contact Log surfaces them in green, the interstitial uses a positive-tone variant, and the Sera-side reading is that the Compact filtered them out of the official record. By Ep 7 the player should be able to look at their log and *see* the asymmetry: a handful of green among a field of triggered/shifted entries. The visible asymmetry is the Ep 7 reveal in evidence form.
+
+Mechanical cap: keep `PROSPERED` rare — three or four across the whole 80-world season, none at a climax slot. They are flukes, not a strategy.
+
+---
+
 ## Episode 1 — *Discovery*
 
 **Cold open.** A border warden's screen lights up with a signature it has been chasing for three years. The hunt is over in nineteen minutes.

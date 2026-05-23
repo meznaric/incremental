@@ -8,8 +8,12 @@
 //   { id, name, ep, status, image, flavor }
 //
 // Status legend: TRIGGERED (set off a cascade), COLLAPSED (world ended),
-// SHIFTED (trajectory bent), MISSING (gone from records). See STATUS_MEANING
-// in contactLog.js for the player-facing labels.
+// SHIFTED (trajectory bent), MISSING (gone from records), PROSPERED (landed
+// well — rare, restricted to early eps when Kalen's luck and intentions still
+// aligned). See STATUS_MEANING in contactLog.js for the player-facing labels
+// and STATUS_COLOR for the swatch. PROSPERED reads green in the Contact Log
+// and is the visual evidence of the asymmetry Ep 7 spells out: a few of
+// Kalen's contacts genuinely worked.
 //
 // Images: every world has a generated concept-art portrait under
 // docs/lore/images/. To add a new world, draft a prompt in gen-images.py
@@ -43,9 +47,9 @@ export const WORLDS_BY_EP = {
     milestone_100m: { id: 'mirum_3',     name: 'MIRUM-3',      ep: 1, status: 'SHIFTED',
       image: './docs/lore/images/mirum-3-treaty-sky.png',
       flavor: 'Three city-states under one ionosphere. They mostly agreed on what they had heard. The disagreement became a treaty.' },
-    milestone_1b:   { id: 'halun_veth',  name: 'HALUN-VETH',   ep: 1, status: 'SHIFTED',
+    milestone_1b:   { id: 'halun_veth',  name: 'HALUN-VETH',   ep: 1, status: 'PROSPERED',
       image: './docs/lore/images/halun-veth-academy.png',
-      flavor: 'They were already listening for life. He answered. Their academy reorganised around the answer in eighteen months.' },
+      flavor: 'They were already listening for life. He answered, and stopped. Their academy reorganised around a single careful sentence and is still arguing about it, well.' },
     milestone_10b:  { id: 'voun',        name: 'VOUN',         ep: 1, status: 'TRIGGERED',
       image: './docs/lore/images/voun-salt-procession.png',
       flavor: 'A religious world. Their priests heard the word "salt" in the carrier. The next decade of trade ran on salt and on nothing else.' },
@@ -79,9 +83,9 @@ export const WORLDS_BY_EP = {
     milestone_10m:  { id: 'drath',       name: 'DRATH',        ep: 2, status: 'SHIFTED',
       image: './docs/lore/images/drath-salt-caravan.png',
       flavor: 'Nomads of the salt plains. They decoded one of his pulse trains as scripture. He had not been speaking yet.' },
-    milestone_100m: { id: 'quel_sin',    name: 'QUEL-SIN',     ep: 2, status: 'SHIFTED',
+    milestone_100m: { id: 'quel_sin',    name: 'QUEL-SIN',     ep: 2, status: 'PROSPERED',
       image: './docs/lore/images/quel-sin-radio-monks.png',
-      flavor: 'Radio-monks of a seven-tone faith. He sang back in their scale, politely. They sang to him for forty years afterwards. Their order is now twice the size.' },
+      flavor: 'Radio-monks of a seven-tone faith. He sang back in their scale, politely. They sang to him for forty years afterwards. Their order is now twice the size and twice as kind.' },
     milestone_1b:   { id: 'eolun',       name: 'EOLUN',        ep: 2, status: 'TRIGGERED',
       image: './docs/lore/images/eolun-moon-colony.png',
       flavor: 'A small cetacean colony on Solunn’s moon. The schism there was already at boil. He tipped it.' },
@@ -115,9 +119,9 @@ export const WORLDS_BY_EP = {
     milestone_1m:   { id: 'esnal',       name: 'ESNAL',        ep: 3, status: 'TRIGGERED',
       image: './docs/lore/images/esnal-copper-pantheon.png',
       flavor: 'A copper-belt civilisation. His glyphs were interpreted as deities. The pantheon now numbers thirty-seven.' },
-    milestone_10m:  { id: 'pellan_toth', name: 'PELLAN-TOTH',  ep: 3, status: 'SHIFTED',
+    milestone_10m:  { id: 'pellan_toth', name: 'PELLAN-TOTH',  ep: 3, status: 'PROSPERED',
       image: './docs/lore/images/pellan-toth-glass.png',
-      flavor: 'Glass cities. Poet-government. They wrote his cadence into law before he had written a constitution.' },
+      flavor: 'Glass cities. Poet-government. They wrote his cadence into law before he had written a constitution. The cadence held. The law is, against the odds, gentle.' },
     milestone_100m: { id: 'norr_halen',  name: 'NORR-HALEN',   ep: 3, status: 'TRIGGERED',
       image: './docs/lore/images/norr-halen-missile-warning.png',
       flavor: 'Atomic-era. They read his first aurora glyphs as a missile warning. Two cities scrambled. One did not stand down on the third order.' },

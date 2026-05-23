@@ -70,7 +70,7 @@ const BASE_INTERSTITIALS = {
     introStamp: 'TRANSCRIPT  ·  s.y. 2407  ·  PAGE 01 / 03',
     bgImage: './docs/lore/images/interrogation-cell.png',
     input: {
-      onStep: 1,
+      onStep: 3,
       placeholder: 'Your name',
       onSubmit: (state, value) => {
         state.contactLog.pickedName = value;
@@ -79,6 +79,8 @@ const BASE_INTERSTITIALS = {
     },
     steps: [
       { voice: 'S', text: 'Sit down.' },
+      { voice: 'S', text: 'The cell is recording. The door does not open from your side.' },
+      { voice: 'S', text: 'There is a file on the desk. Four hundred and twelve pages. Most of it is yours.' },
       { voice: 'S', text: 'State your name. For the record.' },
     ],
   },
@@ -97,6 +99,7 @@ const BASE_INTERSTITIALS = {
           : 'No. That is not your name. You are Kalen Vale, formerly Union Comms.';
       } },
       { voice: 'S', text: 'Eleven years past the Quiet Law. Eighty worlds on the carrier. The cascades are in the file.' },
+      { voice: 'S', text: 'A handful of those worlds are still themselves. The rest are not. I have read every page.' },
       { voice: 'S', text: 'Tonight, Kalen, we have you.' },
     ],
   },
@@ -572,14 +575,29 @@ export function checkGamble(state, result) {
 // Call after any non-gamble purchase. Used to fire "first relay / first
 // convert" beats, and to bump the anomaly counter on rare events. Pass the
 // whole upgrade — we read kind, rarity, and (for long-haul buffs) group.
+//
+// The interstitial gates (first_relay / first_convert) are log-side (survive
+// cycle close) the same way first_engraving is — they used to ride on
+// messages.stats, which wipes with the gameplay save, so the beats re-fired
+// every new cycle. The stats counters stay because the Achievement system
+// reads them as `flag` triggers; they record gameplay-side history per-cycle.
 export function checkPurchase(state, u) {
   const s = state.messages.stats;
+  const log = state.contactLog;
   if (u.kind === 'permanent') {
     s.permanentsBought = (s.permanentsBought || 0) + 1;
-    if (s.permanentsBought === 1) enqueue(state, 'first_relay');
+    if (log && !log.firstRelaySeen) {
+      log.firstRelaySeen = true;
+      saveContactLog(log);
+      enqueue(state, 'first_relay');
+    }
   } else if (u.kind === 'convert') {
     s.convertsBought = (s.convertsBought || 0) + 1;
-    if (s.convertsBought === 1) enqueue(state, 'first_convert');
+    if (log && !log.firstConvertSeen) {
+      log.firstConvertSeen = true;
+      saveContactLog(log);
+      enqueue(state, 'first_convert');
+    }
   }
   if (u.rarity === 'mythic') bumpAnomaly(state, 2);
   if (u.kind === 'buff' && u.group === 'long') bumpAnomaly(state, 1);

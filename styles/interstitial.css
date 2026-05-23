@@ -203,6 +203,7 @@
 .it-contact-status.s-collapsed { color: #ff5a6e; }
 .it-contact-status.s-shifted   { color: #9d6ee0; }
 .it-contact-status.s-missing   { color: #4ea8ff; }
+.it-contact-status.s-prospered { color: #3ec98a; }
 .it-contact-flavor {
   font-size: 12px;
   color: #aab0d0;

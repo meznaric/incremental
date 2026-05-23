@@ -57,7 +57,11 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **Echo / Echoes** | The game's currency. A returned signal-bit. |
 | **a Listener** | Member of the Listening Service order. |
 | **a sky-listener** | Member of the Ahn-Tarsi religious caste (Ep 1). |
-| **the silent worlds** | Worlds that have not yet left their own star. Subjects of the Quiet Law. |
+| **the silent worlds** | Worlds that have not yet left their own star. Subjects of the Quiet Law. The vast majority of inhabited worlds. |
+| **a starflight power** | A civilisation that has crossed the FTL bar. Either *known* (announced themselves, named in the Compact's index, the Union deals with them) or *hidden* (crossed the bar but chose silence). The Union assumes hidden ones exist. The Union does not know how many. See [`world-rules.md`](./world-rules.md#the-shape-of-the-sky). |
+| **the threat appendix** | The Compact section listing the known starflight powers and the Union's posture toward each. Famously opens with the line *"We think we know all of them."* (S2 hint.) |
+| **a prospered world** | A pre-stellar contact that landed *well* — the receiving culture absorbed the signal without breaking. Statistically rare; not in the Quiet Law's official dataset. Kalen has a handful on his log. Ep 7 makes the filtering of these from the Compact's record explicit. |
+| **the Echo Compact** | The polity formed in S3 from the worlds Kalen contacted, after they reach FTL and find each other. Writers'-room placeholder. **Do not use in S1 or S2 copy.** |
 | **a hail** | A direct, deliberate contact attempt. |
 | **a bleed** | An accidental or near-accidental contact. |
 | **a window** | A natural condition (ion calm, aurora coherence, etc.) that makes contact easier. |
@@ -180,6 +184,8 @@ If a term in this file ever needs to change:
 - 2026-05-13 — Initial glossary committed.
 - 2026-05-14 — Added Console Mass, Console Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the Console literally carries the weight of past cycles.
 - 2026-05-23 — Renamed Carrier Mass → Console Mass and Carrier Engravings → Console Engravings. "Carrier" reads as a vessel and an event-noun can't take engravings; "the Console" already exists in the lore (Signal Lock entry below) as the device Kalen sits at. Display strings only — code field `carrierMass` and save key unchanged.
+- 2026-05-23 — Expanded the cosmology in [`world-rules.md`](./world-rules.md): three world tiers (silent / known starflight / hidden starflight), the Compact's *"we think we know all of them"* threat appendix line (S2 hook), and a fuller honest read on the Quiet Law dataset (prospered worlds were filtered out of the official record). Added Kalen's S1 arc paragraph and per-episode arc line to [`episodes.md`](./episodes.md). Added S3 hook — *the Echo Compact* — the polity formed by the worlds Kalen contacted once they reach FTL and find each other. Do not surface that name in S1/S2 copy.
+- 2026-05-23 — Added the **PROSPERED** world status. Green pill in the Contact Log, dedicated CSS palette, three S1 worlds tagged (Halun-Veth EP1, Quel-Sin EP2, Pellan-Toth EP3). Visual evidence of the asymmetry Ep 7 spells out: a small green minority among the field of triggered/shifted/collapsed entries. Keep PROSPERED rare — flukes, not a strategy.
 - 2026-05-14 — Added Signal Lock — the name for the welcome-back screen.
 - 2026-05-14 — Added Signal Diagnostic and current pulse. Names the breakdown screen and the final rate figure; Sera-voiced UI surface.
 - 2026-05-14 — Added Wake. Names the starter rate-mul beat at every cycle open so the mobile collapsed-buff detail modal has a clear provenance label.

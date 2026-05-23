@@ -144,8 +144,8 @@ test('WORLDS_BY_EP: every entry has the required shape', () => {
       assert.equal(typeof def.name, 'string', `${label}.name`);
       assert.equal(typeof def.ep, 'number', `${label}.ep`);
       assert.equal(def.ep, Number(ep), `${label}.ep matches its EP key`);
-      assert.ok(['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING'].includes(def.status),
-        `${label}.status must be one of TRIGGERED|COLLAPSED|SHIFTED|MISSING`);
+      assert.ok(['TRIGGERED', 'COLLAPSED', 'SHIFTED', 'MISSING', 'PROSPERED'].includes(def.status),
+        `${label}.status must be one of TRIGGERED|COLLAPSED|SHIFTED|MISSING|PROSPERED`);
     }
   }
 });

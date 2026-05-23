@@ -114,6 +114,7 @@ export const STATUS_COLOR = {
   COLLAPSED: '#ff5a6e',
   SHIFTED:   '#9d6ee0',
   MISSING:   '#4ea8ff',
+  PROSPERED: '#3ec98a',
 };
 
 // One-phrase plain-English meaning of each status label. Surfaced inline
@@ -123,6 +124,7 @@ export const STATUS_MEANING = {
   COLLAPSED: 'World ended',
   SHIFTED:   'Trajectory bent',
   MISSING:   'Gone from records',
+  PROSPERED: 'Landed well',
 };
 
 const fresh = () => ({
@@ -165,6 +167,12 @@ export function loadContactLog() {
   const firstEngravingSeen = !!s.firstEngravingSeen;
   const firstContactSeen = !!s.firstContactSeen;
   const seasonCompleteShown = !!s.seasonCompleteShown;
+  // Once-per-player gates for the first base-rate purchase and the first
+  // convert (Seed Relay). Previously gated on state.messages.stats, which
+  // wipes every cycle close — so the beats re-fired on every new cycle.
+  // Log-side so they survive cycle closes and Loop mode.
+  const firstRelaySeen = !!s.firstRelaySeen;
+  const firstConvertSeen = !!s.firstConvertSeen;
   // The new first-boot intro (gate → locale → Sera asks name → Sera reveals
   // Kalen → premise → console). Once seen it never replays, even across cycle
   // closes — the contact log survives the gameplay wipe, which is the right
@@ -216,6 +224,7 @@ export function loadContactLog() {
   return {
     run, worlds, mass, engravings, bestPeak, cycleEp,
     firstCloseBeatShown, firstEngravingSeen, firstContactSeen, seasonCompleteShown,
+    firstRelaySeen, firstConvertSeen,
     introSeen, pickedName,
     pattern, pendingPatternChoice, patternUsed, patternCompleted,
     loopMode, loopCycles,

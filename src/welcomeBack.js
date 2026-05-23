@@ -52,14 +52,34 @@ function buildBreakdown(state, savedAt, offline, extras) {
   // Rate-mul buffs (Carrier windows) that were live during any part of the
   // away window. expiresAt > savedAt means the buff was still ticking when
   // Kalen left. If expiresAt < now, it ran out mid-AFK — show that honestly.
+  //
+  // Collapse policy: ≤3 active windows → one row each, with the per-buff
+  // ran-out detail. >3 windows → a single summary row counting them and
+  // surfacing whether any expired mid-AFK. A stacked rate run with twenty
+  // buffs otherwise drowns the rest of the breakdown.
   const rateMuls = (state.buffs && state.buffs.rateMul) || [];
-  for (const b of rateMuls) {
-    if (b.expiresAt <= savedAt) continue;
-    const liveUntil = Math.min(b.expiresAt, savedAt + offline);
-    const liveFor = Math.max(0, liveUntil - savedAt);
-    const ranOut = b.expiresAt < savedAt + offline;
-    const note = ranOut ? `held ${fmtAway(liveFor)} of the away window` : 'held the whole away window';
-    rows.push({ label: `Carrier window ×${b.value}`, value: note });
+  const liveBuffs = rateMuls.filter((b) => b.expiresAt > savedAt);
+  const COLLAPSE_AT = 3;
+  if (liveBuffs.length <= COLLAPSE_AT) {
+    for (const b of liveBuffs) {
+      const liveUntil = Math.min(b.expiresAt, savedAt + offline);
+      const liveFor = Math.max(0, liveUntil - savedAt);
+      const ranOut = b.expiresAt < savedAt + offline;
+      const note = ranOut ? `held ${fmtAway(liveFor)} of the away window` : 'held the whole away window';
+      rows.push({ label: `Carrier window ×${b.value}`, value: note });
+    }
+  } else {
+    const ranOut = liveBuffs.filter((b) => b.expiresAt < savedAt + offline).length;
+    const stacked = liveBuffs.reduce((acc, b) => acc * b.value, 1);
+    const note = ranOut === 0
+      ? 'all held the whole away window'
+      : ranOut === liveBuffs.length
+        ? 'all ran out mid-AFK'
+        : `${ranOut} ran out mid-AFK · ${liveBuffs.length - ranOut} held`;
+    rows.push({
+      label: `Carrier windows · ${liveBuffs.length} stacked (×${stacked.toFixed(stacked >= 10 ? 0 : 1)})`,
+      value: note,
+    });
   }
 
   // Echo Memory — Contact Log scalar. Don't show if it's a no-op.

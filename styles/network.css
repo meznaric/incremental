@@ -150,33 +150,58 @@
   .relay-label { font-size: 9px; }
   .relay-label.ripen-label { font-size: 8.5px; }
 }
-/* Cyberpunk hex cell — low-alpha sector fill, glowing sector stroke.
-   The polygon's sector identity rides on the --sec-color CSS variable
-   set inline by the renderer. */
-.hex-cell polygon {
-  fill: color-mix(in srgb, var(--sec-color) 16%, transparent);
+/* Cyberpunk hex cell — split into three SVG layers so the player reads
+   sector identity + yield bonus + discovery risk at a glance:
+   1) .hex-base    — low-alpha sector fill; the tap target.
+   2) .hex-bar     — yield (left half) and discovery risk (right half), both
+                     rising from the hex bottom. Same sector colour at two
+                     shades; the bar height encodes the multiplier so high-
+                     yield / high-risk sectors look "fuller" without needing
+                     a tooltip.
+   3) .hex-stroke  — sector-tinted outline on top of the bars. Pointer-
+                     transparent so taps still land on the base. */
+.hex-cell .hex-base {
+  fill: color-mix(in srgb, var(--sec-color) 9%, transparent);
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 140ms ease;
+}
+.hex-cell .hex-stroke {
+  fill: none;
   stroke: color-mix(in srgb, var(--sec-color) 70%, transparent);
   stroke-width: 1.2;
-  transition: fill 140ms ease, stroke 140ms ease, filter 140ms ease;
-  cursor: pointer;
+  pointer-events: none;
+  transition: stroke 140ms ease, stroke-width 140ms ease, filter 140ms ease;
 }
-.hex-cell.has-relay polygon {
-  fill: color-mix(in srgb, var(--sec-color) 24%, transparent);
-  stroke: var(--sec-color);
+.hex-bar {
+  pointer-events: none;
+  transition: opacity 140ms ease;
 }
-.hex-cell.selected polygon {
+.hex-bar.yield {
+  fill: color-mix(in srgb, var(--sec-color) 70%, white 30%);
+  opacity: 0.70;
+}
+.hex-bar.disc {
+  fill: color-mix(in srgb, var(--sec-color) 65%, black 50%);
+  opacity: 0.85;
+}
+.hex-cell.has-relay .hex-stroke { stroke: var(--sec-color); }
+.hex-cell.has-relay .hex-base   { fill: color-mix(in srgb, var(--sec-color) 12%, transparent); }
+.hex-cell.has-relay .hex-bar.yield { opacity: 0.48; }
+.hex-cell.has-relay .hex-bar.disc  { opacity: 0.58; }
+.hex-cell.selected .hex-stroke {
   stroke: #ffe082;
   stroke-width: 2.2;
   filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
 }
 /* Empty hex selected (no token queued) — cyan accent so it reads as
    "inspecting" rather than "staged" (which uses the warm gold ghost). */
-.hex-cell.picked polygon {
-  fill: color-mix(in srgb, var(--sec-color) 28%, transparent);
+.hex-cell.picked .hex-stroke {
   stroke: #2dd4ff;
   stroke-width: 2;
   filter: drop-shadow(0 0 5px rgba(45, 212, 255, 0.6));
 }
+.hex-cell.picked .hex-base { fill: color-mix(in srgb, var(--sec-color) 18%, transparent); }
 
 /* Cluster edges — glowing cyan trace, mechanic A's visual cue. */
 .cluster-edge {
@@ -278,12 +303,29 @@
 }
 /* Staged hex (the one the player just chose) gets a warm outline so the
    choice reads even with the bar covering part of the SVG. */
-.hex-cell.staged polygon {
-  fill: color-mix(in srgb, #ffe082 22%, transparent);
+.hex-cell.staged .hex-stroke {
   stroke: #ffe082;
   stroke-width: 2;
   filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.6));
 }
+.hex-cell.staged .hex-base { fill: color-mix(in srgb, #ffe082 22%, transparent); }
+
+/* Rarity pips — N small dots above the relay frame (1 for common, 5 for
+   mythic). Coloured by tier so the player reads the rarity without tapping
+   even when the relay marker is small or several relays cluster together. */
+.relay-pip {
+  pointer-events: none;
+  fill: #aab3ff;
+  paint-order: stroke;
+  stroke: rgba(8, 8, 18, 0.85);
+  stroke-width: 0.6;
+}
+.relay-mark.rar-common    .relay-pip { fill: #b8c4ff; }
+.relay-mark.rar-uncommon  .relay-pip { fill: #88e0a8; }
+.relay-mark.rar-rare      .relay-pip { fill: #f0c078; }
+.relay-mark.rar-legendary .relay-pip { fill: #ffadcc; filter: drop-shadow(0 0 2px rgba(216, 100, 156, 0.7)); }
+.relay-mark.rar-mythic    .relay-pip { fill: #ffe082; filter: drop-shadow(0 0 3px rgba(255, 216, 107, 0.9)); }
+.relay-mark.ripening .relay-pip { opacity: 0.55; }
 
 .net-status {
   display: grid;
@@ -457,7 +499,7 @@
 
 .net-legend-row {
   display: grid;
-  grid-template-columns: 12px 1fr auto;
+  grid-template-columns: 18px 1fr auto;
   align-items: center;
   gap: 8px;
   padding: 3px 0;
@@ -469,6 +511,38 @@
 .net-legend-sw { width: 10px; height: 10px; border-radius: 2px; }
 .net-legend-name { color: #e8e8f0; }
 .net-legend-mults { color: #8a8ac0; font-size: 10px; font-variant-numeric: tabular-nums; }
+/* Mini bar pair next to each sector — same shading rule as the map hex
+   bars so the player can match what they see on the map to the sector. */
+.net-legend-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  width: 16px; height: 14px;
+  gap: 2px;
+}
+.net-legend-bars .bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1px;
+  display: block;
+}
+.net-legend-bars .bar.yield { background: color-mix(in srgb, var(--sec-color) 70%, white 30%); opacity: 0.9; }
+.net-legend-bars .bar.disc  { background: color-mix(in srgb, var(--sec-color) 65%, black 50%);  opacity: 0.95; }
+.net-legend-key {
+  font-size: 10px;
+  color: #8a8ac0;
+  margin: -2px 0 6px;
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.net-legend-key .key-bar {
+  display: inline-block;
+  width: 8px; height: 10px;
+  border-radius: 1px;
+  vertical-align: -2px;
+  margin: 0 1px;
+}
+.net-legend-key .key-bar.yield { background: color-mix(in srgb, #cfd6ff 65%, white 18%); }
+.net-legend-key .key-bar.disc  { background: color-mix(in srgb, #cfd6ff 60%, black 35%); }
 
 /* Bottom dock bar — shows hex / relay / staged-placement detail. Variant
    modifier classes shift the accent color so the player can tell at a glance

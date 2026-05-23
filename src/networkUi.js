@@ -18,6 +18,31 @@ const TIER_ORDER = ['common', 'uncommon', 'rare', 'legendary', 'mythic'];
 const TIER_LABEL = {
   common: 'Common', uncommon: 'Uncommon', rare: 'Rare', legendary: 'Legendary', mythic: 'Mythic',
 };
+// Relay core radius as a fraction of frame radius. Higher rarity = larger
+// painted core so the player can read tier at a glance without tapping. The
+// 0.30 → 0.72 spread doubles+ the visual area between common and mythic.
+const TIER_CORE_SCALE = {
+  common: 0.30, uncommon: 0.42, rare: 0.54, legendary: 0.64, mythic: 0.74,
+};
+// Sector multipliers span yieldMul ∈ [0.7, 2.0] and discoveryMul ∈ [0.2, 5.0].
+// Normalize each independently with a baseline floor so the smallest value
+// is still visibly drawn (not a zero-height sliver).
+const SECTOR_YIELD_MIN = 0.7, SECTOR_YIELD_MAX = 2.0;
+const SECTOR_DISC_MIN  = 0.2, SECTOR_DISC_MAX  = 5.0;
+function sectorBarFractions(sector) {
+  const y = (sector.yieldMul - SECTOR_YIELD_MIN) / (SECTOR_YIELD_MAX - SECTOR_YIELD_MIN);
+  const d = (sector.discoveryMul - SECTOR_DISC_MIN) / (SECTOR_DISC_MAX - SECTOR_DISC_MIN);
+  return {
+    yieldF: 0.18 + 0.82 * Math.max(0, Math.min(1, y)),
+    discF:  0.12 + 0.88 * Math.max(0, Math.min(1, d)),
+  };
+}
+// Negative q/r values produce invalid SVG ids if used raw. Sanitize.
+function clipIdFor(q, r) {
+  const qs = q < 0 ? `n${-q}` : `${q}`;
+  const rs = r < 0 ? `n${-r}` : `${r}`;
+  return `hexclip-${qs}-${rs}`;
+}
 
 function fmtMin(sec) {
   if (sec < 60) return `${Math.ceil(sec)}s`;
@@ -232,6 +257,13 @@ export function makeNetworkUi(state, opts) {
     const occupiedByHex = new Map();
     for (const r of relays) occupiedByHex.set(`${r.hex.q},${r.hex.r}`, r);
 
+    // Pre-compute geometry constants for the in-hex yield / discovery bars.
+    // halfW is the horizontal extent from center to a side vertex; fullH is
+    // the full hex height (top vertex to bottom vertex).
+    const halfW = HEX_SIZE * Math.sqrt(3) / 2;
+    const fullH = HEX_SIZE * 2;
+
+    const clipDefs = [];
     const hexNodes = [];
     for (const h of hexes) {
       const { x, y } = hexCenterFromBounds(h.q, h.r, bounds);
@@ -242,13 +274,31 @@ export function makeNetworkUi(state, opts) {
       const isEmptySelected = !occ && !isStaged && selectedEmptyHex && selectedEmptyHex.q === h.q && selectedEmptyHex.r === h.r;
       const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : '', isStaged ? 'staged' : '', isEmptySelected ? 'picked' : ''].filter(Boolean).join(' ');
       const tip = `${sector.label} · ×${sector.yieldMul} yield · ×${sector.discoveryMul} discovery risk · ×${sector.ripenMul} ripen time`;
+      const polyPts = hexPolygonPoints(x, y);
+      const clipId = clipIdFor(h.q, h.r);
+      clipDefs.push(`<clipPath id="${clipId}"><polygon points="${polyPts}" /></clipPath>`);
+      // Side-by-side bars rise from the hex bottom; left = yield, right =
+      // discovery risk. Both share the sector colour at different shades (set
+      // in CSS) so the player reads which sector the hex belongs to first,
+      // then the two trade-off magnitudes by bar height. Rects are clipped
+      // to the hex outline so they don't bleed past the edges.
+      const { yieldF, discF } = sectorBarFractions(sector);
+      const yieldH = fullH * yieldF;
+      const discH  = fullH * discF;
+      const yBot   = y + HEX_SIZE;
+      const yieldBar = `<rect class="hex-bar yield" x="${(x - halfW).toFixed(2)}" y="${(yBot - yieldH).toFixed(2)}" width="${halfW.toFixed(2)}" height="${yieldH.toFixed(2)}" clip-path="url(#${clipId})" />`;
+      const discBar  = `<rect class="hex-bar disc"  x="${x.toFixed(2)}" y="${(yBot - discH).toFixed(2)}"  width="${halfW.toFixed(2)}" height="${discH.toFixed(2)}"  clip-path="url(#${clipId})" />`;
       // Sector colour bound as a CSS variable so the stylesheet can mix fills
-      // and strokes from one source. Cyberpunk treatment is in the CSS — low
-      // alpha fill, full alpha stroke, occasional glow.
+      // and strokes from one source. The base catches taps (always has a
+      // small fill so visiblePainted hit-testing works); bars + stroke render
+      // on top and are pointer-transparent.
       hexNodes.push(`
         <g class="${cls}" data-hex="1" data-q="${h.q}" data-r="${h.r}" style="--sec-color:${sector.color}">
           <title>${tip}</title>
-          <polygon points="${hexPolygonPoints(x, y)}" />
+          <polygon class="hex-base" points="${polyPts}" />
+          ${yieldBar}
+          ${discBar}
+          <polygon class="hex-stroke" points="${polyPts}" />
         </g>
       `);
     }
@@ -274,12 +324,31 @@ export function makeNetworkUi(state, opts) {
     }
 
     // Reticle: small hex frame around the relay + four corner brackets.
-    // Renders as a "tracked target" rather than a painted dot.
-    const reticle = (cx, cy, scale) => {
+    // Renders as a "tracked target" rather than a painted dot. Core radius
+    // grows with rarity so the tier reads at a glance even when the relay
+    // marker sits over the sector's yield/discovery bars.
+    const reticle = (cx, cy, scale, tier) => {
       const r = HEX_SIZE * 0.48 * scale;
+      const coreScale = TIER_CORE_SCALE[tier || 'common'] || TIER_CORE_SCALE.common;
       const framePts = hexCornerPointsFlat(cx, cy, r);
       const brackets = bracketCorners(cx, cy, r * 1.32);
-      return { framePts, brackets, coreR: r * 0.36 };
+      return { framePts, brackets, coreR: r * coreScale };
+    };
+    // Rarity pips — N small dots above the relay frame indicating tier
+    // (common=1 … mythic=5). Placed in the upper portion of the hex where
+    // the polygon still has horizontal room. Returns an SVG string.
+    const rarityPipsSvg = (cx, cy, tier) => {
+      const idx = TIER_ORDER.indexOf(tier || 'common');
+      const n = Math.max(1, idx + 1);
+      const pipY = cy - HEX_SIZE * 0.72;
+      const spacing = 2.6;
+      const totalW = (n - 1) * spacing;
+      let s = '';
+      for (let i = 0; i < n; i++) {
+        const px = cx - totalW / 2 + i * spacing;
+        s += `<circle class="relay-pip" cx="${px.toFixed(2)}" cy="${pipY.toFixed(2)}" r="1.05" />`;
+      }
+      return s;
     };
 
     const relayNodes = [];
@@ -298,13 +367,14 @@ export function makeNetworkUi(state, opts) {
         const yieldNow = relayYield(net, r, now);
         const yLabel = `+${formatAbbrev(yieldNow)}`;
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\n${yLabel}/s${isolated ? ' · isolated' : ` · ${adj} neighbour${adj === 1 ? '' : 's'}`}`;
-        const ret = reticle(x, y, 1);
+        const ret = reticle(x, y, 1, r.tier);
         relayNodes.push(`
           <g class="relay-mark ${rarCls} ${isolated ? 'isolated' : 'clustered'} ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
             <polygon class="r-frame" points="${ret.framePts}" />
             ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
             <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
+            ${rarityPipsSvg(x, y, r.tier)}
             <text class="relay-label online-label" x="${x}" y="${labelY}">${yLabel}</text>
           </g>
         `);
@@ -316,7 +386,7 @@ export function makeNetworkUi(state, opts) {
         const remain = Math.max(0, r.ripensAt - now);
         const tLabel = fmtMin(remain);
         const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\nRipens in ${tLabel}`;
-        const ret = reticle(x, y, 1);
+        const ret = reticle(x, y, 1, r.tier);
         relayNodes.push(`
           <g class="relay-mark ${rarCls} ripening ${sel ? 'selected' : ''}" data-relay="${r.id}">
             <title>${tip}</title>
@@ -326,6 +396,7 @@ export function makeNetworkUi(state, opts) {
               stroke-dasharray="${(ringC * pct).toFixed(2)} ${ringC.toFixed(2)}"
               transform="rotate(-90 ${x} ${y})" />
             <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
+            ${rarityPipsSvg(x, y, r.tier)}
             <text class="relay-label ripen-label" x="${x}" y="${labelY}">${tLabel}</text>
           </g>
         `);
@@ -341,13 +412,14 @@ export function makeNetworkUi(state, opts) {
       const alreadyOccupied = ph && relays.some((rr) => rr.hex.q === ph.q && rr.hex.r === ph.r);
       if (ph && !alreadyOccupied) {
         const { x, y } = hexCenterFromBounds(ph.q, ph.r, bounds);
-        const ret = reticle(x, y, 1);
         const nextTier = (net.queued && net.queued[0] && net.queued[0].tier) || 'common';
+        const ret = reticle(x, y, 1, nextTier);
         ghostNode = `
           <g class="relay-mark pending rar-${nextTier}">
             <polygon class="r-frame" points="${ret.framePts}" />
             ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
             <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
+            ${rarityPipsSvg(x, y, nextTier)}
           </g>
         `;
       }
@@ -355,6 +427,7 @@ export function makeNetworkUi(state, opts) {
 
     return `
       <svg class="netmap-svg" viewBox="0 0 ${bounds.width.toFixed(0)} ${bounds.height.toFixed(0)}" preserveAspectRatio="xMidYMid meet">
+        <defs>${clipDefs.join('')}</defs>
         ${hexNodes.join('')}
         ${clusterEdges.join('')}
         ${relayNodes.join('')}
@@ -460,13 +533,20 @@ export function makeNetworkUi(state, opts) {
           Sectors
           <button type="button" class="net-help-link" data-act="open-diag">How does this work? <i class="ri ri-arrow-right-s-line"></i></button>
         </div>
-        ${Object.entries(SECTORS).map(([key, s]) => `
-          <div class="net-legend-row sec-tag-${key}">
-            <span class="net-legend-sw" style="background:${s.color}"></span>
+        <div class="net-legend-key">Each hex: <span class="key-bar yield"></span> yield · <span class="key-bar disc"></span> risk</div>
+        ${Object.entries(SECTORS).map(([key, s]) => {
+          const { yieldF, discF } = sectorBarFractions(s);
+          return `
+          <div class="net-legend-row sec-tag-${key}" style="--sec-color:${s.color}">
+            <span class="net-legend-bars">
+              <span class="bar yield" style="height:${(yieldF * 100).toFixed(0)}%"></span>
+              <span class="bar disc"  style="height:${(discF * 100).toFixed(0)}%"></span>
+            </span>
             <span class="net-legend-name">${s.label}</span>
             <span class="net-legend-mults">×${s.yieldMul} yield · ×${s.discoveryMul} risk</span>
           </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
   }

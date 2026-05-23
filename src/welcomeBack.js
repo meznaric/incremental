@@ -8,6 +8,8 @@
 // voice: Sera. Procedural, second person. Periods always.
 import { formatAbbrev } from './bignum.js';
 import { installTap } from './tap.js';
+import { networkContribution } from './network.js';
+import { patternNetworkYieldMul } from './cyclePatterns.js';
 
 // Below this and we don't bother — anything shorter reads as a page refresh,
 // not a return.
@@ -46,6 +48,23 @@ function buildBreakdown(state, savedAt, offline, extras) {
 
   const base = ((state.basePerSecond || 0) + (state.flatBonus || 0)) * (state.permMul || 1);
   rows.push({ label: 'Base carrier', value: `${formatAbbrev(base)}/s` });
+
+  // Seed mesh's foreground contribution at the moment of leaving — the
+  // integral samples it per segment with ripensAt transitions, so this row
+  // reads as the baseline at savedAt with a note when relays ripened during
+  // the away window. Hidden if there was nothing online and nothing ripened.
+  const meshAtLeave = networkContribution(state, savedAt) * patternNetworkYieldMul(state);
+  const relays = (state.network && state.network.relays) || [];
+  const ripenedMidAfk = relays.filter((r) => r.ripensAt > savedAt && r.ripensAt <= savedAt + offline).length;
+  if (meshAtLeave > 0 || ripenedMidAfk > 0) {
+    const ripenNote = ripenedMidAfk > 0
+      ? ` · ${ripenedMidAfk} ripened mid-AFK`
+      : '';
+    const value = meshAtLeave > 0
+      ? `+${formatAbbrev(meshAtLeave)}/s${ripenNote}`
+      : `${ripenedMidAfk} ripened mid-AFK`;
+    rows.push({ label: 'Seed mesh', value });
+  }
 
   rows.push({ label: 'Time away', value: fmtAway(offline) });
 

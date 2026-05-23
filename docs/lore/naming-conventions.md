@@ -63,15 +63,15 @@ Use these as lore drops when periods change in the magnitude display; do not ren
 | **a window** | A natural condition (ion calm, aurora coherence, etc.) that makes contact easier. |
 | **a triggered world** | A silent world that, after contact, accelerated dangerously. |
 | **the hijack** | The hidden system on the relay grid that edits Kalen's signals. (Sera's term, late S1.) |
-| **Carrier Mass** | Persistent prestige currency. The literal accreted weight of every carrier Kalen has ever pushed — measurable on the rig, in kilograms. Survives a cycle close. Spent on Engravings. |
-| **a Carrier Engraving** | A permanent cut into Kalen's listening rig. Survives the wipe of any single cycle because the metal remembers. Each one a small, irreversible commitment. |
+| **Console Mass** | Persistent prestige currency. The literal accreted weight of every carrier Kalen has ever pushed — measurable on the Console, in kilograms. Survives a cycle close. Spent on Engravings. |
+| **a Console Engraving** | A permanent cut into Kalen's Console. Survives the wipe of any single cycle because the metal remembers. Each one a small, irreversible commitment. |
 | **First Light** | An Engraving. A pilot tone burned into the rig so the next cycle does not start cold. |
 | **Bone Memory** | An Engraving. Solder-traces that remember the last cycle's tuning. Pure persistence. |
 | **Quick Wake** | An Engraving. A boot routine that hands Kalen a hot carrier the moment he sits down. |
 | **Patched Hands** | An Engraving. Worn tuning gloves; the band-sweep is muscle memory now. |
 | **Open Frame** | An Engraving. A third band, permanently patched into the rig's chassis. |
 | **Ascent** | An Engraving, and the name of the new mathematical axis it opens. The carrier no longer just gets stronger — it climbs a new dimension. Each level adds +0.02 to the exponent on effective rate. |
-| **accretion** | The in-world physical model for Carrier Mass: every push leaves a residue. Sera's word, used straight-faced. |
+| **accretion** | The in-world physical model for Console Mass: every push leaves a residue. Sera's word, used straight-faced. |
 | **Signal Lock** | The welcome-back screen. Sera's report when Kalen returns to the Console: time away, base carrier, any windows still holding, and the count of Echoes the rig logged in his absence. Procedural register; never reads as a payout. |
 | **Signal Diagnostic** | The breakdown panel. A live, ordered read of the terms that produce the current pulse — base listening yield, decode efficiency, active carrier windows, resonance builds, Echo Memory, and (if cut) the Ascent exponent. Sera-voiced UI; she is showing Kalen the math of his own carrier. |
 | **current pulse** | The Sera-voiced label for the final, post-everything Echoes/s figure on the Signal Diagnostic. "Pulse" reads as one observable signal rather than a rate, which is how Sera would name it. |
@@ -178,7 +178,8 @@ If a term in this file ever needs to change:
 ### Changelog
 
 - 2026-05-13 — Initial glossary committed.
-- 2026-05-14 — Added Carrier Mass, Carrier Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the rig literally carries the weight of past cycles.
+- 2026-05-14 — Added Console Mass, Console Engravings (First Light, Bone Memory, Quick Wake, Patched Hands, Open Frame, Ascent), and the accretion model. Supports the prestige overhaul; the Console literally carries the weight of past cycles.
+- 2026-05-23 — Renamed Carrier Mass → Console Mass and Carrier Engravings → Console Engravings. "Carrier" reads as a vessel and an event-noun can't take engravings; "the Console" already exists in the lore (Signal Lock entry below) as the device Kalen sits at. Display strings only — code field `carrierMass` and save key unchanged.
 - 2026-05-14 — Added Signal Lock — the name for the welcome-back screen.
 - 2026-05-14 — Added Signal Diagnostic and current pulse. Names the breakdown screen and the final rate figure; Sera-voiced UI surface.
 - 2026-05-14 — Added Wake. Names the starter rate-mul beat at every cycle open so the mobile collapsed-buff detail modal has a clear provenance label.

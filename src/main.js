@@ -58,7 +58,7 @@ const state = {
 };
 // Derived each session from the log. Drives Echo Memory in the rate math.
 state.memoryMul = memoryMul(state.contactLog);
-// Carrier Engraving — Ascent. Lifts the whole effective rate by this exponent.
+// Console Engraving — Ascent. Lifts the whole effective rate by this exponent.
 state.ascentExp = ascentExp(state.contactLog);
 
 initMenu();
@@ -71,7 +71,7 @@ initGameLogUi();
 bindEpisode(state.contactLog);
 // "Close the Cycle" — wipes the gameplay save, advances the log's run counter
 // so milestones can fire again, leaves the world list (and therefore Echo
-// Memory) intact, banks Carrier Mass against the cycle's peakAmount, then
+// Memory) intact, banks Console Mass against the cycle's peakAmount, then
 // reloads. Shared between the Contact Log button and the Debug menu shortcut.
 function closeCycleNow() {
   const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
@@ -322,7 +322,7 @@ if (loaded) {
   });
 }
 
-// Apply Carrier Engravings (persistent cross-cycle boosts) on a fresh boot.
+// Apply Console Engravings (persistent cross-cycle boosts) on a fresh boot.
 // Must run before validateSlate so Open Frame's extra band is filled by it.
 if (!loaded) {
   state.amount += firstLightAmount(state.contactLog);

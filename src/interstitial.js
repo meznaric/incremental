@@ -223,7 +223,7 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
-  // voice: Sera. First Carrier Engraving purchased.
+  // voice: Sera. First Console Engraving purchased.
   first_engraving: {
     bgImage: './docs/lore/images/engraving-handwriting.png',
     steps: [
@@ -604,7 +604,7 @@ export function bumpAnomaly(state, by) {
   }
 }
 
-// Call when a Carrier Engraving is purchased. Fires the first-engraving beat
+// Call when a Console Engraving is purchased. Fires the first-engraving beat
 // exactly once *ever* — gated on the contact log so it survives reloads even
 // though messages.shown is gameplay-save state. The log already persists
 // engravings; an "ever bought one" flag rides on the same record.

@@ -1,9 +1,9 @@
 // Rig modal — the persistence layer. Three tabs:
 //
-//   Rig  → Echo Memory + Carrier Mass tiles, plus the "accreting this cycle"
+//   Rig  → Echo Memory + Console Mass tiles, plus the "accreting this cycle"
 //          projection that the player is about to bank on close.
-//   Shop → Carrier Engravings, the only place to spend Carrier Mass.
-//   Info → How Echo Memory and Carrier Mass work, what a cycle close does.
+//   Shop → Console Engravings, the only place to spend Console Mass.
+//   Info → How Echo Memory and Console Mass work, what a cycle close does.
 import {
   ENGRAVINGS, engravingCost, canBuyEngraving, buyEngraving,
   getMass, getEngraving, massForPeak, memoryShards, memoryMul,
@@ -33,7 +33,7 @@ export function initRigModalUi(state, opts = {}) {
       </div>
     </div>
     <div class="faq-block kind-mass">
-      <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Carrier Mass works</div>
+      <div class="faq-head"><i class="ri ri-scales-3-line"></i>How Console Mass works</div>
       <div class="faq-body">
         <p><strong>Earn:</strong> banked at cycle close from the cycle's <em>peak</em> Echo balance. Every 10× past 1k = +1 kg. 100k peak → 3 kg. 1B → 7 kg. 1T → 10 kg.</p>
         <p><strong>Spend:</strong> Engravings in the Shop tab — permanent cuts to the rig.</p>
@@ -43,7 +43,7 @@ export function initRigModalUi(state, opts = {}) {
     <div class="faq-block">
       <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
       <div class="faq-body">
-        <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
+        <p><strong>Survives:</strong> Echo Memory shards, Console Mass, Engravings, the Contact Log itself.</p>
         <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
       </div>
     </div>
@@ -82,7 +82,7 @@ export function initRigModalUi(state, opts = {}) {
         <p class="cl-stat-hint">One shard per name on the log. Each shard adds +${Math.round(ECHO_MEMORY_PER_SHARD * 100)}% to base Echoes/s, before every other multiplier.</p>
       </div>
       <div class="cl-stat is-wide cl-rig-mass">
-        <div class="cl-stat-label">Carrier Mass</div>
+        <div class="cl-stat-label">Console Mass</div>
         <div class="cl-stat-value cl-mass cl-rig-big">${mass} <span class="cl-rig-unit">kg</span></div>
         <p class="cl-stat-hint">Banked at cycle close. Spend it on Engravings — those cuts survive every reset.</p>
       </div>
@@ -135,7 +135,7 @@ export function initRigModalUi(state, opts = {}) {
     }).join('');
     engravingsEl.innerHTML = `
       <div class="cl-eng-head-row">
-        <div class="cl-eng-title">Carrier Engravings</div>
+        <div class="cl-eng-title">Console Engravings</div>
         <div class="cl-eng-balance">${mass} kg</div>
       </div>
       <ul class="cl-eng-list">${rows}</ul>

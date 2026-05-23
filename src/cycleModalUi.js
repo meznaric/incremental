@@ -1,5 +1,5 @@
 // Cycle modal — the live state of the current run. Surfaces the next contact,
-// upcoming names, contact count, and projected Carrier Mass on close. Drives
+// upcoming names, contact count, and projected Console Mass on close. Drives
 // the "Close the Cycle" action with its two-stage confirm.
 //
 // Voice: Kalen first-person ambient. Sera lines reserved for the interstitials.
@@ -92,7 +92,7 @@ export function initCycleModalUi(state, opts = {}) {
       <div class="cl-stat cl-stat-mass">
         <div class="cl-stat-label">If I close now</div>
         <div class="cl-stat-value cl-mass">${projected} kg</div>
-        <p class="cl-stat-hint">Carrier Mass banked from this cycle's peak Echo balance.</p>
+        <p class="cl-stat-hint">Console Mass banked from this cycle's peak Echo balance.</p>
       </div>`;
 
     tilesEl.innerHTML = `${foundTile}${totalTile}${epTile}${massTile}`;
@@ -203,7 +203,7 @@ export function initCycleModalUi(state, opts = {}) {
         const nextLoop = loop + 1;
         actionEl.innerHTML = `
           <div class="cl-action-headline">Echo Loop ${nextLoop} ready.</div>
-          <div class="cl-action-hint">Banking <span class="cl-memory">+10%</span> Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Carrier Mass` : ''}</div>
+          <div class="cl-action-hint">Banking <span class="cl-memory">+10%</span> Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Console Mass` : ''}</div>
           <button type="button" class="cl-close-btn is-ready" data-act="arm">Close Echo Loop ${loop}</button>
         `;
         return;
@@ -213,15 +213,15 @@ export function initCycleModalUi(state, opts = {}) {
         : '';
       actionEl.innerHTML = `
         ${headline}
-        <div class="cl-action-hint">${cycleCount} new name${cycleCount === 1 ? '' : 's'} on the log · banking <span class="cl-memory">+${projectedPct}%</span> to Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Carrier Mass` : ''}</div>
+        <div class="cl-action-hint">${cycleCount} new name${cycleCount === 1 ? '' : 's'} on the log · banking <span class="cl-memory">+${projectedPct}%</span> to Echo Memory${projectedMass > 0 ? ` · accreting <span class="cl-mass">${projectedMass} kg</span> Console Mass` : ''}</div>
         <button type="button" class="cl-close-btn${complete ? ' is-ready' : ''}" data-act="arm">Close the Cycle</button>
       `;
       return;
     }
     actionEl.classList.add('armed');
     const confirmCopy = loop > 0
-      ? `Closing this loop resets your relays and decoders. The Contact Log remains. Loop Resonance compounds on Echo Memory; Carrier Mass accretes against your peak.`
-      : `Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier. Mass accreted on the rig becomes Carrier Mass — spend it on Engravings.`;
+      ? `Closing this loop resets your relays and decoders. The Contact Log remains. Loop Resonance compounds on Echo Memory; Console Mass accretes against your peak.`
+      : `Closing this cycle resets your relays and decoders. The Contact Log remains. Each name you remember strengthens the carrier. Mass accreted on the rig becomes Console Mass — spend it on Engravings.`;
     const confirmBtn = loop > 0 ? `Close Echo Loop ${loop}` : `Close cycle ${getRun(log)}`;
     actionEl.innerHTML = `
       <div class="cl-confirm">
@@ -240,7 +240,7 @@ export function initCycleModalUi(state, opts = {}) {
     <div class="faq-block">
       <div class="faq-head"><i class="ri ri-refresh-line"></i>What a cycle close does</div>
       <div class="faq-body">
-        <p><strong>Survives:</strong> Echo Memory shards, Carrier Mass, Engravings, the Contact Log itself.</p>
+        <p><strong>Survives:</strong> Echo Memory shards, Console Mass, Engravings, the Contact Log itself.</p>
         <p><strong>Resets:</strong> Echo balance, Echoes/s, owned Relays / Decodes / Seed Relays, shop slate, active Windows.</p>
       </div>
     </div>

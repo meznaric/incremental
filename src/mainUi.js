@@ -737,7 +737,7 @@ export function initMainUi(state, deps) {
   // Falls back to the kind-category labels.
   const BUFF_SOURCES = {
     wake:       { name: 'Wake',       desc: 'A standing nudge at every cycle open — the rig pings itself awake.' },
-    quick_wake: { name: 'Quick Wake', desc: 'A Carrier Engraving. Each new cycle opens with the carrier already warm.' },
+    quick_wake: { name: 'Quick Wake', desc: 'A Console Engraving. Each new cycle opens with the carrier already warm.' },
   };
 
   function kindName(kind) {

@@ -128,11 +128,11 @@ export const ACHIEVEMENTS = [
     desc: 'Caught an isolated Seed Relay dripping Echoes on its own. Sparse pays back.',
     hint: 'Place a relay with no online neighbours and wait for the drip.',
     trigger: { kind: 'flag', flag: 'bleedDripsSeen' } },
-  // First Carrier Engraving cut. Log-side flag so it survives cycle close.
+  // First Console Engraving cut. Log-side flag so it survives cycle close.
   { id: 'first_engraving', category: 'mechanics',
     name: 'First cut',
-    desc: 'Cut a Carrier Engraving into the rig. The metal remembers.',
-    hint: 'Spend Carrier Mass on an Engraving.',
+    desc: 'Cut a Console Engraving into the rig. The metal remembers.',
+    hint: 'Spend Console Mass on an Engraving.',
     trigger: { kind: 'logFlag', flag: 'firstEngravingSeen' } },
 
   // — Play —

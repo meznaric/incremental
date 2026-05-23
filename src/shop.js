@@ -175,7 +175,7 @@ function memoryFactor(state) {
   return Number.isFinite(state.memoryMul) && state.memoryMul > 0 ? state.memoryMul : 1;
 }
 
-// Ascent exponent from Carrier Engravings. Lifts the entire effective rate to
+// Ascent exponent from Console Engravings. Lifts the entire effective rate to
 // rate^(1+ascentExp). Stored as state.ascentExp (derived; defaults to 0).
 // WHY: every existing rate term is multiplicative; once cost growth is super-
 // exponential, multipliers asymptote. An exponent on the wire opens a new axis.

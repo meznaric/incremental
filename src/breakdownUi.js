@@ -19,7 +19,7 @@ import { PIN_TIER_COSTS, MAX_PIN_SLOTS, REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECOND
 //   Hail      — gamble loop in plain language
 //   Network   — Seed Relay placement system: sectors, clustering, discovery, drip
 //   Glossary  — lore label → mechanic bridge for every shop kind
-// The Echo Memory / Carrier Mass / cycle-close explainers used to live here
+// The Echo Memory / Console Mass / cycle-close explainers used to live here
 // under a "Names & Mass" tab — those moved to the Names, Rig, and Cycle
 // panels of the Contact Log so the explanation sits next to the thing it
 // describes. Voice: Sera (procedural, second person). She narrates the rig.
@@ -340,7 +340,7 @@ export function initBreakdownUi(state) {
         </div>
       </div>
 
-      <p class="faq-foot">Closing a cycle wipes the mesh — relays don't survive. Carrier Mass earned from the cycle's peak does, so plant aggressively before you close.</p>
+      <p class="faq-foot">Closing a cycle wipes the mesh — relays don't survive. Console Mass earned from the cycle's peak does, so plant aggressively before you close.</p>
     `;
   }
 
@@ -383,7 +383,7 @@ export function initBreakdownUi(state) {
       </div>
       <div class="faq-block kind-mass">
         <div class="faq-head"><i class="ri ri-scales-3-line"></i>Engraving</div>
-        <div class="faq-body">A permanent cut to the rig, bought with Carrier Mass. Survives every cycle close. Open the Contact Log → Rig tab.</div>
+        <div class="faq-body">A permanent cut to the rig, bought with Console Mass. Survives every cycle close. Open the Contact Log → Rig tab.</div>
       </div>
     `;
   }

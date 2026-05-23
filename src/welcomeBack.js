@@ -107,7 +107,7 @@ function buildBreakdown(state, savedAt, offline, extras) {
     rows.push({ label: 'Echo Memory', value: `×${memMul.toFixed(2)}` });
   }
 
-  // Ascent — Carrier Engraving exponent. Only show if it's actually lifting.
+  // Ascent — Console Engraving exponent. Only show if it's actually lifting.
   const exp = state.ascentExp;
   if (Number.isFinite(exp) && exp > 0) {
     rows.push({ label: 'Ascent', value: `rate^(1 + ${exp.toFixed(2)})` });

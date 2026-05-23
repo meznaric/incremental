@@ -183,7 +183,7 @@ export function breakdownRate(state, now) {
       label: 'Ascent exponent',
       op: '^',
       factor: 1 + ascentExp,
-      note: `Carrier Engraving · ${lvl} cut${lvl === 1 ? '' : 's'} into the frame`,
+      note: `Console Engraving · ${lvl} cut${lvl === 1 ? '' : 's'} into the frame`,
     });
   }
 

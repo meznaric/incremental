@@ -20,8 +20,8 @@
 //       { id, name, ep, status, contactedAt: <unix seconds>, run: <run that added it> },
 //       ...
 //     ],
-//     mass: number,              // Carrier Mass — persistent cycle-close currency.
-//     engravings: { [id]: lvl }, // Carrier Engravings owned across cycles.
+//     mass: number,              // Console Mass — persistent cycle-close currency.
+//     engravings: { [id]: lvl }, // Console Engravings owned across cycles.
 //     bestPeak: number,          // Highest peakAmount of any past cycle (for stats).
 //   }
 
@@ -137,7 +137,7 @@ const fresh = () => ({
   lastNamesSeenCount: 0,
   // Mass kg the player had banked the last time they opened the Rig panel.
   // hasUnreadRig(log) flips true when mass > this counter so the right radar
-  // segment pulses the first time the player has Carrier Mass to spend.
+  // segment pulses the first time the player has Console Mass to spend.
   lastRigSeenMass: 0,
 });
 
@@ -316,7 +316,7 @@ export function markNamesSeen(log) {
   log.lastNamesSeenCount = log.worlds.length;
 }
 
-// True when the player has banked Carrier Mass they haven't yet seen on the
+// True when the player has banked Console Mass they haven't yet seen on the
 // Rig panel. Drives the pulse on the contactProgress right radar segment so
 // the first kg of mass is impossible to miss.
 export function hasUnreadRig(log) {
@@ -326,7 +326,7 @@ export function hasUnreadRig(log) {
   return mass > seen;
 }
 
-// Acknowledge the player's current Carrier Mass. Called when the Rig panel
+// Acknowledge the player's current Console Mass. Called when the Rig panel
 // opens — clears hasUnreadRig(log) until more mass accretes at the next close.
 export function markRigSeen(log) {
   if (!log) return;
@@ -407,7 +407,7 @@ export function memoryMul(log) {
 // responsible for wiping the gameplay save and reloading the page.
 // Returns false if the cycle is not eligible to close.
 // `peakAmount` is the highest Echo count this cycle hit; it determines how
-// much Carrier Mass the close banks.
+// much Console Mass the close banks.
 export function closeCycle(log, peakAmount) {
   if (!canCloseCycle(log)) return false;
   const banked = massForPeak(peakAmount);
@@ -435,9 +435,9 @@ export function closeCycle(log, peakAmount) {
   return banked;
 }
 
-// — Carrier Mass & Carrier Engravings —
+// — Console Mass & Console Engravings —
 //
-// Carrier Mass is the *second* persistent cycle-close currency. Where Echo Memory
+// Console Mass is the *second* persistent cycle-close currency. Where Echo Memory
 // is broad (every name ever logged adds a flat multiplier), Mass is bankable
 // and spendable — it buys Engravings, upgrades that survive every cycle close
 // because they're literally cut into Kalen's listening rig.
@@ -462,7 +462,7 @@ export function getEngraving(log, id) {
   return (log && log.engravings && Number.isFinite(log.engravings[id])) ? log.engravings[id] : 0;
 }
 
-// Carrier Engravings — the persistent tier of upgrades bought with Mass.
+// Console Engravings — the persistent tier of upgrades bought with Mass.
 // Each entry: { id, name, desc, cost(level) → kg, max, voice/lore notes }.
 // All in-world names canonicalised in docs/lore/naming-conventions.md.
 export const ENGRAVINGS = [

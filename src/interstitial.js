@@ -497,17 +497,36 @@ export function enqueue(state, id) {
   if (isContact) {
     if (recordContact(state.contactLog, id, Date.now() / 1000)) {
       saveContactLog(state.contactLog);
-      // Filler beats: enqueue a `filler_after_N` recap when the count of
+      // Filler beats: schedule a `filler_after_N` recap when the count of
       // logged worlds in this EP hits N (across all cycles, not just this
       // one). The EP's bound interstitials decide which N values exist;
       // missing keys are silently skipped. EP transition beats are the
       // cycle_open for the next EP, so we don't fire filler_after_10.
+      //
+      // Spread, not stacked: fillers used to enqueue back-to-back with the
+      // milestone beat, so the player saw two interstitials in a row. They
+      // now defer to the geometric midpoint between this milestone and the
+      // next — checkAmount drains them as the climb crosses each fireAt.
       const ep = milestoneWorld.ep;
       const epIds = new Set(Object.values(WORLDS_BY_EP[ep] || {}).map((w) => w.id));
       const epCount = state.contactLog.worlds.filter((w) => epIds.has(w.id)).length;
       if (epCount < 10) {
         const fillerKey = `filler_after_${epCount}`;
-        if (INTERSTITIALS[fillerKey]) enqueue(state, fillerKey);
+        if (INTERSTITIALS[fillerKey]) {
+          const slotIdx = MILESTONE_SLOT_IDS.indexOf(id);
+          const ms = currentMilestones(state.contactLog);
+          const cur = slotIdx >= 0 ? ms[slotIdx] : null;
+          const next = slotIdx >= 0 ? ms[slotIdx + 1] : null;
+          if (cur && next) {
+            const fireAt = Math.sqrt(cur.at * next.at);
+            state.messages.stats.pendingFillers = state.messages.stats.pendingFillers || [];
+            state.messages.stats.pendingFillers.push({ id: fillerKey, fireAt });
+          } else {
+            // No next milestone to gap toward (shouldn't happen for fillers
+            // since they only fire at counts 3/6/9, but be defensive).
+            enqueue(state, fillerKey);
+          }
+        }
       }
     }
   }
@@ -663,9 +682,23 @@ export function enqueueSeasonCompleteBeat(state) {
 }
 
 // Call from the tick loop. Cheap: just numeric compare against peak.
+//
+// Drains pendingFillers (deferred filler_after_N beats) before checking
+// milestones so the filler lands ahead of any milestone the same tick would
+// also fire. A pending filler's fireAt sits at the geometric midpoint between
+// the milestone that scheduled it and the next milestone, so the filler reads
+// as "between names" rather than back-to-back with the contact beat.
 export function checkAmount(state, amount) {
   const s = state.messages.stats;
   if (amount <= (s.peakAmount || 0)) return;
+  if (Array.isArray(s.pendingFillers) && s.pendingFillers.length > 0) {
+    const remaining = [];
+    for (const f of s.pendingFillers) {
+      if (amount >= f.fireAt) enqueue(state, f.id);
+      else remaining.push(f);
+    }
+    s.pendingFillers = remaining;
+  }
   for (const m of currentMilestones(state.contactLog)) {
     if (amount >= m.at && (s.peakAmount || 0) < m.at) enqueue(state, m.id);
   }

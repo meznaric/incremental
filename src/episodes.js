@@ -18,6 +18,32 @@ export const EP_INTERSTITIALS = {
   // EP 1 — Discovery
   // ──────────────────────────────────────────────────────────────────────
   1: {
+    // EP1 arc position: Kalen lucky, curious, half-believing the Law is wrong.
+    // Most beats sit in his contemporary voice — careful, hopeful, slightly
+    // proud — rather than retrospective. The buildup-name (Ahn-Tar-3) gets a
+    // 3-filler chain that walks the player from "there is a world I have not
+    // pushed" to "the sect has formed" to the climactic milestone.
+
+    // K. EP1 buildup #1 — the desert is in the folder, Kalen has not pushed.
+    // Bg uses the climax world's portrait so the buildup is visually threaded.
+    filler_after_3: { bgImage: './docs/lore/images/desert-ahn-tar.png', steps: [
+      { voice: 'K', text: 'There is a world in my folder I have not opened.' },
+      { voice: 'K', text: 'A desert. Theocratic. Oil-lit. They have a caste called the sky-listeners.' },
+      { voice: 'K', text: 'I keep almost reaching for it. The early ones went so well.' },
+    ] },
+    // K. EP1 buildup #2 — he commits, carefully.
+    filler_after_6: { bgImage: './docs/lore/images/desert-ahn-tar.png', steps: [
+      { voice: 'K', text: 'I have opened the desert folder.' },
+      { voice: 'K', text: 'The sky-listener I would speak to is sixteen.' },
+      { voice: 'K', text: 'I am going to do this carefully. Every step. One syllable, one name.' },
+    ] },
+    // K. EP1 buildup #3 — the carrier is out, the sect is forming, he is being careful.
+    filler_after_9: { bgImage: './docs/lore/images/desert-ahn-tar.png', steps: [
+      { voice: 'K', text: 'The desert received the carrier. The boy heard me.' },
+      { voice: 'K', text: 'A small sect has formed around what he says I said.' },
+      { voice: 'K', text: 'I am being careful. I keep being careful.' },
+    ] },
+
     // K. Ish-Karal — nobody on the planet had a transmitter that mattered.
     milestone_1k: { steps: [
       { voice: 'K', text: 'Two of them heard me anyway.', autoMs: 1400 },
@@ -38,10 +64,13 @@ export const EP_INTERSTITIALS = {
       { voice: 'K', text: 'Their pilots logged me as weather.', autoMs: 1400 },
       { voice: 'K', text: 'They named the year after me. They have not stopped using the name.', autoMs: 2200 },
     ] },
-    // K. Hsareth — the duplicate guild he did not know about.
+    // K. Hsareth — Ahn-Tar-3's nearer neighbour, sky-listeners writing letters.
+    // Old beat had retrospective regret ("I made the same mistake there");
+    // that's late-arc Kalen. EP1 Kalen is curious and half-encouraged.
     milestone_10m: { steps: [
-      { voice: 'K', text: 'Ahn-Tar-3’s nearer neighbour.', autoMs: 1400 },
-      { voice: 'K', text: 'I made the same mistake there. Ten years earlier. I did not know.', autoMs: 2200 },
+      { voice: 'K', text: 'Ahn-Tar-3’s nearer neighbour.' },
+      { voice: 'K', text: 'Their sky-listeners write letters across the gulf. They have done it for a century.' },
+      { voice: 'K', text: 'The letters are gentle. I want to do more of this.' },
     ] },
     // S. Mirum-3 — treaty cited his voice as a witness.
     milestone_100m: { steps: [
@@ -64,10 +93,14 @@ export const EP_INTERSTITIALS = {
       { voice: 'S', text: 'You rode in on a harvest chant.', autoMs: 1400 },
       { voice: 'S', text: 'It is now a way to fail school.', autoMs: 2000 },
     ] },
-    // S. Ahn-Tar-3 climax. Original EP1 opener.
+    // S→K. Ahn-Tar-3 climax. The buildup chain pays off here. Sera frames the
+    // act in procedural terms; Kalen's last line is the season's first audible
+    // crack in his "I was being careful" defence.
     milestone_1t: { steps: [
-      { voice: 'S', text: 'The first one. The desert.', autoMs: 1400 },
-      { voice: 'S', text: 'You said his name to him.', autoMs: 2000 },
+      { voice: 'S', text: 'The desert.' },
+      { voice: 'S', text: 'You used a sixteen-year-old as your first relay.' },
+      { voice: 'S', text: 'Six thousand. In three years.' },
+      { voice: 'K', text: 'I was being careful.' },
     ] },
   },
 
@@ -75,11 +108,14 @@ export const EP_INTERSTITIALS = {
   // EP 2 — The Sea Choir
   // ──────────────────────────────────────────────────────────────────────
   2: {
-    // K. Cycle open — transition from EP1 to EP2.
+    // K. Cycle open — confident method-builder. Ahn-Tar-3 is done; he is
+    // already telling himself the next one will be cleaner. The "method"
+    // language is the arc cue — EP2 Kalen has stopped seeing each contact
+    // as one decision and started seeing them as procedure.
     cycle_open: { repeat: true, steps: [
-      { voice: 'K', text: 'Ahn-Tar-3 closed. The casualty count is final.' },
-      { voice: 'K', text: 'Sera has the next folder.' },
-      { voice: 'K', text: 'It is labelled Solunn.' },
+      { voice: 'K', text: 'Ahn-Tar-3 closed. The casualty count is final. I will not forget the count.' },
+      { voice: 'K', text: 'But I learned from it. I know what I did wrong. I have a method now.' },
+      { voice: 'K', text: 'The next folder is a water world. Solunn. They sing. I am going to be careful.' },
     ] },
     // S. Recap after 3 EP2 names. The folder is filling up.
     filler_after_3: { bgImage: './docs/lore/images/recap-ep2-sea-choir.png', steps: [
@@ -153,11 +189,13 @@ export const EP_INTERSTITIALS = {
   // EP 3 — Sky Language
   // ──────────────────────────────────────────────────────────────────────
   3: {
-    // K. Cycle open — transition from EP2 to EP3.
+    // K. Cycle open — performing voice. EP3 Kalen has stopped describing
+    // contact as risk and started describing it as craft. The "practising
+    // their grammar" line is the arc cue — he is teaching now, not whispering.
     cycle_open: { repeat: true, steps: [
-      { voice: 'K', text: 'The Solunni restructured. Sera says that is not the same as collapse.' },
-      { voice: 'K', text: 'I asked her what is.' },
-      { voice: 'K', text: 'She handed me Vehrn-9.' },
+      { voice: 'K', text: 'The Solunni restructured. Sera calls that a softer word than collapse.' },
+      { voice: 'K', text: 'I told her I have something cleaner already drafted. A world named Vehrn-9. Aurora-bright.' },
+      { voice: 'K', text: 'I have been practising their grammar all month. I want this one to land well.' },
     ] },
     // S. Recap after 3 EP3 names.
     filler_after_3: { bgImage: './docs/lore/images/recap-ep3-sky-language.png', steps: [

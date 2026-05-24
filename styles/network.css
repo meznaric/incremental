@@ -1,31 +1,70 @@
-/* Seed Relay network modal */
-.net-card { width: 100%; max-width: 1040px; }
-.net-body { padding: 0; }
-.net-layout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 14px 18px 18px;
+/* Seed Relay network — fullscreen overlay variant.
+   The canvas (built by networkScene.js) goes edge-to-edge of the viewport so
+   the player feels they're flying around the galactic map; the side panel,
+   up-next strip and hex bar float over the canvas with their own padding.
+   Modal chrome (rounded card, max-width, padding) is overridden against the
+   shared modal rules in styles/shop.css. */
+#networkModal {
+  padding: 0;
+  background: rgba(4, 5, 12, 0.5);
 }
-.net-map {
-  flex: 1 1 520px;
-  min-width: 320px;
+.net-card {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.net-card .bm-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid rgba(45, 212, 255, 0.16);
-  background:
-    radial-gradient(ellipse at center, rgba(20, 25, 48, 0.6) 0%, rgba(8, 10, 22, 0.95) 100%),
-    linear-gradient(rgba(45, 212, 255, 0.045) 1px, transparent 1px) 0 0,
-    linear-gradient(90deg, rgba(45, 212, 255, 0.045) 1px, transparent 1px) 0 0;
-  background-size: auto, 24px 24px, 24px 24px;
-  box-shadow: inset 0 0 36px rgba(45, 212, 255, 0.07);
-  padding: 10px;
+  justify-content: space-between;
+  padding: 14px max(18px, env(safe-area-inset-right)) 14px max(18px, env(safe-area-inset-left));
+  padding-top: max(14px, env(safe-area-inset-top));
+  background: linear-gradient(to bottom, rgba(6, 8, 18, 0.92) 0%, rgba(6, 8, 18, 0.55) 60%, rgba(6, 8, 18, 0) 100%);
+  pointer-events: none;
 }
-/* Slow vertical scanline — synth feel without being distracting. */
+.net-card .bm-head > * { pointer-events: auto; }
+.net-body {
+  padding: 0;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.net-layout {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
+  gap: 0;
+}
+.net-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(140, 110, 220, 0.20) 0%, rgba(8, 10, 22, 0) 55%),
+    radial-gradient(ellipse at 30% 80%, rgba(45, 120, 220, 0.18) 0%, rgba(8, 10, 22, 0) 60%),
+    radial-gradient(ellipse at center, rgba(20, 25, 48, 0.5) 0%, rgba(6, 6, 14, 0.96) 100%);
+  touch-action: none;
+}
+/* Slow vertical scanline — synth feel, kept from the v1 SVG map. */
 .net-map::before {
   content: '';
   position: absolute;
@@ -33,36 +72,70 @@
   height: 110px;
   background: linear-gradient(to bottom,
     transparent 0%,
-    rgba(45, 212, 255, 0.05) 35%,
-    rgba(45, 212, 255, 0.10) 50%,
-    rgba(45, 212, 255, 0.05) 65%,
+    rgba(45, 212, 255, 0.04) 35%,
+    rgba(45, 212, 255, 0.08) 50%,
+    rgba(45, 212, 255, 0.04) 65%,
     transparent 100%);
   pointer-events: none;
   animation: net-scan 7s linear infinite;
   mix-blend-mode: screen;
+  z-index: 2;
 }
 @keyframes net-scan {
   0%   { transform: translateY(-140px); }
   100% { transform: translateY(120%); }
 }
-/* Respect reduced-motion preference — kill the scanline. */
 @media (prefers-reduced-motion: reduce) {
   .net-map::before { animation: none; opacity: 0; }
 }
+.net-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.net-canvas:active { cursor: grabbing; }
+/* Hex-bar slot is a child of .net-map; floats at the bottom-centre of the
+   viewport. On wide layouts it sits to the left of the side panel; on phone
+   it spans the full width above the up-next strip. */
+.net-hexbar-slot {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  right: calc(360px + max(16px, env(safe-area-inset-right)));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 5;
+  pointer-events: none;
+}
+.net-hexbar-slot > * { pointer-events: auto; }
+
+/* Side panel floats over the canvas on the right with a translucent panel
+   look so the map stays visible behind it. Scrolls internally when content
+   overflows. */
 .net-side {
-  flex: 0 1 320px;
-  min-width: 260px;
+  position: absolute;
+  top: 72px;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 340px;
+  max-width: 38vw;
+  z-index: 8;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(8, 10, 22, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
-/* Mobile-only "up next" strip — rendered between the map and the side panel
-   so the player can see queued tokens without scrolling past status tiles.
-   Hidden on desktop; the full Placement queue in the side panel owns the
-   canonical view there.
-   min-width: 0 here AND on the strip is load-bearing: flex items default to
-   min-width: auto, which makes them grow to fit content. Without it a long
-   queue would push the modal wider than the viewport. */
 .net-upnext {
   display: none;
   min-width: 0;
@@ -84,7 +157,6 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
-  /* Faint right edge so it reads as horizontally scrollable. */
   mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
 }
@@ -123,209 +195,6 @@
   color: #6a6a90;
   font-style: italic;
 }
-.netmap-svg {
-  width: 100%;
-  height: auto;
-  display: block;
-  /* JS owns --map-scale / --map-tx / --map-ty for pinch-zoom + pan on mobile.
-     Desktop leaves the defaults below (1, 0, 0) and the transform is a no-op. */
-  transform-origin: top left;
-  transform: translate(var(--map-tx, 0px), var(--map-ty, 0px)) scale(var(--map-scale, 1));
-  will-change: transform;
-}
-.relay-label {
-  font-size: 11px;
-  font-weight: 600;
-  fill: #f3f4ff;
-  text-anchor: middle;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(8, 8, 18, 0.85);
-  stroke-width: 2.4;
-  stroke-linejoin: round;
-}
-.relay-label.ripen-label { fill: #d8d2ff; font-size: 10px; }
-@media (max-width: 520px) {
-  .relay-label { font-size: 9px; }
-  .relay-label.ripen-label { font-size: 8.5px; }
-}
-/* Cyberpunk hex cell — split into three SVG layers so the player reads
-   sector identity + yield bonus + discovery risk at a glance:
-   1) .hex-base    — low-alpha sector fill; the tap target.
-   2) .hex-bar     — yield (left half) and discovery risk (right half), both
-                     rising from the hex bottom. Same sector colour at two
-                     shades; the bar height encodes the multiplier so high-
-                     yield / high-risk sectors look "fuller" without needing
-                     a tooltip.
-   3) .hex-stroke  — sector-tinted outline on top of the bars. Pointer-
-                     transparent so taps still land on the base. */
-.hex-cell .hex-base {
-  fill: color-mix(in srgb, var(--sec-color) 9%, transparent);
-  pointer-events: all;
-  cursor: pointer;
-  transition: fill 140ms ease;
-}
-.hex-cell .hex-stroke {
-  fill: none;
-  stroke: color-mix(in srgb, var(--sec-color) 70%, transparent);
-  stroke-width: 1.2;
-  pointer-events: none;
-  transition: stroke 140ms ease, stroke-width 140ms ease, filter 140ms ease;
-}
-.hex-bar {
-  pointer-events: none;
-  transition: opacity 140ms ease;
-}
-.hex-bar.yield {
-  fill: color-mix(in srgb, var(--sec-color) 70%, white 30%);
-  opacity: 0.70;
-}
-.hex-bar.disc {
-  fill: color-mix(in srgb, var(--sec-color) 65%, black 50%);
-  opacity: 0.85;
-}
-.hex-cell.has-relay .hex-stroke { stroke: var(--sec-color); }
-.hex-cell.has-relay .hex-base   { fill: color-mix(in srgb, var(--sec-color) 12%, transparent); }
-.hex-cell.has-relay .hex-bar.yield { opacity: 0.48; }
-.hex-cell.has-relay .hex-bar.disc  { opacity: 0.58; }
-.hex-cell.selected .hex-stroke {
-  stroke: #ffe082;
-  stroke-width: 2.2;
-  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
-}
-/* Empty hex selected (no token queued) — cyan accent so it reads as
-   "inspecting" rather than "staged" (which uses the warm gold ghost). */
-.hex-cell.picked .hex-stroke {
-  stroke: #2dd4ff;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 5px rgba(45, 212, 255, 0.6));
-}
-.hex-cell.picked .hex-base { fill: color-mix(in srgb, var(--sec-color) 18%, transparent); }
-
-/* Cluster edges — glowing cyan trace, mechanic A's visual cue. */
-.cluster-edge {
-  stroke: rgba(45, 212, 255, 0.7);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-dasharray: 4 3;
-  pointer-events: none;
-  filter: drop-shadow(0 0 3px rgba(45, 212, 255, 0.55));
-  animation: cluster-pulse 2.4s ease-in-out infinite;
-}
-@keyframes cluster-pulse {
-  0%, 100% { stroke-opacity: 0.55; }
-  50%      { stroke-opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cluster-edge { animation: none; }
-}
-
-/* Relay markers — read as scanner reticles, not painted dots. The
-   backplate frame uses screen-dark fill so the core dot pops; the four
-   L-bracket corners add the "this thing is being tracked" feel. */
-.relay-mark { pointer-events: all; cursor: pointer; }
-.relay-mark .r-frame {
-  fill: rgba(8, 10, 22, 0.85);
-  stroke: rgba(45, 212, 255, 0.7);
-  stroke-width: 1.1;
-}
-.relay-mark .r-core { stroke: none; }
-.relay-mark .r-bracket {
-  fill: none;
-  stroke: rgba(45, 212, 255, 0.85);
-  stroke-width: 1.4;
-  stroke-linecap: square;
-}
-.relay-mark.clustered .r-core {
-  fill: #ffd86b;
-  filter: drop-shadow(0 0 3px rgba(255, 216, 107, 0.95));
-}
-.relay-mark.clustered .r-frame  { stroke: rgba(255, 216, 107, 0.85); }
-.relay-mark.clustered .r-bracket { stroke: rgba(255, 216, 107, 0.9); }
-.relay-mark.isolated .r-core {
-  fill: #2dd4ff;
-  filter: drop-shadow(0 0 4px rgba(45, 212, 255, 0.95));
-}
-.relay-mark.isolated .r-frame   { stroke: rgba(45, 212, 255, 0.85); }
-.relay-mark.isolated .r-bracket { stroke: rgba(45, 212, 255, 0.9); }
-/* Ripening — dim purple base, brighter progress arc, brackets hidden. */
-.relay-mark.ripening .r-frame {
-  stroke: rgba(192, 132, 252, 0.55);
-  fill: rgba(8, 10, 22, 0.75);
-}
-.relay-mark.ripening .ripe-base {
-  fill: none;
-  stroke: rgba(192, 132, 252, 0.2);
-  stroke-width: 2;
-}
-.relay-mark.ripening .ripe-fill {
-  fill: none;
-  stroke: #c084fc;
-  stroke-width: 2.6;
-  filter: drop-shadow(0 0 3px rgba(192, 132, 252, 0.75));
-}
-.relay-mark.ripening .r-core { fill: rgba(192, 132, 252, 0.6); }
-.relay-mark.ripening .r-bracket { display: none; }
-.relay-mark.selected .r-frame {
-  stroke: #ffe082;
-  stroke-width: 2.2;
-  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.7));
-}
-.relay-mark.selected .r-bracket { stroke: #ffe082; }
-/* Ghost reticle — preview of a relay before the player confirms placement.
-   Dashed frame + low-alpha core, pulses to read as "not committed". */
-.relay-mark.pending { pointer-events: none; }
-.relay-mark.pending .r-frame {
-  fill: rgba(255, 224, 130, 0.10);
-  stroke: #ffe082;
-  stroke-width: 1.6;
-  stroke-dasharray: 3 3;
-  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.55));
-  animation: net-pending-pulse 1.4s ease-in-out infinite;
-}
-.relay-mark.pending .r-bracket {
-  fill: none;
-  stroke: rgba(255, 224, 130, 0.9);
-  stroke-width: 1.4;
-  stroke-linecap: square;
-}
-.relay-mark.pending .r-core {
-  fill: rgba(255, 224, 130, 0.6);
-  filter: drop-shadow(0 0 4px rgba(255, 224, 130, 0.7));
-}
-@keyframes net-pending-pulse {
-  0%, 100% { opacity: 0.95; }
-  50%      { opacity: 0.55; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .relay-mark.pending .r-frame { animation: none; }
-}
-/* Staged hex (the one the player just chose) gets a warm outline so the
-   choice reads even with the bar covering part of the SVG. */
-.hex-cell.staged .hex-stroke {
-  stroke: #ffe082;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 6px rgba(255, 224, 130, 0.6));
-}
-.hex-cell.staged .hex-base { fill: color-mix(in srgb, #ffe082 22%, transparent); }
-
-/* Rarity pips — N small dots above the relay frame (1 for common, 5 for
-   mythic). Coloured by tier so the player reads the rarity without tapping
-   even when the relay marker is small or several relays cluster together. */
-.relay-pip {
-  pointer-events: none;
-  fill: #aab3ff;
-  paint-order: stroke;
-  stroke: rgba(8, 8, 18, 0.85);
-  stroke-width: 0.6;
-}
-.relay-mark.rar-common    .relay-pip { fill: #b8c4ff; }
-.relay-mark.rar-uncommon  .relay-pip { fill: #88e0a8; }
-.relay-mark.rar-rare      .relay-pip { fill: #f0c078; }
-.relay-mark.rar-legendary .relay-pip { fill: #ffadcc; filter: drop-shadow(0 0 2px rgba(216, 100, 156, 0.7)); }
-.relay-mark.rar-mythic    .relay-pip { fill: #ffe082; filter: drop-shadow(0 0 3px rgba(255, 216, 107, 0.9)); }
-.relay-mark.ripening .relay-pip { opacity: 0.55; }
 
 .net-status {
   display: grid;
@@ -355,7 +224,6 @@
   padding: 2px 0;
   font-variant-numeric: tabular-nums;
 }
-/* Sector swatches under Coverage — covered ones glow with sector color. */
 .net-cov-chips {
   display: flex;
   gap: 4px;
@@ -401,6 +269,7 @@
 }
 .net-help-link:hover { color: #c4cfff; }
 .net-help-link .ri { font-size: 12px; }
+
 /* Diagnostic-tab tables + bullets — reused by the Network tab. */
 .diag-table {
   width: 100%;
@@ -447,6 +316,7 @@
   color: #c4cfff;
   border-radius: 0 4px 4px 0;
 }
+
 .net-queue, .net-detail, .net-legend {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
@@ -511,8 +381,6 @@
 .net-legend-sw { width: 10px; height: 10px; border-radius: 2px; }
 .net-legend-name { color: #e8e8f0; }
 .net-legend-mults { color: #8a8ac0; font-size: 10px; font-variant-numeric: tabular-nums; }
-/* Mini bar pair next to each sector — same shading rule as the map hex
-   bars so the player can match what they see on the map to the sector. */
 .net-legend-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -550,8 +418,7 @@
    relay (cyan / red / purple depending on status), or just peeking at an
    empty hex (cyan). */
 .net-place-bar {
-  position: absolute;
-  left: 12px; right: 12px; bottom: 12px;
+  position: relative;
   background: rgba(8, 10, 22, 0.94);
   border: 1px solid rgba(255, 224, 130, 0.45);
   border-radius: 10px;
@@ -560,9 +427,33 @@
   flex-direction: column;
   gap: 6px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 224, 130, 0.18);
-  z-index: 10;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  transform-origin: 50% 100%;
+  /* will-change: opacity, transform — only set while animation classes are
+     present so the GPU layer isn't promoted for the idle bar. */
+}
+.net-place-bar.net-bar-enter {
+  animation: net-bar-enter 260ms cubic-bezier(0.18, 0.7, 0.28, 1.04);
+  will-change: opacity, transform;
+}
+.net-place-bar.net-bar-exit {
+  animation: net-bar-exit 200ms ease-in forwards;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+@keyframes net-bar-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.92); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+@keyframes net-bar-exit {
+  from { opacity: 1; transform: translateY(0)  scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .net-place-bar.net-bar-enter,
+  .net-place-bar.net-bar-exit { animation: none; }
 }
 .net-place-bar.relay.status-clustered {
   border-color: rgba(255, 216, 107, 0.5);
@@ -637,59 +528,57 @@
   background: linear-gradient(180deg, rgba(255, 224, 130, 0.35), rgba(255, 224, 130, 0.18));
 }
 
-@media (max-width: 640px) {
-  .net-layout { flex-direction: column; }
-  .net-side   { flex: 1 1 auto; }
+/* On narrow viewports the side panel becomes a docked bottom sheet so it
+   doesn't eat half the canvas width. Up-next ribbon shows above the hex
+   bar with its own padding. The canvas itself still goes full-edge.
+   Collapse behaviour: when a cell is selected (any kind), networkUi adds
+   .collapsed-mobile to the sheet and only the 4-up status row remains
+   visible. The hex bar floats just above the sheet — its bottom offset
+   tracks the sheet height via :has(). */
+@media (max-width: 720px) {
+  .net-side {
+    top: auto;
+    right: max(12px, env(safe-area-inset-right));
+    left: max(12px, env(safe-area-inset-left));
+    width: auto;
+    max-width: none;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    max-height: 42vh;
+    padding: 12px;
+    transition: max-height 220ms ease, padding 220ms ease;
+  }
+  .net-side.collapsed-mobile {
+    max-height: 76px;
+    padding: 10px 12px;
+    overflow: hidden;
+  }
+  .net-side.collapsed-mobile > :not(.net-status) {
+    display: none;
+  }
+  .net-hexbar-slot {
+    right: max(12px, env(safe-area-inset-right));
+    left: max(12px, env(safe-area-inset-left));
+    bottom: calc(42vh + max(12px, env(safe-area-inset-bottom)) + 12px);
+    transition: bottom 220ms ease;
+  }
+  /* When the sheet is collapsed, the hex bar drops down to sit just above
+     it. :has() is broadly supported in modern engines; if missing, the bar
+     stays at the expanded position which is still readable. */
+  .net-body:has(.net-side.collapsed-mobile) .net-hexbar-slot {
+    bottom: calc(76px + max(12px, env(safe-area-inset-bottom)) + 10px);
+  }
   .net-upnext { display: block; }
-  /* Cover-fit on the map. The SVG is visually scaled and translated via CSS
-     vars set in JS (see attachInteractions in networkUi.js) — one-finger drag
-     pans, two-finger pinch zooms, both clamped to the map content. */
-  .net-map {
-    flex: 0 0 auto;
-    height: 58vh;
-    padding: 0;
-    touch-action: none;
-    cursor: grab;
+}
+@media (max-width: 520px) {
+  #networkModal { padding: 0; }
+  .net-side {
+    padding: 10px;
+    max-height: 50vh;
   }
-  .net-map:active { cursor: grabbing; }
-  .net-place-bar {
-    left: 10px; right: 10px; bottom: 10px;
+  .net-hexbar-slot {
+    bottom: calc(50vh + max(8px, env(safe-area-inset-bottom)) + 8px);
+  }
+  .net-body:has(.net-side.collapsed-mobile) .net-hexbar-slot {
+    bottom: calc(70px + max(8px, env(safe-area-inset-bottom)) + 8px);
   }
 }
-
-/* --- Map node rarity tinting.
-   The reticle's frame/core color already carries semantic meaning (clustered
-   vs isolated vs ripening) so rarity rides on a separate visual channel: an
-   outer glow + a small inset ring drawn around the relay core. Higher rarity
-   = brighter, warmer glow; mythic adds a slow pulse so it pops at a glance.
-   Pending (placement-preview) ghosts also get the queued tier's color so the
-   player sees what they are about to commit. */
-.relay-mark.rar-common              { filter: drop-shadow(0 0 3px rgba(138, 160, 255, 0.50)); }
-.relay-mark.rar-uncommon            { filter: drop-shadow(0 0 5px rgba(111, 184, 140, 0.60)); }
-.relay-mark.rar-rare                { filter: drop-shadow(0 0 7px rgba(200, 156, 92, 0.70)); }
-.relay-mark.rar-legendary           { filter: drop-shadow(0 0 9px rgba(216, 100, 156, 0.78)); }
-.relay-mark.rar-mythic              { filter: drop-shadow(0 0 12px rgba(255, 216, 107, 0.95)); }
-
-/* Inset rarity ring drawn on the core — a thin stroke in the tier color so
-   even when the cluster/isolated frame is yellow or cyan the rarity reads. */
-.relay-mark.rar-common .r-core    { stroke: rgba(138, 160, 255, 0.85); stroke-width: 1.2; }
-.relay-mark.rar-uncommon .r-core  { stroke: rgba(111, 184, 140, 0.95); stroke-width: 1.4; }
-.relay-mark.rar-rare .r-core      { stroke: rgba(200, 156, 92, 1);    stroke-width: 1.6; }
-.relay-mark.rar-legendary .r-core { stroke: rgba(216, 100, 156, 1);   stroke-width: 1.8; }
-.relay-mark.rar-mythic .r-core    { stroke: rgba(255, 216, 107, 1);   stroke-width: 2.0; }
-
-/* Mythic reads as the apex tier — gentle pulse on the inset ring. */
-.relay-mark.rar-mythic .r-core { animation: rar-mythic-pulse 2.2s ease-in-out infinite; }
-@keyframes rar-mythic-pulse {
-  0%, 100% { stroke-opacity: 0.85; }
-  50%      { stroke-opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .relay-mark.rar-mythic .r-core { animation: none; }
-}
-
-/* Ripening nodes dim their inset ring so the not-yet-online state still
-   reads, but the rarity glow on the whole mark stays so the player can tell
-   a rare seed from a common seed even before it ripens. */
-.relay-mark.ripening .r-core { stroke-opacity: 0.6; }
-

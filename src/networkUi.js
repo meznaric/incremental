@@ -1,32 +1,21 @@
 import { installTap } from './tap.js';
 import { formatAbbrev } from './bignum.js';
 import {
-  SECTORS, TIER_INFO, getHexes, getHexAt, placeRelay,
+  SECTORS, TIER_INFO, getHexAt, placeRelay,
   networkContribution, networkStatus,
   relayYield, discoveryRatePerMin, adjacentOnlineCount, coverageMultiplier,
   ensureNetwork, bleedValue, hexDistance,
 } from './network.js';
+import { makeNetworkScene } from './networkScene.js';
 import { nowSeconds } from './save.js';
-
-const HEX_SIZE = 24;       // viewBox-units corner radius (pointy-top). Smaller
-                            // at higher MAP_RADIUS so the grid fits the container
-                            // without each hex shrinking past the readable label size.
-const HEX_GAP = 0;         // outline padding around each polygon
-const SVG_PAD = 18;        // padding around the whole hex cluster
 
 const TIER_ORDER = ['common', 'uncommon', 'rare', 'legendary', 'mythic'];
 const TIER_LABEL = {
   common: 'Common', uncommon: 'Uncommon', rare: 'Rare', legendary: 'Legendary', mythic: 'Mythic',
 };
-// Relay core radius as a fraction of frame radius. Higher rarity = larger
-// painted core so the player can read tier at a glance without tapping. The
-// 0.30 → 0.72 spread doubles+ the visual area between common and mythic.
-const TIER_CORE_SCALE = {
-  common: 0.30, uncommon: 0.42, rare: 0.54, legendary: 0.64, mythic: 0.74,
-};
 // Sector multipliers span yieldMul ∈ [0.7, 2.0] and discoveryMul ∈ [0.2, 5.0].
 // Normalize each independently with a baseline floor so the smallest value
-// is still visibly drawn (not a zero-height sliver).
+// is still visibly drawn in the legend (not a zero-height sliver).
 const SECTOR_YIELD_MIN = 0.7, SECTOR_YIELD_MAX = 2.0;
 const SECTOR_DISC_MIN  = 0.2, SECTOR_DISC_MAX  = 5.0;
 function sectorBarFractions(sector) {
@@ -37,12 +26,6 @@ function sectorBarFractions(sector) {
     discF:  0.12 + 0.88 * Math.max(0, Math.min(1, d)),
   };
 }
-// Negative q/r values produce invalid SVG ids if used raw. Sanitize.
-function clipIdFor(q, r) {
-  const qs = q < 0 ? `n${-q}` : `${q}`;
-  const rs = r < 0 ? `n${-r}` : `${r}`;
-  return `hexclip-${qs}-${rs}`;
-}
 
 function fmtMin(sec) {
   if (sec < 60) return `${Math.ceil(sec)}s`;
@@ -50,87 +33,18 @@ function fmtMin(sec) {
   return `${(sec / 3600).toFixed(1)}h`;
 }
 
-function hexCenterFromBounds(q, r, bounds) {
-  const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2) - bounds.minX + SVG_PAD;
-  const y = HEX_SIZE * 1.5 * r - bounds.minY + SVG_PAD;
-  return { x, y };
-}
-
-function computeBounds() {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const h of getHexes()) {
-    const x = HEX_SIZE * Math.sqrt(3) * (h.q + h.r / 2);
-    const y = HEX_SIZE * 1.5 * h.r;
-    if (x - HEX_SIZE < minX) minX = x - HEX_SIZE;
-    if (x + HEX_SIZE > maxX) maxX = x + HEX_SIZE;
-    if (y - HEX_SIZE < minY) minY = y - HEX_SIZE;
-    if (y + HEX_SIZE > maxY) maxY = y + HEX_SIZE;
-  }
-  return { minX, maxX, minY, maxY, width: (maxX - minX) + SVG_PAD * 2, height: (maxY - minY) + SVG_PAD * 2 };
-}
-
-function hexPolygonPoints(cx, cy) {
-  const pts = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 2;
-    pts.push(`${(cx + (HEX_SIZE - HEX_GAP) * Math.cos(angle)).toFixed(2)},${(cy + (HEX_SIZE - HEX_GAP) * Math.sin(angle)).toFixed(2)}`);
-  }
-  return pts.join(' ');
-}
-
-// Pointy-top hex corners at an arbitrary radius (used for the relay frame).
-function hexCornerPointsFlat(cx, cy, r) {
-  const pts = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 2;
-    pts.push(`${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`);
-  }
-  return pts.join(' ');
-}
-
-// Four L-bracket strokes one per quadrant, sized to wrap a square of side
-// 2 × r around (cx, cy). Each bracket is an open polyline of three points
-// (a short horizontal + a short vertical leg meeting at the corner).
-function bracketCorners(cx, cy, r) {
-  const leg = r * 0.42; // length of each leg
-  const off = r * 0.92; // distance from center to corner
-  const corners = [
-    [-1, -1], [ 1, -1], [ 1,  1], [-1,  1],
-  ];
-  return corners.map(([sx, sy]) => {
-    const ax = (cx + sx * off).toFixed(2);
-    const ay = (cy + sy * off).toFixed(2);
-    const hx = (cx + sx * off - sx * leg).toFixed(2);
-    const hy = ay;
-    const vx = ax;
-    const vy = (cy + sy * off - sy * leg).toFixed(2);
-    return `${hx},${hy} ${ax},${ay} ${vx},${vy}`;
-  });
-}
-
 export function makeNetworkUi(state, opts) {
   const modalEl = document.getElementById('networkModal');
   const bodyEl = document.getElementById('networkModalBody');
   const titleEl = document.getElementById('networkModalTitle');
   const chipEl = document.getElementById('networkChip');
-  if (!modalEl || !bodyEl || !chipEl) return { open: () => {}, render: () => {}, refresh: () => {}, drainLosses: () => 0 };
+  if (!modalEl || !bodyEl || !chipEl) return { open: () => {}, render: () => {}, refresh: () => {}, drainLosses: () => 0, flashBleed: () => {} };
   const openDiagnostic = opts && typeof opts.openDiagnostic === 'function' ? opts.openDiagnostic : null;
 
-  const bounds = computeBounds();
   let selectedRelayId = null;
   let selectedEmptyHex = null; // {q, r} — tapped empty hex with no queued token
   let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation (queue present)
-  // Mobile-only view transform applied to the SVG (in CSS pixels for tx/ty,
-  // unitless for scale). The map element is kept stable across renders so the
-  // drag-in-progress, pinch state and these listeners survive. `initialized`
-  // stays sticky once true — pan/zoom carries across opens so re-entering the
-  // modal lands the player back where they were looking last time.
-  const view = { scale: 1, tx: 0, ty: 0, initialized: false };
-  // Pinches release the second finger before the first; the trailing single
-  // pointer would otherwise register as a tap on the underlying hex. Stamp a
-  // short suppression window after every pinch (or zoom keystroke) so the
-  // body-level installTap handler skips that ghost tap.
-  let suppressTapUntil = 0;
+  let scene = null;            // networkScene instance, created on first open
 
   const open = () => {
     ensureNetwork(state);
@@ -142,17 +56,22 @@ export function makeNetworkUi(state, opts) {
     pendingPlacement = null;
     selectedEmptyHex = null;
     selectedRelayId = null;
+    // Reset the hex-bar animation tracker so reopening the modal triggers
+    // a fresh entrance the next time a cell is selected.
+    lastBarKey = 'none';
+    lastBarHTML = '';
+    if (pendingExitTimer) { clearTimeout(pendingExitTimer); pendingExitTimer = null; }
+    if (scene) scene.close();
   };
   const clearSelection = () => {
     selectedRelayId = null;
     selectedEmptyHex = null;
     pendingPlacement = null;
   };
-  // On viewport resize the container dimensions change, so the existing pan
-  // offset may now be out of bounds. clampView (in render) snaps it back into
-  // range — the user's zoom level is preserved.
+  // Resize observer flips needsResize on the scene; rAF picks it up next frame.
   window.addEventListener('resize', () => {
     if (!modalEl.classList.contains('open')) return;
+    if (scene) scene.resize();
     render();
   });
 
@@ -162,21 +81,19 @@ export function makeNetworkUi(state, opts) {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !modalEl.classList.contains('open')) return;
-    // First Esc clears any open hex/relay selection; second Esc closes the modal.
     if (selectedRelayId || selectedEmptyHex || pendingPlacement) {
       clearSelection();
-      render();
+      pushSelectionToScene();
+      renderOverlays();
       return;
     }
     close();
   });
 
-  // Delegated tap handler on the modal body. Listens for hex / relay / queue
-  // taps via data-act attributes that render() stamps onto the SVG nodes.
+  // Delegated taps on modal body for the bottom-bar buttons and the diag link.
+  // Hex / relay selection now flows through the scene's onSelect callback —
+  // taps on the canvas don't bubble up as data-hex/data-relay anymore.
   installTap(bodyEl, (_e, target) => {
-    // Ghost tap left over from a pinch or pan release — ignore so we don't
-    // stage a placement on the hex the user happened to lift over.
-    if (performance.now() < suppressTapUntil) return;
     if (target.closest('[data-act="open-diag"]')) {
       if (openDiagnostic) openDiagnostic('network');
       return;
@@ -185,262 +102,106 @@ export function makeNetworkUi(state, opts) {
       if (pendingPlacement) {
         placeRelay(state, pendingPlacement, nowSeconds());
         pendingPlacement = null;
-        render();
+        if (scene) scene.refresh(nowSeconds());
+        pushSelectionToScene();
+        renderOverlays();
       }
       return;
     }
     if (target.closest('[data-act="cancel-placement"]') || target.closest('[data-act="clear-selection"]')) {
       clearSelection();
-      render();
+      pushSelectionToScene();
+      renderOverlays();
       return;
-    }
-    // Taps that land inside the bar (but not on a button) shouldn't bleed
-    // through to the hex underneath.
-    if (target.closest('.net-place-bar')) return;
-    const hexEl = target.closest('[data-hex]');
-    const relayEl = target.closest('[data-relay]');
-    if (relayEl) {
-      const id = relayEl.getAttribute('data-relay');
-      // Re-tap on the already-selected relay clears the bar.
-      if (id === selectedRelayId) clearSelection();
-      else { selectedRelayId = id; selectedEmptyHex = null; pendingPlacement = null; }
-      render();
-      return;
-    }
-    if (hexEl) {
-      const q = Number(hexEl.getAttribute('data-q'));
-      const r = Number(hexEl.getAttribute('data-r'));
-      if (!Number.isFinite(q) || !Number.isFinite(r)) return;
-      const net = state.network;
-      const occupiedRelay = net && net.relays.find((rr) => rr.hex.q === q && rr.hex.r === r);
-      if (occupiedRelay) {
-        if (occupiedRelay.id === selectedRelayId) clearSelection();
-        else { selectedRelayId = occupiedRelay.id; selectedEmptyHex = null; pendingPlacement = null; }
-        render();
-        return;
-      }
-      // Empty hex: stage placement if a token is queued, otherwise just
-      // surface its sector info in the bar. Either way a re-tap on the same
-      // hex clears.
-      if (net && net.queued.length > 0) {
-        if (pendingPlacement && pendingPlacement.q === q && pendingPlacement.r === r) {
-          clearSelection();
-        } else {
-          pendingPlacement = { q, r };
-          selectedRelayId = null;
-          selectedEmptyHex = null;
-        }
-      } else if (selectedEmptyHex && selectedEmptyHex.q === q && selectedEmptyHex.r === r) {
-        clearSelection();
-      } else {
-        selectedEmptyHex = { q, r };
-        selectedRelayId = null;
-        pendingPlacement = null;
-      }
-      render();
-      return;
-    }
-    // Tap landed somewhere inside the map but not on a hex (e.g. outside the
-    // hex cluster on a panned view). Clear any current selection.
-    if (target.closest('.net-map')) {
-      if (selectedRelayId || selectedEmptyHex || pendingPlacement) {
-        clearSelection();
-        render();
-      }
     }
   });
 
-  function renderHexSvg(now) {
-    const hexes = getHexes();
+  function handleSelect(sel) {
     const net = state.network;
-    const relays = (net && net.relays) || [];
-    const occupiedByHex = new Map();
-    for (const r of relays) occupiedByHex.set(`${r.hex.q},${r.hex.r}`, r);
-
-    // Pre-compute geometry constants for the in-hex yield / discovery bars.
-    // halfW is the horizontal extent from center to a side vertex; fullH is
-    // the full hex height (top vertex to bottom vertex).
-    const halfW = HEX_SIZE * Math.sqrt(3) / 2;
-    const fullH = HEX_SIZE * 2;
-
-    const clipDefs = [];
-    const hexNodes = [];
-    for (const h of hexes) {
-      const { x, y } = hexCenterFromBounds(h.q, h.r, bounds);
-      const sector = SECTORS[h.sector] || SECTORS.frontier;
-      const occ = occupiedByHex.get(`${h.q},${h.r}`);
-      const isSelected = occ && occ.id === selectedRelayId;
-      const isStaged = !occ && pendingPlacement && pendingPlacement.q === h.q && pendingPlacement.r === h.r;
-      const isEmptySelected = !occ && !isStaged && selectedEmptyHex && selectedEmptyHex.q === h.q && selectedEmptyHex.r === h.r;
-      const cls = ['hex-cell', `sec-${h.sector}`, occ ? 'has-relay' : 'empty', isSelected ? 'selected' : '', isStaged ? 'staged' : '', isEmptySelected ? 'picked' : ''].filter(Boolean).join(' ');
-      const tip = `${sector.label} · ×${sector.yieldMul} yield · ×${sector.discoveryMul} discovery risk · ×${sector.ripenMul} ripen time`;
-      const polyPts = hexPolygonPoints(x, y);
-      const clipId = clipIdFor(h.q, h.r);
-      clipDefs.push(`<clipPath id="${clipId}"><polygon points="${polyPts}" /></clipPath>`);
-      // Side-by-side bars rise from the hex bottom; left = yield, right =
-      // discovery risk. Both share the sector colour at different shades (set
-      // in CSS) so the player reads which sector the hex belongs to first,
-      // then the two trade-off magnitudes by bar height. Rects are clipped
-      // to the hex outline so they don't bleed past the edges.
-      const { yieldF, discF } = sectorBarFractions(sector);
-      const yieldH = fullH * yieldF;
-      const discH  = fullH * discF;
-      const yBot   = y + HEX_SIZE;
-      const yieldBar = `<rect class="hex-bar yield" x="${(x - halfW).toFixed(2)}" y="${(yBot - yieldH).toFixed(2)}" width="${halfW.toFixed(2)}" height="${yieldH.toFixed(2)}" clip-path="url(#${clipId})" />`;
-      const discBar  = `<rect class="hex-bar disc"  x="${x.toFixed(2)}" y="${(yBot - discH).toFixed(2)}"  width="${halfW.toFixed(2)}" height="${discH.toFixed(2)}"  clip-path="url(#${clipId})" />`;
-      // Sector colour bound as a CSS variable so the stylesheet can mix fills
-      // and strokes from one source. The base catches taps (always has a
-      // small fill so visiblePainted hit-testing works); bars + stroke render
-      // on top and are pointer-transparent.
-      hexNodes.push(`
-        <g class="${cls}" data-hex="1" data-q="${h.q}" data-r="${h.r}" style="--sec-color:${sector.color}">
-          <title>${tip}</title>
-          <polygon class="hex-base" points="${polyPts}" />
-          ${yieldBar}
-          ${discBar}
-          <polygon class="hex-stroke" points="${polyPts}" />
-        </g>
-      `);
-    }
-
-    // Cluster edges: draw a thin warm line between each pair of online,
-    // adjacent relays. Makes mechanic A (dense yields more / dies faster)
-    // visible at a glance. Drawn before relays so the relay dots cover the
-    // edge ends.
-    const clusterEdges = [];
-    for (let i = 0; i < relays.length; i++) {
-      const a = relays[i];
-      if (now < a.ripensAt) continue;
-      const ac = hexCenterFromBounds(a.hex.q, a.hex.r, bounds);
-      for (let j = i + 1; j < relays.length; j++) {
-        const b = relays[j];
-        if (now < b.ripensAt) continue;
-        if (hexDistance(a.hex, b.hex) !== 1) continue;
-        const bc = hexCenterFromBounds(b.hex.q, b.hex.r, bounds);
-        clusterEdges.push(
-          `<line class="cluster-edge" x1="${ac.x.toFixed(1)}" y1="${ac.y.toFixed(1)}" x2="${bc.x.toFixed(1)}" y2="${bc.y.toFixed(1)}" />`
-        );
-      }
-    }
-
-    // Reticle: small hex frame around the relay + four corner brackets.
-    // Renders as a "tracked target" rather than a painted dot. Core radius
-    // grows with rarity so the tier reads at a glance even when the relay
-    // marker sits over the sector's yield/discovery bars.
-    const reticle = (cx, cy, scale, tier) => {
-      const r = HEX_SIZE * 0.48 * scale;
-      const coreScale = TIER_CORE_SCALE[tier || 'common'] || TIER_CORE_SCALE.common;
-      const framePts = hexCornerPointsFlat(cx, cy, r);
-      const brackets = bracketCorners(cx, cy, r * 1.32);
-      return { framePts, brackets, coreR: r * coreScale };
-    };
-    // Rarity pips — N small dots above the relay frame indicating tier
-    // (common=1 … mythic=5). Placed in the upper portion of the hex where
-    // the polygon still has horizontal room. Returns an SVG string.
-    const rarityPipsSvg = (cx, cy, tier) => {
-      const idx = TIER_ORDER.indexOf(tier || 'common');
-      const n = Math.max(1, idx + 1);
-      const pipY = cy - HEX_SIZE * 0.72;
-      const spacing = 2.6;
-      const totalW = (n - 1) * spacing;
-      let s = '';
-      for (let i = 0; i < n; i++) {
-        const px = cx - totalW / 2 + i * spacing;
-        s += `<circle class="relay-pip" cx="${px.toFixed(2)}" cy="${pipY.toFixed(2)}" r="1.05" />`;
-      }
-      return s;
-    };
-
-    const relayNodes = [];
-    for (const r of relays) {
-      const { x, y } = hexCenterFromBounds(r.hex.q, r.hex.r, bounds);
-      const online = now >= r.ripensAt;
-      const sel = r.id === selectedRelayId;
-      const labelY = y + HEX_SIZE * 0.85;
-      const sector = SECTORS[r.sector] || SECTORS.frontier;
-      // Tier is baked into the relay-mark class so CSS can paint the frame,
-      // brackets, core, and outer glow per rarity. See network.css → rar-*.
-      const rarCls = `rar-${r.tier || 'common'}`;
-      if (online) {
-        const adj = adjacentOnlineCount(net, r, now);
-        const isolated = adj === 0;
-        const yieldNow = relayYield(net, r, now);
-        const yLabel = `+${formatAbbrev(yieldNow)}`;
-        const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\n${yLabel}/s${isolated ? ' · isolated' : ` · ${adj} neighbour${adj === 1 ? '' : 's'}`}`;
-        const ret = reticle(x, y, 1, r.tier);
-        relayNodes.push(`
-          <g class="relay-mark ${rarCls} ${isolated ? 'isolated' : 'clustered'} ${sel ? 'selected' : ''}" data-relay="${r.id}">
-            <title>${tip}</title>
-            <polygon class="r-frame" points="${ret.framePts}" />
-            ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
-            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
-            ${rarityPipsSvg(x, y, r.tier)}
-            <text class="relay-label online-label" x="${x}" y="${labelY}">${yLabel}</text>
-          </g>
-        `);
+    // via:'pan' = passive preview while the player drags the camera. Show
+    // info on the cell under the reticle, but don't stage a placement or
+    // toggle anything — explicit tap (via:'tap') still owns commitment.
+    const isPan = sel.via === 'pan';
+    if (sel.kind === 'relay') {
+      if (!isPan && sel.id === selectedRelayId) clearSelection();
+      else { selectedRelayId = sel.id; selectedEmptyHex = null; pendingPlacement = null; }
+    } else if (sel.kind === 'hex') {
+      const occupied = net && net.relays.find((r) => r.hex.q === sel.q && r.hex.r === sel.r);
+      if (occupied) {
+        if (!isPan && occupied.id === selectedRelayId) clearSelection();
+        else { selectedRelayId = occupied.id; selectedEmptyHex = null; pendingPlacement = null; }
+      } else if (!isPan && net && net.queued.length > 0) {
+        if (pendingPlacement && pendingPlacement.q === sel.q && pendingPlacement.r === sel.r) {
+          clearSelection();
+        } else {
+          pendingPlacement = { q: sel.q, r: sel.r };
+          selectedRelayId = null;
+          selectedEmptyHex = null;
+        }
+      } else if (!isPan && selectedEmptyHex && selectedEmptyHex.q === sel.q && selectedEmptyHex.r === sel.r) {
+        clearSelection();
       } else {
-        const total = r.ripensAt - r.plantedAt;
-        const pct = total > 0 ? Math.min(1, Math.max(0, (now - r.plantedAt) / total)) : 0;
-        const ringR = HEX_SIZE * 0.46;
-        const ringC = 2 * Math.PI * ringR;
-        const remain = Math.max(0, r.ripensAt - now);
-        const tLabel = fmtMin(remain);
-        const tip = `${TIER_LABEL[r.tier] || r.tier} · ${sector.label}\nRipens in ${tLabel}`;
-        const ret = reticle(x, y, 1, r.tier);
-        relayNodes.push(`
-          <g class="relay-mark ${rarCls} ripening ${sel ? 'selected' : ''}" data-relay="${r.id}">
-            <title>${tip}</title>
-            <polygon class="r-frame" points="${ret.framePts}" />
-            <circle class="ripe-base" cx="${x}" cy="${y}" r="${ringR}" />
-            <circle class="ripe-fill" cx="${x}" cy="${y}" r="${ringR}"
-              stroke-dasharray="${(ringC * pct).toFixed(2)} ${ringC.toFixed(2)}"
-              transform="rotate(-90 ${x} ${y})" />
-            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
-            ${rarityPipsSvg(x, y, r.tier)}
-            <text class="relay-label ripen-label" x="${x}" y="${labelY}">${tLabel}</text>
-          </g>
-        `);
+        // Pan preview OR explicit tap on an empty hex with no queue — both
+        // surface the empty-hex sector info bar.
+        selectedEmptyHex = { q: sel.q, r: sel.r };
+        selectedRelayId = null;
+        pendingPlacement = null;
       }
+    } else if (sel.kind === 'empty-space') {
+      if (selectedRelayId || selectedEmptyHex || pendingPlacement) clearSelection();
     }
+    pushSelectionToScene();
+    renderOverlays();
+  }
 
-    // Ghost reticle on the staged hex — same shape as a real relay frame but
-    // dashed/pulsing so the player sees it's a preview. Tinted by the tier of
-    // the queued token that would land there.
-    let ghostNode = '';
+  function pushSelectionToScene() {
+    if (!scene) return;
+    const now = nowSeconds();
     if (pendingPlacement) {
-      const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
-      const alreadyOccupied = ph && relays.some((rr) => rr.hex.q === ph.q && rr.hex.r === ph.r);
-      if (ph && !alreadyOccupied) {
-        const { x, y } = hexCenterFromBounds(ph.q, ph.r, bounds);
-        const nextTier = (net.queued && net.queued[0] && net.queued[0].tier) || 'common';
-        const ret = reticle(x, y, 1, nextTier);
-        ghostNode = `
-          <g class="relay-mark pending rar-${nextTier}">
-            <polygon class="r-frame" points="${ret.framePts}" />
-            ${ret.brackets.map((b) => `<polyline class="r-bracket" points="${b}" />`).join('')}
-            <circle class="r-core" cx="${x}" cy="${y}" r="${ret.coreR.toFixed(2)}" />
-            ${rarityPipsSvg(x, y, nextTier)}
-          </g>
-        `;
-      }
+      const tier = (state.network && state.network.queued[0] && state.network.queued[0].tier) || 'common';
+      scene.setSelection({ kind: 'pending', q: pendingPlacement.q, r: pendingPlacement.r, tier }, now);
+      return;
     }
+    if (selectedRelayId) {
+      scene.setSelection({ kind: 'relay', id: selectedRelayId }, now);
+      return;
+    }
+    if (selectedEmptyHex) {
+      scene.setSelection({ kind: 'hex', q: selectedEmptyHex.q, r: selectedEmptyHex.r }, now);
+      return;
+    }
+    scene.setSelection({ kind: null }, now);
+  }
 
-    return `
-      <svg class="netmap-svg" viewBox="0 0 ${bounds.width.toFixed(0)} ${bounds.height.toFixed(0)}" preserveAspectRatio="xMidYMid meet">
-        <defs>${clipDefs.join('')}</defs>
-        ${hexNodes.join('')}
-        ${clusterEdges.join('')}
-        ${relayNodes.join('')}
-        ${ghostNode}
-      </svg>
+  function ensureSkeleton() {
+    if (bodyEl.querySelector('.net-layout')) return;
+    bodyEl.innerHTML = `
+      <div class="net-layout">
+        <div class="net-map">
+          <canvas class="net-canvas"></canvas>
+          <div class="net-hexbar-slot"></div>
+        </div>
+        <div class="net-upnext"></div>
+        <div class="net-side"></div>
+      </div>
     `;
+  }
+
+  function ensureScene() {
+    if (scene) return scene;
+    const canvas = bodyEl.querySelector('.net-canvas');
+    if (!canvas) return null;
+    scene = makeNetworkScene({
+      canvas,
+      getState: () => state,
+      onSelect: handleSelect,
+    });
+    return scene;
   }
 
   // Mobile-only strip rendered between the map and the side panel. Compact
   // horizontal chip list of upcoming tokens so the player can see what they
-  // are about to place without scrolling past status/summary. Hidden on
-  // desktop via CSS — the full Placement queue in renderSidePanel still owns
-  // the canonical view there.
+  // are about to place without scrolling past status/summary.
   function renderUpNext() {
     const net = ensureNetwork(state);
     const queued = (net && net.queued) || [];
@@ -482,9 +243,6 @@ export function makeNetworkUi(state, opts) {
           </div>
         `).join('');
 
-    // Coverage details: which sectors currently host at least one online
-    // relay. The summary panel shows the count, the bonus, and a row of
-    // swatches with covered ones glowing — a direct nudge to spread.
     const coveredSectors = new Set();
     for (const r of net.relays) {
       if (now >= r.ripensAt) coveredSectors.add(r.sector);
@@ -533,7 +291,7 @@ export function makeNetworkUi(state, opts) {
           Sectors
           <button type="button" class="net-help-link" data-act="open-diag">How does this work? <i class="ri ri-arrow-right-s-line"></i></button>
         </div>
-        <div class="net-legend-key">Each hex: <span class="key-bar yield"></span> yield · <span class="key-bar disc"></span> risk</div>
+        <div class="net-legend-key">High <span class="key-bar yield"></span> sectors lift; high <span class="key-bar disc"></span> sectors glow.</div>
         ${Object.entries(SECTORS).map(([key, s]) => {
           const { yieldF, discF } = sectorBarFractions(s);
           return `
@@ -551,200 +309,21 @@ export function makeNetworkUi(state, opts) {
     `;
   }
 
-  // --- Mobile pan + pinch-zoom -------------------------------------------
-  // The SVG is rendered at viewBox size and visually transformed by the CSS
-  // vars --map-scale / --map-tx / --map-ty on the (stable) .net-map element.
-  // Pan from single-finger drag, zoom from two-finger pinch. Both clamp so
-  // the map can't be dragged into empty space.
-  const MIN_SCALE = 0.6;
-  const MAX_SCALE = 3;
-  const MOBILE_INITIAL_SCALE = 1.7;
-  const MOBILE_BREAKPOINT = 640; // matches the media query in network.css
-  function isMobileView() {
-    return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
-  }
-  // SVG fills the map's content width (width: 100%, height: auto). With a
-  // preserveAspectRatio="xMidYMid meet" viewBox the rendered height follows
-  // the viewBox aspect ratio — compute it directly so we don't have to depend
-  // on a freshly-applied transform to read getBoundingClientRect.
-  function naturalLayoutSize(mapEl) {
-    const cw = mapEl.clientWidth;
-    if (!(cw > 0)) return null;
-    const aspect = bounds.height / bounds.width;
-    return { w: cw, h: cw * aspect };
-  }
-  // Overscroll headroom past the natural fit. Without it, the bottom hexes
-  // get trapped under the placement bar / iOS home indicator because the
-  // tightest clamp aligns the map's bottom edge with the container's bottom.
-  const OVERSCROLL_FRAC = 0.5;
-  function clampView(mapEl) {
-    const nat = naturalLayoutSize(mapEl);
-    if (!nat) return;
-    const cw = mapEl.clientWidth;
-    const ch = mapEl.clientHeight;
-    const vw = nat.w * view.scale;
-    const vh = nat.h * view.scale;
-    const padX = cw * OVERSCROLL_FRAC;
-    const padY = ch * OVERSCROLL_FRAC;
-    if (vw <= cw) {
-      const cx = (cw - vw) / 2;
-      view.tx = Math.max(cx - padX, Math.min(cx + padX, view.tx));
-    } else {
-      view.tx = Math.max(cw - vw - padX, Math.min(padX, view.tx));
-    }
-    if (vh <= ch) {
-      const cy = (ch - vh) / 2;
-      view.ty = Math.max(cy - padY, Math.min(cy + padY, view.ty));
-    } else {
-      view.ty = Math.max(ch - vh - padY, Math.min(padY, view.ty));
-    }
-  }
-  function centerView(mapEl) {
-    const nat = naturalLayoutSize(mapEl);
-    if (!nat) return;
-    const cw = mapEl.clientWidth;
-    const ch = mapEl.clientHeight;
-    view.tx = (cw - nat.w * view.scale) / 2;
-    view.ty = (ch - nat.h * view.scale) / 2;
-  }
-  function applyView(mapEl) {
-    mapEl.style.setProperty('--map-scale', view.scale.toFixed(3));
-    mapEl.style.setProperty('--map-tx', `${view.tx.toFixed(1)}px`);
-    mapEl.style.setProperty('--map-ty', `${view.ty.toFixed(1)}px`);
-  }
-  function attachInteractions(mapEl) {
-    const pointers = new Map(); // pointerId -> {x, y}
-    let dragState = null;
-    let pinchState = null;
-    mapEl.addEventListener('pointerdown', (e) => {
-      // Only handle touch — desktop mouse keeps the no-pan / no-zoom layout
-      // because the SVG already fits its container on wide viewports.
-      if (e.pointerType !== 'touch') return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      // Take explicit pointer capture on the (stable) mapEl. Without this,
-      // the browser's implicit capture is bound to the touched <polygon>,
-      // which the 100ms refresh tick rebuilds via innerHTML. That destroys
-      // the capture target → pointercancel → dragState cleared → the pan
-      // freezes mid-stroke with the finger still down (the "stuck touch"
-      // bug). It also let the same pointercancel bubble to the body-level
-      // installTap and stage a placement on the hex the user was panning
-      // past. mapEl never re-renders, so capture lives for the whole gesture.
-      try { mapEl.setPointerCapture(e.pointerId); } catch {}
-      if (pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        const dist = Math.hypot(b.x - a.x, b.y - a.y);
-        if (dist < 1) return;
-        const midX = (a.x + b.x) / 2;
-        const midY = (a.y + b.y) / 2;
-        const rect = mapEl.getBoundingClientRect();
-        // Anchor the pinch midpoint in svg-natural coordinates so the same
-        // map location stays pinned under the fingers while they spread.
-        pinchState = {
-          startDist: dist,
-          baseScale: view.scale,
-          rectLeft: rect.left,
-          rectTop: rect.top,
-          anchorX: (midX - rect.left - view.tx) / view.scale,
-          anchorY: (midY - rect.top - view.ty) / view.scale,
-        };
-        dragState = null;
-      } else {
-        dragState = {
-          pointerId: e.pointerId,
-          startX: e.clientX, startY: e.clientY,
-          baseTx: view.tx, baseTy: view.ty,
-          active: false,
-        };
-      }
-    });
-    mapEl.addEventListener('pointermove', (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinchState && pointers.size >= 2) {
-        const [a, b] = [...pointers.values()];
-        const dist = Math.hypot(b.x - a.x, b.y - a.y);
-        if (dist < 1) return;
-        const ratio = dist / pinchState.startDist;
-        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchState.baseScale * ratio));
-        const midX = (a.x + b.x) / 2;
-        const midY = (a.y + b.y) / 2;
-        view.scale = newScale;
-        view.tx = midX - pinchState.rectLeft - pinchState.anchorX * newScale;
-        view.ty = midY - pinchState.rectTop - pinchState.anchorY * newScale;
-        clampView(mapEl);
-        applyView(mapEl);
-        return;
-      }
-      if (dragState && e.pointerId === dragState.pointerId) {
-        // Need the map to actually overflow before drag does anything; if it
-        // doesn't, the clamp will snap us back to center.
-        const dx = e.clientX - dragState.startX;
-        const dy = e.clientY - dragState.startY;
-        // Defer commit until the gesture is clearly a pan — keeps tiny finger
-        // jitters during a tap from sliding the map. 15px matches the tap
-        // tolerance, so taps and pans don't both fire.
-        if (!dragState.active && Math.hypot(dx, dy) < 15) return;
-        dragState.active = true;
-        view.tx = dragState.baseTx + dx;
-        view.ty = dragState.baseTy + dy;
-        clampView(mapEl);
-        applyView(mapEl);
-      }
-    });
-    const end = (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.delete(e.pointerId);
-      if (pinchState) {
-        // Suppress the trailing single-pointer tap that fires when the second
-        // finger lifts first — without this, releasing a pinch over a hex
-        // would stage a placement.
-        suppressTapUntil = performance.now() + 350;
-        if (pointers.size < 2) {
-          pinchState = null;
-          // Re-seat drag from whichever finger is still down so the user can
-          // pan smoothly without releasing first.
-          if (pointers.size === 1) {
-            const [id] = [...pointers.keys()];
-            const p = pointers.get(id);
-            dragState = {
-              pointerId: id,
-              startX: p.x, startY: p.y,
-              baseTx: view.tx, baseTy: view.ty,
-              active: false,
-            };
-          }
-        }
-        return;
-      }
-      if (dragState && e.pointerId === dragState.pointerId) {
-        if (dragState.active) suppressTapUntil = performance.now() + 100;
-        dragState = null;
-      }
-    };
-    mapEl.addEventListener('pointerup', end);
-    mapEl.addEventListener('pointercancel', end);
-  }
-  // -----------------------------------------------------------------------
-
-  // Bottom bar: unified surface for "what did I just tap on?". Lives in the
-  // same docked slot for all three modes — relay detail, staged placement,
-  // empty-hex sector info — so the player's eye doesn't have to hunt between
-  // a sidebar block and a separate placement bar.
+  // Bottom bar: docked surface for "what did I just tap on?" — relay detail,
+  // staged placement, or empty-hex sector info. Lives inside .net-map so it
+  // overlays the 3D canvas.
   function renderHexBar(now) {
     const net = state.network;
-    // 1) Staged placement (queue + chosen hex). Highest priority.
     if (pendingPlacement && net && net.queued.length > 0) {
       const ph = getHexAt(pendingPlacement.q, pendingPlacement.r);
       if (ph && !net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r)) {
         return renderStagedBar(ph, net, now);
       }
     }
-    // 2) Selected relay.
     if (selectedRelayId && net) {
       const relay = net.relays.find((r) => r.id === selectedRelayId);
       if (relay) return renderRelayBar(relay, net, now);
     }
-    // 3) Selected empty hex (no queue).
     if (selectedEmptyHex) {
       const ph = getHexAt(selectedEmptyHex.q, selectedEmptyHex.r);
       if (ph && !(net && net.relays.some((r) => r.hex.q === ph.q && r.hex.r === ph.r))) {
@@ -761,7 +340,6 @@ export function makeNetworkUi(state, opts) {
     const projectedYield = (Number(token.baseYield) || 0) * sector.yieldMul;
     const ripenSec = tier.ripenSec * sector.ripenMul;
     const queueTail = net.queued.length > 1 ? ` <span class="net-place-sep">·</span> <span>${net.queued.length - 1} more queued</span>` : '';
-    // Online neighbours at the picked hex hint at the cluster yield boost.
     const adjOnline = countAdjacentOnline(net, ph, now);
     const clusterHint = adjOnline > 0
       ? `<span>${adjOnline} online neighbour${adjOnline === 1 ? '' : 's'} → +${(adjOnline * 25)}% cluster</span>`
@@ -850,7 +428,6 @@ export function makeNetworkUi(state, opts) {
     `;
   }
 
-  // Count online relays adjacent to a hex (used for the staged-bar cluster hint).
   function countAdjacentOnline(net, hex, now) {
     if (!net) return 0;
     let n = 0;
@@ -860,8 +437,6 @@ export function makeNetworkUi(state, opts) {
     }
     return n;
   }
-
-  // List the tiers of the online relays adjacent to `relay`, e.g. "rare, common".
   function listAdjacentOnlineTiers(net, relay, now) {
     if (!net) return '';
     const tiers = [];
@@ -871,36 +446,124 @@ export function makeNetworkUi(state, opts) {
       if (hexDistance(rr.hex, relay.hex) === 1) tiers.push(rr.tier);
     }
     if (!tiers.length) return '';
-    // Order by rarity ascending so heaviest hitters show first.
     tiers.sort((a, b) => TIER_ORDER.indexOf(b) - TIER_ORDER.indexOf(a));
     return tiers.map((t) => TIER_LABEL[t] || t).join(', ');
   }
 
-  function ensureSkeleton() {
-    if (bodyEl.querySelector('.net-layout')) return;
-    bodyEl.innerHTML = `
-      <div class="net-layout">
-        <div class="net-map"></div>
-        <div class="net-upnext"></div>
-        <div class="net-side"></div>
-      </div>
-    `;
-    const mapEl = bodyEl.querySelector('.net-map');
-    if (mapEl) attachInteractions(mapEl);
+  // Whether the side sheet should be peeking (mobile only — CSS gates the
+  // visual effect to small viewports). Any cell selection collapses it so
+  // the canvas is unobstructed for panning; clearing the selection ("Done")
+  // expands it again to the full network details.
+  function hasSelection() {
+    return !!(selectedRelayId || selectedEmptyHex || pendingPlacement);
+  }
+  function applySheetState() {
+    const sideEl = bodyEl.querySelector('.net-side');
+    if (!sideEl) return;
+    sideEl.classList.toggle('collapsed-mobile', hasSelection());
+  }
+
+  // The bar's "identity" — when this string changes, the bar fades + scales
+  // in (entrance animation). Identical key across renders means values may
+  // be updating but the bar is the same surface; we update inner content
+  // without recreating the .net-place-bar element, so the animation plays
+  // through cleanly and we don't re-trigger it on every tick.
+  let lastBarKey = 'none';
+  let lastBarHTML = '';
+  let pendingExitTimer = null;
+  function barIdentity() {
+    if (pendingPlacement) return `staged-${pendingPlacement.q},${pendingPlacement.r}`;
+    if (selectedRelayId) return `relay-${selectedRelayId}`;
+    if (selectedEmptyHex) return `empty-${selectedEmptyHex.q},${selectedEmptyHex.r}`;
+    return 'none';
+  }
+  function updateHexBar(now) {
+    const slot = bodyEl.querySelector('.net-hexbar-slot');
+    if (!slot) return;
+    const newKey = barIdentity();
+
+    // No bar before, no bar now — nothing to do.
+    if (newKey === 'none' && lastBarKey === 'none') return;
+
+    if (newKey === lastBarKey) {
+      // Same bar surface — refresh internal text only, preserve the outer
+      // .net-place-bar element so its entrance animation keeps playing.
+      const newHTML = renderHexBar(now);
+      if (newHTML === lastBarHTML) return;
+      lastBarHTML = newHTML;
+      const existing = slot.firstElementChild;
+      if (!existing) {
+        slot.innerHTML = newHTML;
+        return;
+      }
+      // Parse the new outer element, swap in its innards + className while
+      // keeping the live DOM node (and its in-flight animation) intact.
+      const temp = document.createElement('div');
+      temp.innerHTML = newHTML;
+      const newBar = temp.firstElementChild;
+      if (newBar) {
+        const hadEnter = existing.classList.contains('net-bar-enter');
+        existing.innerHTML = newBar.innerHTML;
+        existing.className = newBar.className;
+        if (hadEnter) existing.classList.add('net-bar-enter');
+      }
+      return;
+    }
+
+    // Identity changed. Cancel any pending exit so back-to-back transitions
+    // don't strand a half-removed bar.
+    if (pendingExitTimer) { clearTimeout(pendingExitTimer); pendingExitTimer = null; }
+
+    if (newKey === 'none') {
+      // Bar going away — fade out, then drop from DOM.
+      const existing = slot.firstElementChild;
+      if (existing) {
+        existing.classList.remove('net-bar-enter');
+        existing.classList.add('net-bar-exit');
+        pendingExitTimer = setTimeout(() => {
+          if (slot.firstElementChild === existing) slot.innerHTML = '';
+          pendingExitTimer = null;
+        }, 200);
+      } else {
+        slot.innerHTML = '';
+      }
+      lastBarKey = 'none';
+      lastBarHTML = '';
+      return;
+    }
+
+    // New bar surface — replace HTML and run entrance animation.
+    const newHTML = renderHexBar(now);
+    slot.innerHTML = newHTML;
+    const bar = slot.firstElementChild;
+    if (bar) bar.classList.add('net-bar-enter');
+    lastBarKey = newKey;
+    lastBarHTML = newHTML;
+  }
+
+  // renderOverlays = redraw the docked hex-bar + up-next + side panel only.
+  // The 3D canvas is driven by scene.refresh() in the full render() path.
+  function renderOverlays() {
+    if (!modalEl.classList.contains('open')) return;
+    const now = nowSeconds();
+    const upNextEl = bodyEl.querySelector('.net-upnext');
+    const sideEl = bodyEl.querySelector('.net-side');
+    updateHexBar(now);
+    if (upNextEl) upNextEl.innerHTML = renderUpNext();
+    if (sideEl) sideEl.innerHTML = renderSidePanel(now);
+    applySheetState();
   }
 
   function render() {
     if (!modalEl.classList.contains('open')) return;
     const now = nowSeconds();
-    // Drop a stale selection if the relay was lost between renders.
+    // Drop stale selection if the relay was lost between renders.
     if (selectedRelayId && state.network && !state.network.relays.some((r) => r.id === selectedRelayId)) {
       selectedRelayId = null;
     }
-    // Empty-hex selection: clear if a relay landed there since the tap.
     if (selectedEmptyHex && state.network && state.network.relays.some((r) => r.hex.q === selectedEmptyHex.q && r.hex.r === selectedEmptyHex.r)) {
       selectedEmptyHex = null;
     }
-    // Clear stale pending if the queue dried up.
     if (pendingPlacement && (!state.network || state.network.queued.length === 0)) {
       pendingPlacement = null;
     }
@@ -909,45 +572,37 @@ export function makeNetworkUi(state, opts) {
       ? `Network · ${status.online + status.ripening} relay${status.online + status.ripening === 1 ? '' : 's'}`
       : 'Network';
     ensureSkeleton();
-    const mapEl = bodyEl.querySelector('.net-map');
-    const upNextEl = bodyEl.querySelector('.net-upnext');
-    const sideEl = bodyEl.querySelector('.net-side');
-    mapEl.innerHTML = renderHexSvg(now) + renderHexBar(now);
-    if (upNextEl) upNextEl.innerHTML = renderUpNext();
-    sideEl.innerHTML = renderSidePanel(now);
-    if (!view.initialized) {
-      requestAnimationFrame(() => {
-        view.scale = isMobileView() ? MOBILE_INITIAL_SCALE : 1;
-        centerView(mapEl);
-        view.initialized = true;
-        applyView(mapEl);
-      });
-    } else {
-      clampView(mapEl);
-      applyView(mapEl);
+    const sc = ensureScene();
+    if (sc) {
+      if (!sc.running) {
+        sc.open();
+        // Give the canvas a layout tick before first refresh so resize sees real px.
+        requestAnimationFrame(() => { sc.resize(); sc.refresh(now); pushSelectionToScene(); });
+      } else {
+        sc.refresh(now);
+        pushSelectionToScene();
+      }
     }
+    renderOverlays();
   }
 
   function refresh() {
-    // Update the HUD chip every HUD tick. Cheap; only DOM-touch when changed.
     const now = nowSeconds();
     const s = networkStatus(state, now);
     const label = chipEl.querySelector('.net-chip-label');
-    // Compact summary — keep words where they fit, drop them where space is tight.
-    // Format priority: queued action first (it's the verb the player needs),
-    // then online (live yield), then ripening (background work).
     const parts = [];
     if (s.queued > 0) parts.push(`${s.queued} to place`);
     parts.push(`${s.online} online`);
     if (s.ripening > 0) parts.push(`${s.ripening} ripening`);
     const text = parts.join(' · ');
     if (label && label.textContent !== text) label.textContent = text;
-    // Visibility: any network activity surfaces the chip.
     const visible = !!state.network && (s.online + s.ripening + s.queued + s.lost) > 0;
     chipEl.style.display = visible ? '' : 'none';
-    // Queued tokens → yellow/pulse so the player knows there's an action waiting.
     chipEl.classList.toggle('has-queue', s.queued > 0);
-    if (modalEl.classList.contains('open')) render();
+    if (modalEl.classList.contains('open')) {
+      if (scene) scene.refresh(now);
+      renderOverlays();
+    }
   }
 
   function drainLosses() {
@@ -959,17 +614,15 @@ export function makeNetworkUi(state, opts) {
   }
 
   // Brief blue pulse + floating "+X" when an isolated relay drips. Caller fires
-  // this from the per-tick loop. We dedupe overlapping floaters by limiting to
+  // this from the per-tick loop. Dedupe overlapping floaters by limiting to
   // one active at a time — bleed totals already aggregate per-tick.
   let lastBleedAt = 0;
   function flashBleed(amount) {
     if (!(amount > 0)) return;
     const now = performance.now();
-    // Restart the chip glow.
     chipEl.classList.remove('fx-bleed');
     void chipEl.offsetWidth;
     chipEl.classList.add('fx-bleed');
-    // Floater — skip if a previous one is still mid-flight (< 350ms ago).
     if (now - lastBleedAt > 350) {
       lastBleedAt = now;
       const f = document.createElement('span');

@@ -59,7 +59,8 @@ export function makeNetworkUi(state, opts) {
     // Reset the hex-bar animation tracker so reopening the modal triggers
     // a fresh entrance the next time a cell is selected.
     lastBarKey = 'none';
-    lastBarHTML = '';
+    if (currentBarEl && currentBarEl.parentNode) currentBarEl.remove();
+    currentBarEl = null;
     if (pendingExitTimer) { clearTimeout(pendingExitTimer); pendingExitTimer = null; }
     if (scene) scene.close();
   };
@@ -118,31 +119,36 @@ export function makeNetworkUi(state, opts) {
 
   function handleSelect(sel) {
     const net = state.network;
-    // via:'pan' = passive preview while the player drags the camera. Show
-    // info on the cell under the reticle, but don't stage a placement or
-    // toggle anything — explicit tap (via:'tap') still owns commitment.
-    const isPan = sel.via === 'pan';
+    // The centered cell IS the action target. Pan moves the centered cell
+    // continuously; tap also moves it (and focuses the camera there). Both
+    // routes resolve to the same selection rules below — the only thing
+    // tap-only behaviour does differently is toggle off an existing
+    // selection if the player re-taps the same cell.
+    const isTap = sel.via === 'tap';
     if (sel.kind === 'relay') {
-      if (!isPan && sel.id === selectedRelayId) clearSelection();
+      if (isTap && sel.id === selectedRelayId) clearSelection();
       else { selectedRelayId = sel.id; selectedEmptyHex = null; pendingPlacement = null; }
     } else if (sel.kind === 'hex') {
       const occupied = net && net.relays.find((r) => r.hex.q === sel.q && r.hex.r === sel.r);
       if (occupied) {
-        if (!isPan && occupied.id === selectedRelayId) clearSelection();
+        if (isTap && occupied.id === selectedRelayId) clearSelection();
         else { selectedRelayId = occupied.id; selectedEmptyHex = null; pendingPlacement = null; }
-      } else if (!isPan && net && net.queued.length > 0) {
-        if (pendingPlacement && pendingPlacement.q === sel.q && pendingPlacement.r === sel.r) {
+      } else if (net && net.queued.length > 0) {
+        // Queue present + empty hex: stage a placement preview at that cell.
+        // Panning across cells continuously re-stages so the player can sweep
+        // through candidates; "Place here" commits. Re-tapping the staged
+        // cell clears it.
+        if (isTap && pendingPlacement && pendingPlacement.q === sel.q && pendingPlacement.r === sel.r) {
           clearSelection();
         } else {
           pendingPlacement = { q: sel.q, r: sel.r };
           selectedRelayId = null;
           selectedEmptyHex = null;
         }
-      } else if (!isPan && selectedEmptyHex && selectedEmptyHex.q === sel.q && selectedEmptyHex.r === sel.r) {
+      } else if (isTap && selectedEmptyHex && selectedEmptyHex.q === sel.q && selectedEmptyHex.r === sel.r) {
         clearSelection();
       } else {
-        // Pan preview OR explicit tap on an empty hex with no queue — both
-        // surface the empty-hex sector info bar.
+        // No queue + empty hex: surface the sector-stats bar.
         selectedEmptyHex = { q: sel.q, r: sel.r };
         selectedRelayId = null;
         pendingPlacement = null;
@@ -463,13 +469,18 @@ export function makeNetworkUi(state, opts) {
     sideEl.classList.toggle('collapsed-mobile', hasSelection());
   }
 
-  // The bar's "identity" — when this string changes, the bar fades + scales
-  // in (entrance animation). Identical key across renders means values may
-  // be updating but the bar is the same surface; we update inner content
-  // without recreating the .net-place-bar element, so the animation plays
-  // through cleanly and we don't re-trigger it on every tick.
+  // The bar's "identity" — when it changes, the bar animates in/out. While
+  // the identity is unchanged we DO NOT touch the bar's DOM, because the
+  // HUD tick fires renderOverlays every 100ms and any inner-HTML patch
+  // would yank the Cancel / Place / Done buttons out from under the
+  // player's finger mid-tap. That's the bug — placement looked broken
+  // because the button the user pressed had just been replaced by a clone.
+  //
+  // Tradeoff: timer-like values inside the bar (ripens-in countdown, live
+  // yield) freeze while the bar is open. Acceptable — the bar is a quick
+  // peek; close + reopen refreshes it.
   let lastBarKey = 'none';
-  let lastBarHTML = '';
+  let currentBarEl = null;
   let pendingExitTimer = null;
   function barIdentity() {
     if (pendingPlacement) return `staged-${pendingPlacement.q},${pendingPlacement.r}`;
@@ -477,68 +488,52 @@ export function makeNetworkUi(state, opts) {
     if (selectedEmptyHex) return `empty-${selectedEmptyHex.q},${selectedEmptyHex.r}`;
     return 'none';
   }
+  function clearPendingExit() {
+    if (pendingExitTimer) { clearTimeout(pendingExitTimer); pendingExitTimer = null; }
+  }
+  function detachBar(el, immediate) {
+    if (!el) return;
+    if (immediate) { el.remove(); return; }
+    el.classList.remove('net-bar-enter');
+    el.classList.add('net-bar-exit');
+    pendingExitTimer = setTimeout(() => {
+      if (el.parentNode) el.remove();
+      pendingExitTimer = null;
+    }, 220);
+  }
   function updateHexBar(now) {
     const slot = bodyEl.querySelector('.net-hexbar-slot');
     if (!slot) return;
     const newKey = barIdentity();
+    // Identity unchanged — leave the live DOM alone. Buttons stay tappable,
+    // animation plays through. (See big comment above.)
+    if (newKey === lastBarKey) return;
 
-    // No bar before, no bar now — nothing to do.
-    if (newKey === 'none' && lastBarKey === 'none') return;
-
-    if (newKey === lastBarKey) {
-      // Same bar surface — refresh internal text only, preserve the outer
-      // .net-place-bar element so its entrance animation keeps playing.
-      const newHTML = renderHexBar(now);
-      if (newHTML === lastBarHTML) return;
-      lastBarHTML = newHTML;
-      const existing = slot.firstElementChild;
-      if (!existing) {
-        slot.innerHTML = newHTML;
-        return;
-      }
-      // Parse the new outer element, swap in its innards + className while
-      // keeping the live DOM node (and its in-flight animation) intact.
-      const temp = document.createElement('div');
-      temp.innerHTML = newHTML;
-      const newBar = temp.firstElementChild;
-      if (newBar) {
-        const hadEnter = existing.classList.contains('net-bar-enter');
-        existing.innerHTML = newBar.innerHTML;
-        existing.className = newBar.className;
-        if (hadEnter) existing.classList.add('net-bar-enter');
-      }
-      return;
-    }
-
-    // Identity changed. Cancel any pending exit so back-to-back transitions
-    // don't strand a half-removed bar.
-    if (pendingExitTimer) { clearTimeout(pendingExitTimer); pendingExitTimer = null; }
+    // Identity changed.
+    clearPendingExit();
+    const outgoing = currentBarEl;
 
     if (newKey === 'none') {
-      // Bar going away — fade out, then drop from DOM.
-      const existing = slot.firstElementChild;
-      if (existing) {
-        existing.classList.remove('net-bar-enter');
-        existing.classList.add('net-bar-exit');
-        pendingExitTimer = setTimeout(() => {
-          if (slot.firstElementChild === existing) slot.innerHTML = '';
-          pendingExitTimer = null;
-        }, 200);
-      } else {
-        slot.innerHTML = '';
-      }
+      // No new bar — fade the outgoing one out.
+      currentBarEl = null;
       lastBarKey = 'none';
-      lastBarHTML = '';
+      detachBar(outgoing, false);
       return;
     }
 
-    // New bar surface — replace HTML and run entrance animation.
-    const newHTML = renderHexBar(now);
-    slot.innerHTML = newHTML;
-    const bar = slot.firstElementChild;
-    if (bar) bar.classList.add('net-bar-enter');
+    // New bar — build it, animate it in. Outgoing bar (if any) gets detached
+    // immediately so the slot only ever holds one bar at a time, avoiding
+    // layout shuffles during the transition.
+    if (outgoing) detachBar(outgoing, true);
+    const temp = document.createElement('div');
+    temp.innerHTML = renderHexBar(now);
+    const bar = temp.firstElementChild;
+    if (bar) {
+      bar.classList.add('net-bar-enter');
+      slot.appendChild(bar);
+      currentBarEl = bar;
+    }
     lastBarKey = newKey;
-    lastBarHTML = newHTML;
   }
 
   // renderOverlays = redraw the docked hex-bar + up-next + side panel only.

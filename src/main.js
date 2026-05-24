@@ -503,18 +503,30 @@ function tick(raf) {
   // getContactAffordance every tick — no separate affordance call needed.
 
   let buffCount = 0;
+  // The falling-columns wavefront only reads short, punchy buffs — long
+  // ramp-up boosts (Drift, Console Mass, etc.) would otherwise keep the
+  // ripple permanently on. 4 min = the cutoff between "in-the-moment
+  // window pop" and "background long-haul boost"; only the former should
+  // visibly ride the columns.
+  const WAVE_MAX_DURATION_S = 240;
+  let waveBuffCount = 0;
   const bs = state.buffs;
   if (bs) {
     for (const k of ['rateMul', 'gambleLuck', 'gambleCushion', 'compound']) {
       const xs = bs[k];
       if (!xs) continue;
-      for (const x of xs) if (x.expiresAt > t) buffCount++;
+      for (const x of xs) {
+        if (x.expiresAt <= t) continue;
+        buffCount++;
+        const dur = Number(x.duration);
+        if (Number.isFinite(dur) && dur > 0 && dur < WAVE_MAX_DURATION_S) waveBuffCount++;
+      }
     }
   }
   // Ripple emanates from the top-middle of the canvas (NDC 0,1) so the
   // wavefront sweeps downward across the falling columns.
   const rippleCenter = unprojectNdcToZ0(0, 1);
-  display.update(state.amount, rate, t, dt, buffCount, rippleCenter);
+  display.update(state.amount, rate, t, dt, waveBuffCount, rippleCenter);
   hero.update(state.amount, rate, baseRate, dt);
   // Belt-and-braces: an exception inside the interstitial system must not
   // kill the rAF loop. A frozen game-loop ("things stop flowing until I

@@ -884,10 +884,13 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       const dy = e.clientY - dragState.startY;
       if (!dragState.active && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       dragState.active = true;
-      // AOE-style pan: drag translates the camera target across the ground.
-      // Pull-the-world feel — drag right moves the world right, so the
-      // camera target moves left under the finger.
-      const pan = screenDeltaToWorldPan(-dx, -dy);
+      // AOE-style pan: horizontal stays pull-the-world (drag right scrolls
+      // the world right, mirrors a touch map). Vertical is push-the-world —
+      // drag down moves the camera target toward the viewer, which on a
+      // tilted camera reads as "follow the finger into the lower part of
+      // the screen." Pull on vertical felt inverted because in a 3D tilted
+      // view, screen-down doesn't map to a single intuitive ground direction.
+      const pan = screenDeltaToWorldPan(-dx, dy);
       cam.target.x = dragState.baseTargetX + pan.dx;
       cam.target.z = dragState.baseTargetZ + pan.dz;
       // Manual drag overrides any in-flight focus animation.

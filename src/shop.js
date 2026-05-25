@@ -592,6 +592,29 @@ export function rerollCost(state, now) {
   return computeRerollCost(state, now, countRerollable(state));
 }
 
+// Silent welcome-back reroll. If the player came back to a lower rate than
+// they left at (typically: Carry windows expired mid-AFK), the slate is still
+// priced for the peak — every unpinned card costs more than a fresh roll
+// would. Roll one hypothetical reroll for each unpinned slot and swap in
+// anything cheaper. Doesn't charge Echoes or consume freeRerolls — it's a
+// quality-of-life nudge, gated by the caller on offline duration + rate drop.
+export function applyOfflineCheapReroll(state, now) {
+  const ctx = rollContext(state, now);
+  let swapped = 0;
+  for (let i = 0; i < state.shop.slots.length; i++) {
+    if (isSlotPinned(state, i)) continue;
+    const cur = state.shop.slots[i];
+    if (!cur) continue;
+    const candidate = rerollSlot(state.shop.slots, i, ctx);
+    if (candidate && candidate.cost < cur.cost) {
+      state.shop.slots[i] = candidate;
+      swapped++;
+    }
+  }
+  if (swapped) state.shop.offeredRate = ctx.rate;
+  return swapped;
+}
+
 function countRerollable(state) {
   let n = 0;
   for (let i = 0; i < state.shop.slots.length; i++) {

@@ -1,4 +1,4 @@
-import { integrateRate, pruneBuffs, validateSlate, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
+import { integrateRate, pruneBuffs, validateSlate, effectiveRate, applyOfflineCheapReroll, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
 import { ensureNetwork, reconcileOffline, reconcileOfflineBleeds, getHexAt } from './network.js';
 
 export const SAVE_KEY = 'incremental.save.v14';
@@ -186,6 +186,16 @@ export function loadState(state) {
   const offlineBleed = offline > 0 ? reconcileOfflineBleeds(state, offline, now) : 0;
   const rerollsGained = Math.max(0, (state.freeRerolls || 0) - rerollsBefore);
   state.amount += earnings + offlineBleed;
+  // Rate-drop relief: if Carry windows (or relays) ran out mid-AFK and the
+  // live rate is lower than what the slate was priced at, silently roll one
+  // reroll and keep anything cheaper for unpinned slots. Compare rates at
+  // savedAt vs now — buffs in state still carry their original expiresAt, so
+  // the savedAt sample picks them up and the now sample doesn't.
+  const rateAtLeave = effectiveRate(state, savedAt);
+  const rateNow = effectiveRate(state, now);
+  if (offline >= 60 && rateAtLeave > rateNow) {
+    applyOfflineCheapReroll(state, now);
+  }
   validateSlate(state, now);
   return {
     offline, earnings, savedAt, now,

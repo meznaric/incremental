@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Echoes — Balance Simulator</title>
+  <meta name="theme-color" content="#0a0a14" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles/sim.css" />
+</head>
+<body>
+  <header class="sim-header">
+    <div class="title">
+      <a href="./" class="back" title="Back to game">←</a>
+      <h1>Balance Simulator</h1>
+      <span class="subtitle">10 cycles · headless run against the real shop math</span>
+    </div>
+    <div class="header-actions">
+      <button id="runBtn" class="primary">Run simulation</button>
+      <button id="resetBtn">Reset config</button>
+    </div>
+  </header>
+
+  <main class="sim-main">
+    <aside class="sim-controls" id="controls">
+      <section>
+        <h2>Run</h2>
+        <label>Cycles to simulate
+          <input type="number" id="ctl-cycles" min="1" max="50" value="10" />
+        </label>
+        <label>Wall-clock days (cap)
+          <input type="number" id="ctl-days" min="1" max="120" value="30" />
+          <span class="help">Hard cap on simulated game time. Each EP gets harder, so reaching 10 cycles takes much more than 10 days.</span>
+        </label>
+        <label>Decision interval (s)
+          <input type="number" id="ctl-active-tick" min="1" max="30" value="4" />
+          <span class="help">Lower = more taps/minute during active windows. Slower to compute.</span>
+        </label>
+        <label>Sample interval (s)
+          <input type="number" id="ctl-sample" min="60" max="3600" value="600" step="60" />
+          <span class="help">Chart resolution. Bigger = faster, blockier curves.</span>
+        </label>
+        <label>RNG seed
+          <input type="number" id="ctl-seed" value="1" />
+          <span class="help">Same seed → same schedule + same gamble outcomes.</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Schedule</h2>
+        <div class="row">
+          <label>Awake start (hr)
+            <input type="number" id="ctl-awake-start" min="0" max="23" value="8" />
+          </label>
+          <label>Awake end (hr)
+            <input type="number" id="ctl-awake-end" min="1" max="24" value="23" />
+          </label>
+        </div>
+        <h3>Day 0 (onboarding)</h3>
+        <div class="row">
+          <label>Long bursts <input type="number" id="ctl-opener-long" min="0" max="20" value="3" /></label>
+          <label>Short bursts <input type="number" id="ctl-opener-short" min="0" max="40" value="8" /></label>
+        </div>
+        <div class="row">
+          <label>Long mins <input type="number" id="ctl-opener-long-min" min="1" max="180" value="25" /></label>
+          <label>Short mins <input type="number" id="ctl-opener-short-min" min="1" max="60" value="4" /></label>
+        </div>
+        <h3>Days 1+ (steady state)</h3>
+        <div class="row">
+          <label>Long bursts min <input type="number" id="ctl-long-min" min="0" max="20" value="2" /></label>
+          <label>Long bursts max <input type="number" id="ctl-long-max" min="0" max="20" value="5" /></label>
+        </div>
+        <div class="row">
+          <label>Short bursts min <input type="number" id="ctl-short-min" min="0" max="40" value="5" /></label>
+          <label>Short bursts max <input type="number" id="ctl-short-max" min="0" max="40" value="10" /></label>
+        </div>
+        <div class="row">
+          <label>Long mins <input type="number" id="ctl-long-len" min="1" max="180" value="15" /></label>
+          <label>Short mins <input type="number" id="ctl-short-len" min="1" max="60" value="2" /></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Player policy</h2>
+        <label>Permanent payback ≤ (s)
+          <input type="number" id="ctl-payback" min="10" max="86400" value="10800" step="60" />
+          <span class="help">Buy a permanent if cost / marginal-rate ≤ this. Default 3 h — muls compound, so even a long-payback buy frees up the next decade.</span>
+        </label>
+        <label>Buff cost ≤ (s of rate)
+          <input type="number" id="ctl-buff-cost" min="1" max="7200" value="1800" step="30" />
+          <span class="help">Carriers stack — real play spams them.</span>
+        </label>
+        <label>Reroll budget (s of rate)
+          <input type="number" id="ctl-reroll" min="0" max="3600" value="600" step="10" />
+        </label>
+        <label class="check">
+          <input type="checkbox" id="ctl-gamble" checked /> Allow gambles (EV ≥ break-even, wager ≤ 25% of bal)
+        </label>
+        <label>Early-close ETA (hours)
+          <input type="number" id="ctl-early-close" min="0" max="240" value="6" step="1" />
+          <span class="help">Close mid-cycle if the next milestone is more than N hours away at current rate. Set 240 to disable. Real players make this tradeoff routinely — less mass per cycle, but the EP advances.</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Carry-in</h2>
+        <p class="help">Simulate a returning player with existing engravings/mass. Leave at 0 for a brand-new save.</p>
+        <label>Carrier Mass (kg)
+          <input type="number" id="ctl-start-mass" min="0" max="10000" value="0" />
+        </label>
+        <label>Echo Memory (shards/contacts)
+          <input type="number" id="ctl-start-memory" min="0" max="1000" value="0" />
+        </label>
+        <p class="help">After cycle close the simulator greedy-spends mass on engravings: First Light → Patched Hands → Open Frame → Quick Wake → Bone Memory → Ascent.</p>
+      </section>
+    </aside>
+
+    <section class="sim-output" id="output">
+      <div class="summary-cards" id="summary"></div>
+
+      <div class="chart-pane cycle-chips-pane">
+        <header><h3>Cycles</h3><span class="help">Toggle to compare a subset · x-axis on every chart is in-cycle time</span></header>
+        <div id="cycleChips" class="cycle-chips"></div>
+      </div>
+
+      <div class="chart-pane">
+        <header>
+          <h3>Echoes (balance) over time</h3>
+          <div class="legend-toggle">
+            <label class="check"><input type="checkbox" id="tog-balance-log" checked /> log Y</label>
+          </div>
+        </header>
+        <canvas id="chart-balance"></canvas>
+      </div>
+
+      <div class="chart-pane">
+        <header><h3>Effective rate (Echoes/s)</h3>
+          <div class="legend-toggle">
+            <label class="check"><input type="checkbox" id="tog-rate-log" checked /> log Y</label>
+          </div>
+        </header>
+        <canvas id="chart-rate"></canvas>
+      </div>
+
+      <div class="chart-pane">
+        <header><h3>Echo Memory multiplier &amp; Carrier Mass</h3></header>
+        <canvas id="chart-memory"></canvas>
+      </div>
+
+      <div class="chart-pane table">
+        <header><h3>Cycle ledger</h3></header>
+        <div id="cycleTable" class="cycle-table"></div>
+      </div>
+
+      <div class="chart-pane table">
+        <header><h3>Final engravings</h3></header>
+        <div id="engravings" class="engravings"></div>
+      </div>
+
+      <div class="chart-pane">
+        <header><h3>Balance diagnostics</h3></header>
+        <div id="diagnostics" class="diagnostics"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="status" class="status"></div>
+
+  <script type="module" src="./src/sim/main.js"></script>
+</body>
+</html>

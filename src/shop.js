@@ -80,6 +80,13 @@ export function makeShopState() {
     // Drifts ("while-you-are-away") fold into this. Default 1 means a clean
     // boot offers no offline bonus until the player buys some.
     offlineMul: 1,
+    // Quiet-Law Bypass / Channel Leak — late-game cards that soften log
+    // dampening's α and grant a separate multiplier bucket. Kept apart from
+    // permMul so the Decode card stack stays clean. Counts feed
+    // effectiveDampenAlpha(); dampenBreakMul applies at the same point as
+    // permMul (pre-dampening). Resets on Cycle close, like permMul.
+    dampenBreaks: { mythic: 0, legendary: 0 },
+    dampenBreakMul: 1,
     owned: {},
     buffs: {
       rateMul:       [], // { value, duration, expiresAt }
@@ -194,17 +201,31 @@ function applyAscent(rate, exp) {
 // Tunable: dropping ALPHA tightens the cap; raising AT delays its bite.
 export const DAMPEN_AT = 1e12;
 export const DAMPEN_ALPHA = 0.92;
-export function applyDampening(rate) {
+// Hard ceiling on α so the Quiet-Law Bypass / Channel Leak chain can never
+// fully negate dampening — the cliff softens but never disappears.
+export const DAMPEN_ALPHA_MAX = 0.99;
+export const DAMPEN_ALPHA_PER_MYTHIC = 0.03;
+export const DAMPEN_ALPHA_PER_LEGENDARY = 0.015;
+export function effectiveDampenAlpha(state) {
+  if (!state) return DAMPEN_ALPHA;
+  const m = (state.dampenBreaks && state.dampenBreaks.mythic) || 0;
+  const l = (state.dampenBreaks && state.dampenBreaks.legendary) || 0;
+  return Math.min(
+    DAMPEN_ALPHA_MAX,
+    DAMPEN_ALPHA + DAMPEN_ALPHA_PER_MYTHIC * m + DAMPEN_ALPHA_PER_LEGENDARY * l,
+  );
+}
+export function applyDampening(rate, alpha = DAMPEN_ALPHA) {
   if (!(rate > DAMPEN_AT)) return rate;
-  return DAMPEN_AT * Math.pow(rate / DAMPEN_AT, DAMPEN_ALPHA);
+  return DAMPEN_AT * Math.pow(rate / DAMPEN_AT, alpha);
 }
 
 // Cost-side half-relief: super-exponential card ladders (permanent/drift/coil)
 // don't see dampening at all, so balance growth lagging by f doubles their wall.
 // sqrt(f) gives back half of that compression so DDc+ stays buyable.
-export function dampeningCostMul(rate) {
+export function dampeningCostMul(rate, alpha = DAMPEN_ALPHA) {
   if (!(rate > DAMPEN_AT)) return 1;
-  return Math.pow(rate / DAMPEN_AT, (DAMPEN_ALPHA - 1) / (2 * DAMPEN_ALPHA));
+  return Math.pow(rate / DAMPEN_AT, (alpha - 1) / (2 * alpha));
 }
 
 // Seed-Relay yield folds into the additive base, same place as flatBonus,
@@ -217,11 +238,11 @@ function additiveBase(state, now) {
 }
 
 export function effectiveRate(state, now) {
-  let rate = additiveBase(state, now) * state.permMul;
+  let rate = additiveBase(state, now) * state.permMul * (state.dampenBreakMul || 1);
   rate *= patternBaseRateMul(state);
   for (const desc of RATE_BUFFS) rate *= desc.multAt(state.buffs[desc.key] || [], now);
   rate *= memoryFactor(state);
-  rate = applyDampening(rate);
+  rate = applyDampening(rate, effectiveDampenAlpha(state));
   return applyAscent(rate, ascentExp(state));
 }
 
@@ -231,10 +252,10 @@ export function effectiveRate(state, now) {
 // even with no buffs active, so comparing against that gives a false "off"
 // reading for the buffed glow on the rate label.
 export function unbufedEffectiveRate(state, now) {
-  let rate = additiveBase(state, now) * state.permMul;
+  let rate = additiveBase(state, now) * state.permMul * (state.dampenBreakMul || 1);
   rate *= patternBaseRateMul(state);
   rate *= memoryFactor(state);
-  rate = applyDampening(rate);
+  rate = applyDampening(rate, effectiveDampenAlpha(state));
   return applyAscent(rate, ascentExp(state));
 }
 
@@ -265,7 +286,8 @@ export function integrateRate(state, t0, t1) {
   }
   const sorted = [...transitions].sort((x, y) => x - y);
   const exp = ascentExp(state);
-  const flatBaseMul = state.permMul * patternBaseRateMul(state) * memoryFactor(state);
+  const alpha = effectiveDampenAlpha(state);
+  const flatBaseMul = state.permMul * (state.dampenBreakMul || 1) * patternBaseRateMul(state) * memoryFactor(state);
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i], c = sorted[i + 1];
@@ -302,11 +324,11 @@ export function integrateRate(state, t0, t1) {
       let segmentTotal;
       if (continuousFound && dt > 0) {
         const avgRate = linearBase * (timeIntegral / dt);
-        const dampened = applyDampening(avgRate);
+        const dampened = applyDampening(avgRate, alpha);
         const lifted = exp > 0 ? applyAscent(dampened, exp) : dampened;
         segmentTotal = lifted * dt;
       } else {
-        const dampened = applyDampening(linearBase);
+        const dampened = applyDampening(linearBase, alpha);
         const lifted = exp > 0 ? applyAscent(dampened, exp) : dampened;
         segmentTotal = lifted * timeIntegral;
       }
@@ -327,7 +349,7 @@ export function rollContext(state, now) {
     // Number of currently-online Seed Relays. Used by isEligible to gate
     // mesh-aware upgrades (Patient Coil) until the mesh actually exists.
     meshOnline: countOnlineRelays(state, now),
-    costRelief: dampeningCostMul(rate),
+    costRelief: dampeningCostMul(rate, effectiveDampenAlpha(state)),
   };
 }
 
@@ -350,6 +372,19 @@ export function marginalRateForPurchase(state, slot, now) {
     state.permMul = orig * u.value;
     after = effectiveRate(state, now);
     state.permMul = orig;
+  } else if (u.kind === 'dampenBreak') {
+    // Project both axes — the ×value mul and the α bump — so the card shows
+    // the full lift, including the dampening curve softening past the cliff.
+    const origMul = state.dampenBreakMul || 1;
+    const origBreaks = state.dampenBreaks || { mythic: 0, legendary: 0 };
+    state.dampenBreakMul = origMul * (u.value || 1);
+    state.dampenBreaks = {
+      mythic: (origBreaks.mythic || 0) + (u.tier === 'mythic' ? 1 : 0),
+      legendary: (origBreaks.legendary || 0) + (u.tier === 'legendary' ? 1 : 0),
+    };
+    after = effectiveRate(state, now);
+    state.dampenBreakMul = origMul;
+    state.dampenBreaks = origBreaks;
   } else if (u.kind === 'convert') {
     // Convert is a placement queue — no immediate rate change. The shop card
     // surfaces "queue token" rather than effective /s; the actual gain lands
@@ -465,6 +500,22 @@ export function tryBuy(state, slotIdx, now) {
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
     state.offlineMul = (state.offlineMul || 1) * u.value;
+    state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    checkPurchase(state, u);
+    replaceSlot(state, slotIdx, now);
+    return { ok: true };
+  }
+
+  if (u.kind === 'dampenBreak') {
+    // Quiet-Law Bypass / Channel Leak: lifts the dampening α and adds a
+    // multiplier to the dedicated bucket. Counts go on state.dampenBreaks so
+    // effectiveDampenAlpha can find them; the multiplier rides dampenBreakMul.
+    if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
+    if (usePatternFree) consumePatternFreePurchase(state);
+    else state.amount -= cost;
+    if (!state.dampenBreaks) state.dampenBreaks = { mythic: 0, legendary: 0 };
+    state.dampenBreaks[u.tier] = (state.dampenBreaks[u.tier] || 0) + 1;
+    state.dampenBreakMul = (state.dampenBreakMul || 1) * (u.value || 1);
     state.owned[u.id] = (state.owned[u.id] || 0) + 1;
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);

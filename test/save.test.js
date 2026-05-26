@@ -241,3 +241,59 @@ test('loadState ignores malformed shop.slots entries', () => {
   // loaded one survived intact OR got replaced (id is still a string).
   assert.equal(typeof b.shop.slots[0].id, 'string');
 });
+
+test('loadState defaults dampenBreaks + dampenBreakMul when absent (pre-Bypass save)', () => {
+  beforeEach();
+  // Snapshot a pre-Bypass save: no dampenBreaks, no dampenBreakMul keys.
+  // Mirrors a real existing player's save from before the feature shipped.
+  const snap = {
+    amount: 1234,
+    basePerSecond: 5,
+    flatBonus: 0,
+    permMul: 2,
+    owned: {},
+    buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [],
+             metaStrength: [], metaDuration: [], metaLuck: [] },
+    gambleCd: {},
+    shop: { slots: [], slotsUnlocked: 2, rerollUnlocked: false, pinSlots: 0, pinnedSlots: [], offeredRate: 0 },
+    messages: { shown: {}, queue: [], stats: {} },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+
+  const b = freshState();
+  loadState(b);
+  assert.deepEqual(b.dampenBreaks, { mythic: 0, legendary: 0 });
+  assert.equal(b.dampenBreakMul, 1);
+  // Other fields still hydrate as expected — proving the existing save remains valid.
+  assert.equal(b.amount, 1234);
+  assert.equal(b.permMul, 2);
+});
+
+test('loadState hydrates dampenBreaks + dampenBreakMul when present', () => {
+  beforeEach();
+  // Write the snapshot directly: an earlier `clearSave removes the save` test
+  // flips a module-scoped suppressed flag that silences saveState() for the
+  // rest of the run. We're testing the load path anyway, so bypass save() and
+  // hand-roll the snapshot.
+  const snap = {
+    amount: 100,
+    basePerSecond: 0,
+    flatBonus: 0,
+    permMul: 1,
+    dampenBreaks: { mythic: 2, legendary: 1 },
+    dampenBreakMul: 50,
+    offlineMul: 1,
+    owned: {},
+    buffs: { rateMul: [], gambleLuck: [], gambleCushion: [], compound: [],
+             metaStrength: [], metaDuration: [], metaLuck: [] },
+    gambleCd: {},
+    shop: { slots: [], slotsUnlocked: 2, rerollUnlocked: false, pinSlots: 0, pinnedSlots: [], offeredRate: 0 },
+    messages: { shown: {}, queue: [], stats: {} },
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+
+  const b = freshState();
+  loadState(b);
+  assert.deepEqual(b.dampenBreaks, { mythic: 2, legendary: 1 });
+  assert.equal(b.dampenBreakMul, 50);
+});

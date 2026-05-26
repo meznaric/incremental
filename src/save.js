@@ -17,6 +17,8 @@ export function saveState(state) {
     basePerSecond: state.basePerSecond,
     flatBonus: state.flatBonus,
     permMul: state.permMul,
+    dampenBreaks: state.dampenBreaks || { mythic: 0, legendary: 0 },
+    dampenBreakMul: state.dampenBreakMul || 1,
     offlineMul: state.offlineMul || 1,
     freeRerolls: state.freeRerolls || 0,
     patternFreeLeft: state.patternFreeLeft || 0,
@@ -63,6 +65,13 @@ export function loadState(state) {
   state.basePerSecond = Number(s.basePerSecond) || 0;
   state.flatBonus = Number(s.flatBonus) || 0;
   state.permMul = Number(s.permMul) || 1;
+  const db = s.dampenBreaks;
+  state.dampenBreaks = {
+    mythic: Math.max(0, Math.floor(Number(db && db.mythic) || 0)),
+    legendary: Math.max(0, Math.floor(Number(db && db.legendary) || 0)),
+  };
+  const dbm = Number(s.dampenBreakMul);
+  state.dampenBreakMul = Number.isFinite(dbm) && dbm > 0 ? dbm : 1;
   const om = Number(s.offlineMul);
   state.offlineMul = Number.isFinite(om) && om > 0 ? om : 1;
   const fr = Number(s.freeRerolls);

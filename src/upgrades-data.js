@@ -347,4 +347,26 @@ export const UPGRADES = [
   { id: 'drift_sieve',   kind: 'drift', rarity: 'mythic',
     name: 'Pre-Echo Sieve', desc: 'Whoever wrote this filter was not Union. ×2.0 to offline gain.',
     value: 2.0,   baseCost: 5e11,   growth: 10,  minRate: 1e9 },
+
+  // Quiet-Law Bypass (mythic) / Channel Leak (legendary) — the soft-cap
+  // breakers. Each copy lifts log-dampening's α by a small amount and stacks
+  // its own multiplier into state.dampenBreakMul. The unlockLadder gates the
+  // Nth copy behind a deeper raw rate so the relief never lands all at once.
+  // See effectiveDampenAlpha and DAMPEN_ALPHA_MAX in src/shop.js for the cap
+  // (α ≤ 0.99) that keeps the cliff from ever fully disappearing. Cost is
+  // rare-tier — the gating is the difficulty, not the price.
+  { id: 'quiet_law_bypass', kind: 'dampenBreak', rarity: 'mythic',
+    tier: 'mythic',
+    name: 'Quiet-Law Bypass',
+    desc: 'Forty-year-old board. The Listening Service never wrote the cap into its firmware.',
+    value: 10, alphaAdd: 0.03,
+    unlockLadder: [1e38, 1e54, 1e74, 1e98],
+    baseCost: 1e6, growth: 8 },
+  { id: 'channel_leak', kind: 'dampenBreak', rarity: 'legendary',
+    tier: 'legendary', weightRarity: 'rare',
+    name: 'Channel Leak',
+    desc: 'A bench job — half the part numbers are filed off. The cap still bites, but it bleeds.',
+    value: 5, alphaAdd: 0.015,
+    unlockLadder: [1e46, 1e64, 1e86, 1e112],
+    baseCost: 5e5, growth: 6 },
 ];

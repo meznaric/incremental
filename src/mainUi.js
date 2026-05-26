@@ -67,6 +67,8 @@ export function initMainUi(state, deps) {
       'Bleed = a one-shot Echo payout. Adds the listed Echoes to your balance. No ongoing effect.',
     drift:
       'Drift = permanent offline multiplier. Only fires while you are away — when you come back, the integrated rate is multiplied by your stacked Drift. Foreground Echoes/s is unchanged.',
+    dampenBreak:
+      'Bypass = pre-Union carrier circuitry that softens log dampening. Each copy lifts the cliff exponent α and stacks its own multiplier. The next copy requires a deeper raw rate — the cap softens but never fully vanishes.',
   };
   function permExplain(u) {
     if (u.permType === 'mul') {
@@ -143,6 +145,20 @@ export function initMainUi(state, deps) {
         `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
         `<div class="slot-modal-row"><span>Multiplier</span><span>×${u.value}</span></div>`,
       );
+    } else if (u.kind === 'dampenBreak') {
+      const eff = marginalRateForPurchase(state, slot, nowSeconds());
+      const ownedN = state.owned[u.id] || 0;
+      const ladder = Array.isArray(u.unlockLadder) ? u.unlockLadder : [];
+      const nextGate = ownedN + 1 < ladder.length ? ladder[ownedN + 1] : null;
+      rows.push(
+        `<div class="slot-modal-row"><span>Effective gain</span><span>+${formatAbbrev(eff)} Echoes/s</span></div>`,
+        `<div class="slot-modal-row"><span>Bypass multiplier</span><span>×${u.value}</span></div>`,
+        `<div class="slot-modal-row"><span>Cliff relief</span><span>+${u.alphaAdd.toFixed(3)} α (cap 0.99)</span></div>`,
+        `<div class="slot-modal-row"><span>Copies owned</span><span>${ownedN} / ${ladder.length}</span></div>`,
+      );
+      if (nextGate != null) {
+        rows.push(`<div class="slot-modal-row"><span>Next copy unlocks at</span><span>${formatAbbrev(nextGate)}/s</span></div>`);
+      }
     } else if (u.kind === 'buff') {
       rows.push(`<div class="slot-modal-row"><span>Duration</span><span>${u.duration}s</span></div>`);
     } else if (u.kind === 'drift') {
@@ -608,6 +624,9 @@ export function initMainUi(state, deps) {
       const theme = KIND_THEME[u.kind] || {};
       const buffTheme = u.kind === 'buff' ? BUFF_TYPE_THEME[u.buffType] : null;
       el.dataset.kind = u.kind;
+      // Mythic variant of dampenBreak keeps the loud foil + shimmer; the
+      // legendary variant gets the dampen-leg class for the quieter treatment.
+      el.classList.toggle('dampen-leg', u.kind === 'dampenBreak' && u.tier === 'legendary');
       // Tint the whole slot (icon + border + glow) per buffType. The
       // data-kind="buff" CSS rule derives --kind-border/--kind-glow from
       // --kind-color via color-mix, so overriding the colour alone shifts
@@ -655,6 +674,11 @@ export function initMainUi(state, deps) {
       } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
         const eff = marginalRateForPurchase(state, slot, now);
         outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;
+      } else if (u.kind === 'dampenBreak') {
+        // Show the projected gain in /s — the dampening-α lift means this can
+        // surface enormous numbers past the cliff, which is the whole point.
+        const eff = marginalRateForPurchase(state, slot, now);
+        outcomes = `<div class="outcome win"><i class="ri ri-flashlight-line"></i> +${formatAbbrev(eff)}/s effective · ×${u.value} bypass · +${u.alphaAdd.toFixed(3)} α</div>`;
       } else if (u.kind === 'drift') {
         // Drift previews the offline-only multiplier — never lies about a
         // foreground /s gain (it doesn't move foreground rate).
@@ -683,7 +707,7 @@ export function initMainUi(state, deps) {
 
       let meta = '';
       if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
-      else if ((u.kind === 'permanent' || u.kind === 'drift' || u.kind === 'coil') && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
+      else if ((u.kind === 'permanent' || u.kind === 'drift' || u.kind === 'coil' || u.kind === 'dampenBreak') && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
       el.querySelector('.meta').textContent = meta;
       const pinEl = el.querySelector('.pin');
       pinEl.style.display = (state.shop.pinSlots || 0) > 0 ? '' : 'none';

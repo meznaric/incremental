@@ -180,6 +180,17 @@ const BASE_INTERSTITIALS = {
     ],
   },
 
+  // voice: Sera. First Quiet-Law Bypass (mythic) — the cliff softens. A
+  // pre-Union board just got wired into a Union console; Sera notes the
+  // mechanical lift without celebrating it, in keeping with her register.
+  first_bypass: {
+    steps: [
+      { voice: 'S', text: 'The board you just patched in is older than the Quiet Law.' },
+      { voice: 'S', text: 'Whoever wrote its firmware never agreed to a ceiling. The cliff just got softer.' },
+      { voice: 'S', text: 'Carry on. Quietly.' },
+    ],
+  },
+
   // voice: Sera. First Seed Relay (convert) — a real, expensive commitment.
   // Third beat is procedural so the player knows the Network map exists and
   // what to do with the placement token they just bought.
@@ -621,6 +632,11 @@ export function checkPurchase(state, u) {
       saveContactLog(log);
       enqueue(state, 'first_convert');
     }
+  } else if (u.kind === 'dampenBreak' && u.tier === 'mythic') {
+    // Mythic-only first acquire: cycle-scoped, no contact-log flag needed —
+    // state.messages.shown gates against repeat, and that map resets via
+    // Cycle close along with the rest of state.
+    enqueue(state, 'first_bypass');
   }
   if (u.rarity === 'mythic') bumpAnomaly(state, 2);
   if (u.kind === 'buff' && u.group === 'long') bumpAnomaly(state, 1);

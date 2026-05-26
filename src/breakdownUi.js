@@ -36,7 +36,10 @@ export function initBreakdownUi(state) {
   function fmtFactor(row) {
     if (row.kind === 'base' || row.kind === 'add') return `+${formatAbbrev(row.factor)} /s`;
     if (row.kind === 'info') return `+${formatAbbrev(row.factor)} /min`;
-    if (row.kind === 'mul') return `×${row.factor < 100 ? row.factor.toFixed(2) : formatAbbrev(row.factor)}`;
+    if (row.kind === 'mul') {
+      if (row.factor > 0 && row.factor < 0.01) return `×${row.factor.toExponential(2)}`;
+      return `×${row.factor < 100 ? row.factor.toFixed(2) : formatAbbrev(row.factor)}`;
+    }
     if (row.kind === 'exp') return `^${row.factor.toFixed(2)}`;
     if (row.kind === 'total') return `${formatAbbrev(row.factor)} /s`;
     return '';

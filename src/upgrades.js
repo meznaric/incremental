@@ -51,6 +51,9 @@ export const KIND_THEME = {
   // Coil sits next to Seed Relay in lore — also yellow-family — but reads as
   // a warmer amber so the player never confuses the two on the slate.
   coil:      { icon: 'ri-shuffle-line',       color: '#e8a85a', label: 'Coil' },
+  // Quiet-Law Bypass (mythic) / Channel Leak (legendary). Sits in its own
+  // theme bucket so the shop chrome marks it as the rare card it is.
+  dampenBreak: { icon: 'ri-flashlight-line',  color: '#ff5ad5', label: 'Bypass' },
 };
 
 export function kindLabel(u) {
@@ -74,6 +77,15 @@ export function isEligible(u, ctx) {
   // resulting offers were unaffordable *and* useless (×1.05 priced at Qi-scale)
   // — they just hogged slots a stronger tier would have filled.
   if (u.maxRate != null && r >= u.maxRate) return false;
+  // Per-copy unlock ladder: each owned copy gates the next behind a higher
+  // rate threshold. Once owned ≥ ladder.length, the card never appears again.
+  // Used by Quiet-Law Bypass / Channel Leak to spread mythic-tier dampening
+  // relief across the late-game arc instead of dropping in a single run.
+  if (u.unlockLadder && Array.isArray(u.unlockLadder)) {
+    const owned = (ctx?.owned && ctx.owned[u.id]) || 0;
+    if (owned >= u.unlockLadder.length) return false;
+    if (r < u.unlockLadder[owned]) return false;
+  }
   return true;
 }
 
@@ -89,7 +101,10 @@ export const BUFF_GROUP_WEIGHT = { long: 2, burst: 1 };
 
 function weightedPick(pool) {
   const weights = pool.map((u) => (
-    (RARITY_WEIGHTS[u.rarity] || 1)
+    // weightRarity decouples draw odds from display rarity. Channel Leak shows
+    // as legendary on the card but rolls at the rare bucket's weight — matches
+    // the design call "legendary-coloured, but as common as a rare drop."
+    (RARITY_WEIGHTS[u.weightRarity || u.rarity] || 1)
       * (KIND_WEIGHT[u.kind] ?? 1)
       * (u.group ? (BUFF_GROUP_WEIGHT[u.group] ?? 1) : 1)
   ));
@@ -356,6 +371,12 @@ export function costFor(upgrade, ctx) {
         ? Math.max(upgrade.baseCost, ctx.rate * upgrade.rateCostSec)
         : upgrade.baseCost;
       return base * Math.pow(upgrade.growth, n + (n * n) / 25) * (ctx.costRelief ?? 1);
+    }
+    case 'dampenBreak': {
+      // Cheap on purpose — the ladder is the gate, not the price. Costs at the
+      // 1e38+ unlock floor are pocket change against the player's balance.
+      const n = ctx.owned[upgrade.id] || 0;
+      return upgrade.baseCost * Math.pow(upgrade.growth, n + (n * n) / 25) * (ctx.costRelief ?? 1);
     }
   }
   return 0;

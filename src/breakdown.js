@@ -18,7 +18,7 @@
 // `op` is the display operator for the leftmost column ('+ /s', '×', '^', '=').
 
 import { patternBaseRateMul, getActivePattern } from './cyclePatterns.js';
-import { applyDampening, DAMPEN_AT } from './shop.js';
+import { applyDampening, DAMPEN_AT, effectiveDampenAlpha, DAMPEN_ALPHA } from './shop.js';
 import {
   networkContribution, coverageMultiplier, adjacentOnlineCount, bleedValue, TIER_INFO,
 } from './network.js';
@@ -101,6 +101,21 @@ export function breakdownRate(state, now) {
     });
   }
 
+  const breakMul = state.dampenBreakMul || 1;
+  if (breakMul !== 1) {
+    const breaks = state.dampenBreaks || { mythic: 0, legendary: 0 };
+    const parts = [];
+    if (breaks.mythic) parts.push(`${breaks.mythic} Quiet-Law Bypass`);
+    if (breaks.legendary) parts.push(`${breaks.legendary} Channel Leak`);
+    rows.push({
+      kind: 'mul',
+      label: 'Bypass stack',
+      op: '×',
+      factor: breakMul,
+      note: parts.length ? parts.join(' · ') : 'Pre-Union carrier circuitry',
+    });
+  }
+
   const patternMul = patternBaseRateMul(state);
   if (patternMul !== 1) {
     const p = getActivePattern(state);
@@ -163,13 +178,18 @@ export function breakdownRate(state, now) {
   // log space and the total row matches effectiveRate.
   let postDampen = linear;
   if (linear > DAMPEN_AT) {
-    postDampen = applyDampening(linear);
+    const alpha = effectiveDampenAlpha(state);
+    postDampen = applyDampening(linear, alpha);
+    const baseNote = 'High-rate compression — each decade past trillion yields less than a full decade of output';
+    const relieved = alpha > DAMPEN_ALPHA + 1e-9;
     rows.push({
       kind: 'mul',
       label: 'Log dampening',
       op: '×',
       factor: postDampen / linear,
-      note: 'High-rate compression — each decade past trillion yields less than a full decade of output',
+      note: relieved
+        ? `${baseNote} · α ${alpha.toFixed(3)} (Bypass stack softened the cliff)`
+        : baseNote,
     });
   }
 

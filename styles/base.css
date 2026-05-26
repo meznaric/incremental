@@ -1804,10 +1804,12 @@ input[type="text"]:focus { border-color: #6688ff; }
 }
 .slot[data-kind="convert"]   { --kind-color: #f5d34a; --kind-border: rgba(245, 211, 74, 0.45);  --kind-glow: rgba(245, 211, 74, 0.55); border-color: var(--kind-border); }
 .slot[data-kind="gamble"]    { --kind-color: #ff5a6e; --kind-border: rgba(255, 90, 110, 0.45);  --kind-glow: rgba(255, 90, 110, 0.6); border-color: var(--kind-border); }
+.slot[data-kind="dampenBreak"] { --kind-color: #ff5ad5; --kind-border: rgba(255, 90, 213, 0.6);  --kind-glow: rgba(255, 90, 213, 0.7); border-color: var(--kind-border); }
 @media (hover: hover) and (pointer: fine) {
   .slot[data-kind="permanent"]:hover { border-color: #4cd07d; }
   .slot[data-kind="buff"]:hover      { border-color: var(--kind-color); }
   .slot[data-kind="convert"]:hover   { border-color: #f5d34a; }
   .slot[data-kind="gamble"]:hover    { border-color: #ff5a6e; }
+  .slot[data-kind="dampenBreak"]:hover { border-color: var(--kind-color); }
 }
 

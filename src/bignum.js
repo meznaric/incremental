@@ -75,7 +75,7 @@ export function formatAbbrev(n) {
   const p = periodIndexBase1000(n);
   const v = n / Math.pow(1000, p);
   const ab = PERIODS[p].abbrev || '';
-  return `${v.toFixed(2)}${ab}`;
+  return ab ? `${v.toFixed(2)} ${ab}` : v.toFixed(2);
 }
 
 export function formatGrouped(n) {

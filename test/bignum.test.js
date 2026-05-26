@@ -21,10 +21,10 @@ test('formatAbbrev: 10–999 is integer string', () => {
 });
 
 test('formatAbbrev: uses period suffixes from 1k upward', () => {
-  assert.equal(formatAbbrev(1_000), '1.00k');
-  assert.equal(formatAbbrev(1_500_000), '1.50m');
-  assert.equal(formatAbbrev(2_300_000_000), '2.30b');
-  assert.equal(formatAbbrev(1e12), '1.00t');
+  assert.equal(formatAbbrev(1_000), '1.00 k');
+  assert.equal(formatAbbrev(1_500_000), '1.50 m');
+  assert.equal(formatAbbrev(2_300_000_000), '2.30 b');
+  assert.equal(formatAbbrev(1e12), '1.00 t');
 });
 
 test('formatAbbrev: Infinity / NaN render as ∞', () => {
@@ -112,6 +112,6 @@ test('periodForBase100: maps a base-100 magnitude to a period/rank pair', () => 
   const p1 = periodForBase100(1);
   assert.equal(p1.period, 1);
   // m100 large enough to land in the last defined period
-  const big = periodForBase100(100);
+  const big = periodForBase100(PERIODS.length * 2);
   assert.equal(big.period, PERIODS.length - 1);
 });

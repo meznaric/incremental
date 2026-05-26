@@ -389,8 +389,12 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
     for (const [key, entry] of hexEntries.entries()) {
       const show = visibleKeys.has(key);
       entry.mesh.visible = show;
-      entry.edge.visible = show;
       entry.halo.visible = occupiedKeys.has(key);
+      // Edges always draw. Active cells get full sector glow; empty cells
+      // keep a faint trace so the grid bounds are legible.
+      entry.edge.material.opacity = show
+        ? entry.edgeActiveOpacity
+        : entry.edgeActiveOpacity * 0.18;
     }
   }
 
@@ -492,10 +496,15 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
 
       // Glowing edge — same color, higher alpha. Brightness driven by disc mul
       // (set on the material color, so we can dim/brighten per-state too).
+      // We track the bright "active" opacity here so updateHexVisibility can
+      // switch between full-strength (occupied / focused) and a faint trace
+      // opacity (empty cells) — the faint state gives the player a sense of
+      // the grid's bounds without filling the map with chrome.
+      const edgeActiveOpacity = 0.45 + 0.45 * discFraction(sector);
       const edgeMat = new THREE.LineBasicMaterial({
         color: sector.color,
         transparent: true,
-        opacity: 0.45 + 0.45 * discFraction(sector),
+        opacity: edgeActiveOpacity,
         depthWrite: false,
       });
       const edge = new THREE.LineSegments(edgeGeoSrc, edgeMat);
@@ -518,16 +527,18 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       halo.position.set(x, -HEX_THICKNESS / 2 + 0.01, z);
       hexLayer.add(halo);
 
-      // Start hidden — refresh() turns these on per-frame based on whether
-      // the cell hosts a relay, is centered by the camera, or is staged for
-      // placement. The mesh is still pickable while invisible because
-      // raycaster doesn't filter on .visible.
+      // Mesh + halo start hidden; refresh() turns these on per-frame for
+      // occupied / centered / staged cells. The edge stays visible always —
+      // faded for empty cells so the player can read the network's bounds,
+      // brightened when the cell is "active". Mesh is still pickable while
+      // invisible because raycaster doesn't filter on .visible.
       mesh.visible = false;
-      edge.visible = false;
       halo.visible = false;
+      edge.material.opacity = edgeActiveOpacity * 0.18;
 
       hexEntries.set(`${h.q},${h.r}`, {
         mesh, edge, halo, sector: h.sector,
+        edgeActiveOpacity,
         basePos: new THREE.Vector3(x, 0, z),
       });
     }
@@ -884,12 +895,10 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       const dy = e.clientY - dragState.startY;
       if (!dragState.active && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       dragState.active = true;
-      // AOE-style pan: horizontal stays pull-the-world (drag right scrolls
-      // the world right, mirrors a touch map). Vertical is push-the-world —
-      // drag down moves the camera target toward the viewer, which on a
-      // tilted camera reads as "follow the finger into the lower part of
-      // the screen." Pull on vertical felt inverted because in a 3D tilted
-      // view, screen-down doesn't map to a single intuitive ground direction.
+      // Drag-the-world feel: the content under the finger follows the finger
+      // (Google Maps / iOS pan). Both axes negate so the camera target moves
+      // opposite to the gesture, which makes the world appear to slide WITH
+      // the finger rather than against it.
       const pan = screenDeltaToWorldPan(-dx, dy);
       cam.target.x = dragState.baseTargetX + pan.dx;
       cam.target.z = dragState.baseTargetZ + pan.dz;

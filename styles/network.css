@@ -136,6 +136,29 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* Drag-handle / chevron at the top of the panel. Mobile-only: tap to
+   toggle expanded ↔ collapsed. Hidden on desktop where the panel is
+   permanently pinned open. */
+.net-side-handle {
+  display: none;
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 6px 24px;
+  margin: -4px 0 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.net-side-handle-grip {
+  display: block;
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(180, 190, 230, 0.35);
+  transition: background 180ms ease;
+}
+.net-side-handle:hover .net-side-handle-grip { background: rgba(180, 190, 230, 0.55); }
 .net-upnext {
   display: none;
   min-width: 0;
@@ -434,8 +457,6 @@
      present so the GPU layer isn't promoted for the idle bar. */
 }
 .net-place-bar.net-bar-enter {
-  /* Same duration + curve as the side-sheet collapse below, so when "Done"
-     fires the bar fades out at the same time the sheet expands. */
   animation: net-bar-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: opacity, transform;
 }
@@ -496,6 +517,29 @@
 }
 .net-place-sep { color: #5a5a78; }
 .net-place-hint { font-size: 11px; color: #8a8ac0; font-style: italic; }
+.net-place-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.net-place-close {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c4c4d8;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.net-place-close:hover { background: rgba(255, 255, 255, 0.10); color: #e8e8f0; }
 .net-place-actions {
   display: flex;
   gap: 8px;
@@ -532,9 +576,10 @@
 /* On narrow viewports the side panel becomes a docked bottom sheet so it
    doesn't eat half the canvas width. Up-next ribbon shows above the hex
    bar with its own padding. The canvas itself still goes full-edge.
-   Collapse behaviour: when a cell is selected (any kind), networkUi adds
-   .collapsed-mobile to the sheet and only the 4-up status row remains
-   visible. The hex bar floats just above the sheet — its bottom offset
+   Collapse behaviour: the sheet starts collapsed (handle + 4-up status
+   only) and stays that way until the player taps the handle or the status
+   row to expand it. Cell selection no longer auto-expands or auto-collapses
+   the sheet. The hex bar floats just above the sheet — its bottom offset
    tracks the sheet height via :has(). */
 @media (max-width: 720px) {
   .net-side {
@@ -545,16 +590,24 @@
     max-width: none;
     bottom: max(12px, env(safe-area-inset-bottom));
     max-height: 42vh;
-    padding: 12px;
+    padding: 10px 12px 12px;
+    gap: 10px;
     transition: max-height 220ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .net-side-handle { display: block; }
   .net-side.collapsed-mobile {
-    max-height: 76px;
-    padding: 10px 12px;
+    max-height: 92px;
+    padding: 6px 12px 10px;
     overflow: hidden;
   }
-  .net-side.collapsed-mobile > :not(.net-status) {
+  /* Collapsed view: show only the handle + 4-up status. Status row becomes
+     a tap target that expands the panel. */
+  .net-side.collapsed-mobile > :not(.net-status):not(.net-side-handle) {
     display: none;
+  }
+  .net-side.collapsed-mobile .net-status {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .net-hexbar-slot {
     right: max(12px, env(safe-area-inset-right));
@@ -566,7 +619,7 @@
      it. :has() is broadly supported in modern engines; if missing, the bar
      stays at the expanded position which is still readable. */
   .net-body:has(.net-side.collapsed-mobile) .net-hexbar-slot {
-    bottom: calc(76px + max(12px, env(safe-area-inset-bottom)) + 10px);
+    bottom: calc(92px + max(12px, env(safe-area-inset-bottom)) + 10px);
   }
   .net-upnext { display: block; }
 }
@@ -580,6 +633,6 @@
     bottom: calc(50vh + max(8px, env(safe-area-inset-bottom)) + 8px);
   }
   .net-body:has(.net-side.collapsed-mobile) .net-hexbar-slot {
-    bottom: calc(70px + max(8px, env(safe-area-inset-bottom)) + 8px);
+    bottom: calc(86px + max(8px, env(safe-area-inset-bottom)) + 8px);
   }
 }

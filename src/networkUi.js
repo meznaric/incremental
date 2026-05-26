@@ -45,6 +45,11 @@ export function makeNetworkUi(state, opts) {
   let selectedEmptyHex = null; // {q, r} — tapped empty hex with no queued token
   let pendingPlacement = null; // {q, r} — staged hex awaiting confirmation (queue present)
   let scene = null;            // networkScene instance, created on first open
+  // Side panel expansion is purely user-driven (tap the handle). Closed by
+  // default on mobile so the canvas is unobstructed; selecting / clearing
+  // a cell never changes this. Desktop ignores the flag — CSS pins the
+  // panel open at media widths > 720px regardless.
+  let infoPanelOpen = false;
 
   const open = () => {
     ensureNetwork(state);
@@ -56,6 +61,7 @@ export function makeNetworkUi(state, opts) {
     pendingPlacement = null;
     selectedEmptyHex = null;
     selectedRelayId = null;
+    infoPanelOpen = false;
     // Reset the hex-bar animation tracker so reopening the modal triggers
     // a fresh entrance the next time a cell is selected.
     lastBarKey = 'none';
@@ -113,6 +119,20 @@ export function makeNetworkUi(state, opts) {
       clearSelection();
       pushSelectionToScene();
       renderOverlays();
+      return;
+    }
+    if (target.closest('[data-act="toggle-info"]')) {
+      infoPanelOpen = !infoPanelOpen;
+      applySheetState();
+      return;
+    }
+    if (target.closest('[data-act="open-info"]')) {
+      // Tap anywhere on the collapsed status row opens the panel. While
+      // expanded the status row is non-interactive (the handle closes).
+      if (!infoPanelOpen) {
+        infoPanelOpen = true;
+        applySheetState();
+      }
       return;
     }
   });
@@ -261,7 +281,10 @@ export function makeNetworkUi(state, opts) {
     }).join('');
 
     return `
-      <div class="net-status">
+      <button type="button" class="net-side-handle" data-act="toggle-info" aria-label="Toggle network info">
+        <span class="net-side-handle-grip"></span>
+      </button>
+      <div class="net-status" data-act="open-info">
         <div class="net-stat">
           <span class="net-stat-num">${status.online}</span>
           <span class="net-stat-lab">online</span>
@@ -397,16 +420,16 @@ export function makeNetworkUi(state, opts) {
       <div class="net-place-bar relay status-${status}" role="dialog" aria-label="Relay detail">
         <div class="net-place-head">
           <span class="net-place-tier rar-${relay.tier}">${TIER_LABEL[relay.tier] || relay.tier} relay <span class="net-place-status">· ${status}</span></span>
-          <span class="net-detail-sec sec-tag-${relay.sector}">${sector.label}</span>
+          <span class="net-place-head-right">
+            <span class="net-detail-sec sec-tag-${relay.sector}">${sector.label}</span>
+            <button type="button" class="net-place-close" data-act="clear-selection" aria-label="Close">×</button>
+          </span>
         </div>
         ${headStat}
         ${baseRow}
         ${neighbourLine}
         ${bleedLine}
         ${halfLifeLine}
-        <div class="net-place-actions">
-          <button class="net-place-btn cancel" type="button" data-act="clear-selection">Done</button>
-        </div>
       </div>
     `;
   }
@@ -421,15 +444,15 @@ export function makeNetworkUi(state, opts) {
       <div class="net-place-bar empty" role="dialog" aria-label="Empty hex detail">
         <div class="net-place-head">
           <span class="net-place-tier">Empty hex</span>
-          <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
+          <span class="net-place-head-right">
+            <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
+            <button type="button" class="net-place-close" data-act="clear-selection" aria-label="Close">×</button>
+          </span>
         </div>
         <div class="net-detail-row"><span>Yield</span><span>×${sector.yieldMul}</span></div>
         <div class="net-detail-row"><span>Discovery</span><span>×${sector.discoveryMul}</span></div>
         <div class="net-detail-row"><span>Ripen</span><span>×${sector.ripenMul}</span></div>
         ${hint}
-        <div class="net-place-actions">
-          <button class="net-place-btn cancel" type="button" data-act="clear-selection">Done</button>
-        </div>
       </div>
     `;
   }
@@ -456,17 +479,14 @@ export function makeNetworkUi(state, opts) {
     return tiers.map((t) => TIER_LABEL[t] || t).join(', ');
   }
 
-  // Whether the side sheet should be peeking (mobile only — CSS gates the
-  // visual effect to small viewports). Any cell selection collapses it so
-  // the canvas is unobstructed for panning; clearing the selection ("Done")
-  // expands it again to the full network details.
-  function hasSelection() {
-    return !!(selectedRelayId || selectedEmptyHex || pendingPlacement);
-  }
+  // Side sheet visibility is purely user-driven via the handle / status row.
+  // Selecting a cell never opens or closes the panel — the canvas stays
+  // uncluttered until the player explicitly pulls the panel up. CSS gates
+  // the visual collapse to the mobile breakpoint; desktop ignores the class.
   function applySheetState() {
     const sideEl = bodyEl.querySelector('.net-side');
     if (!sideEl) return;
-    sideEl.classList.toggle('collapsed-mobile', hasSelection());
+    sideEl.classList.toggle('collapsed-mobile', !infoPanelOpen);
   }
 
   // The bar's "identity" — when it changes, the bar animates in/out. While

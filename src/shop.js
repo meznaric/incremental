@@ -200,7 +200,12 @@ function applyAscent(rate, exp) {
 // permanents and multiplier stacks both compound past trillion into runaway.
 // Tunable: dropping ALPHA tightens the cap; raising AT delays its bite.
 export const DAMPEN_AT = 1e12;
-export const DAMPEN_ALPHA = 0.92;
+// Each decade of raw output past DAMPEN_AT yields α decades of effective
+// output, so a 1% bump on α directly buys back 1% of every late-game
+// decade. Was 0.92 (8% tax/decade); at 0.94 a player at nonillion is hit
+// roughly 2.3× less hard while the cliff still binds enough that the
+// Quiet-Law Bypass cards stay meaningful.
+export const DAMPEN_ALPHA = 0.94;
 // Hard ceiling on α so the Quiet-Law Bypass / Channel Leak chain can never
 // fully negate dampening — the cliff softens but never disappears.
 export const DAMPEN_ALPHA_MAX = 0.99;

@@ -37,9 +37,9 @@ test('effectiveDampenAlpha: bumps per copy and caps at the ceiling', () => {
   const s0 = freshState();
   assert.equal(effectiveDampenAlpha(s0), DAMPEN_ALPHA);
   s0.dampenBreaks = { mythic: 1, legendary: 0 };
-  assert.equal(effectiveDampenAlpha(s0).toFixed(4), '0.9500');
+  assert.equal(effectiveDampenAlpha(s0).toFixed(4), '0.9700');
   s0.dampenBreaks = { mythic: 1, legendary: 1 };
-  assert.equal(effectiveDampenAlpha(s0).toFixed(4), '0.9650');
+  assert.equal(effectiveDampenAlpha(s0).toFixed(4), '0.9850');
   // Push past the cap — should clamp at DAMPEN_ALPHA_MAX (0.99).
   s0.dampenBreaks = { mythic: 4, legendary: 4 };
   assert.equal(effectiveDampenAlpha(s0), DAMPEN_ALPHA_MAX);
@@ -66,7 +66,7 @@ test('Channel Leak: tryBuy lifts α by 0.015 and ×5 mul', () => {
   assert.equal(r.ok, true);
   assert.equal(s.dampenBreaks.legendary, 1);
   assert.equal(s.dampenBreakMul, 5);
-  assert.equal(effectiveDampenAlpha(s).toFixed(4), '0.9350');
+  assert.equal(effectiveDampenAlpha(s).toFixed(4), '0.9550');
 });
 
 test('unlockLadder: gates the Nth copy behind a higher rate', () => {
@@ -96,11 +96,13 @@ test('effectiveRate: dampenBreakMul rides the rate pipeline at α-cliff scale', 
 
 test('effectiveRate: α relief softens the cliff past DAMPEN_AT', () => {
   // Construct a state past the dampening threshold and confirm α lift yields
-  // a higher post-dampening rate.
+  // a higher post-dampening rate. With base α=0.94 and the α≤0.99 cap, three
+  // mythics deliver a Δα of 0.05 — at 1e38 raw decades past the cliff that
+  // works out to ~80× lift, still a clear softening signal.
   const s = freshState({ basePerSecond: 1e50 });
   s.permMul = 1;
   const baseRate = effectiveRate(s, 0);
   s.dampenBreaks = { mythic: 3, legendary: 0 };
   const liftedRate = effectiveRate(s, 0);
-  assert.ok(liftedRate > baseRate * 100, `expected >100× lift at deep dampening, got ${liftedRate / baseRate}×`);
+  assert.ok(liftedRate > baseRate * 50, `expected >50× lift at deep dampening, got ${liftedRate / baseRate}×`);
 });

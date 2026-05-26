@@ -15,8 +15,13 @@
 export const UPDATES = [
   {
     date: '2026-05-26',
+    title: 'Softer cliff',
+    body: 'Log dampening past the trillion-mark now taxes 6% per decade instead of 8%. Players deep in the late game (nonillion and beyond) feel the cliff about 2.3× less hard.',
+  },
+  {
+    date: '2026-05-26',
     title: 'Quiet-Law Bypass',
-    body: 'Two new rare cards appear past the log-dampening cliff: a mythic Quiet-Law Bypass and a legendary Channel Leak. They soften the late-game wall and stack their own multiplier — gated so each new copy needs a deeper raw rate.',
+    body: 'Two new rare cards appear once dampening starts to bite: a mythic Quiet-Law Bypass and a legendary Channel Leak. They soften the late-game wall further and stack their own multiplier — gated so each new copy needs a deeper raw rate.',
     highlight: true,
   },
   {

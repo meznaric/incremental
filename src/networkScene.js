@@ -895,11 +895,16 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       const dy = e.clientY - dragState.startY;
       if (!dragState.active && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       dragState.active = true;
-      // Drag-the-world feel: the content under the finger follows the finger
-      // (Google Maps / iOS pan). Both axes negate so the camera target moves
-      // opposite to the gesture, which makes the world appear to slide WITH
-      // the finger rather than against it.
-      const pan = screenDeltaToWorldPan(-dx, dy);
+      // Drag-the-world feel (Google Maps / piece of paper on a desk): the
+      // point under the finger follows the finger. Counter-intuitive sign:
+      // we ADD pan.dx / pan.dz (positive finger delta → positive target
+      // delta) because this scene's camera basis maps screen-right to world
+      // -X and screen-up to world +Z (lookAt with azimuth -π/2 builds the
+      // local axes that way). Moving the camera target in world +X makes
+      // the existing world content shift RIGHT on screen, and so on. The
+      // `-dy` flip on Y is because screen-Y grows downward but the world
+      // forward axis (+Z) corresponds to screen-up.
+      const pan = screenDeltaToWorldPan(dx, -dy);
       cam.target.x = dragState.baseTargetX + pan.dx;
       cam.target.z = dragState.baseTargetZ + pan.dz;
       // Manual drag overrides any in-flight focus animation.

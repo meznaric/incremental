@@ -72,13 +72,13 @@ test('Channel Leak: tryBuy lifts α by 0.015 and ×5 mul', () => {
 test('unlockLadder: gates the Nth copy behind a higher rate', () => {
   const u = getUpgrade('quiet_law_bypass');
   // No copies owned, rate below the floor — not eligible.
-  assert.equal(isEligible(u, { rate: 1e37, owned: {} }), false);
-  // At the unlock floor, eligible for the first copy.
-  assert.equal(isEligible(u, { rate: 1e38, owned: {} }), true);
+  assert.equal(isEligible(u, { rate: 1e24, owned: {} }), false);
+  // At the unlock floor (×0.1 dampening territory), eligible for the first copy.
+  assert.equal(isEligible(u, { rate: 1e25, owned: {} }), true);
   // First copy owned but rate hasn't climbed enough — not eligible yet.
-  assert.equal(isEligible(u, { rate: 1e38, owned: { [u.id]: 1 } }), false);
+  assert.equal(isEligible(u, { rate: 1e30, owned: { [u.id]: 1 } }), false);
   // Reach the 2nd-copy threshold — eligible again.
-  assert.equal(isEligible(u, { rate: 1e54, owned: { [u.id]: 1 } }), true);
+  assert.equal(isEligible(u, { rate: 1e41, owned: { [u.id]: 1 } }), true);
   // Past the last ladder rung — never appears again.
   assert.equal(isEligible(u, { rate: 1e120, owned: { [u.id]: 4 } }), false);
 });

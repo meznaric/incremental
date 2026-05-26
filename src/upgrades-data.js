@@ -355,18 +355,25 @@ export const UPGRADES = [
   // See effectiveDampenAlpha and DAMPEN_ALPHA_MAX in src/shop.js for the cap
   // (α ≤ 0.99) that keeps the cliff from ever fully disappearing. Cost is
   // rare-tier — the gating is the difficulty, not the price.
+  //
+  // First mythic rung lines up with the ×0.1 dampening factor (~1e25), so
+  // the card appears the moment the player first *feels* the cliff. Later
+  // rungs accelerate (gaps 16/20/24 decades) so the deep-late-game copies
+  // stay rare. Legendary mirrors the same accelerating gap pattern but is
+  // offset one tier later — the legendary is the consolation prize when
+  // the mythic doesn't roll, not the first to appear.
   { id: 'quiet_law_bypass', kind: 'dampenBreak', rarity: 'mythic',
     tier: 'mythic',
     name: 'Quiet-Law Bypass',
     desc: 'Forty-year-old board. The Listening Service never wrote the cap into its firmware.',
     value: 10, alphaAdd: 0.03,
-    unlockLadder: [1e38, 1e54, 1e74, 1e98],
+    unlockLadder: [1e25, 1e41, 1e61, 1e85],
     baseCost: 1e6, growth: 8 },
   { id: 'channel_leak', kind: 'dampenBreak', rarity: 'legendary',
     tier: 'legendary', weightRarity: 'rare',
     name: 'Channel Leak',
     desc: 'A bench job — half the part numbers are filed off. The cap still bites, but it bleeds.',
     value: 5, alphaAdd: 0.015,
-    unlockLadder: [1e46, 1e64, 1e86, 1e112],
+    unlockLadder: [1e33, 1e51, 1e73, 1e99],
     baseCost: 5e5, growth: 6 },
 ];

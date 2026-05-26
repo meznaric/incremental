@@ -38,6 +38,7 @@ import {
   loadAchievements, saveAchievements, evaluateAchievements, markStat,
 } from './achievements.js';
 import { initAchievementsUi } from './achievementsUi.js';
+import { initUpdatesUi } from './updatesUi.js';
 
 const state = {
   amount: 0,
@@ -133,6 +134,9 @@ function getContactAffordance() {
 }
 const breakdownUi = initBreakdownUi(state);
 const achievementsUi = initAchievementsUi(state);
+// Updates UI is fully self-contained — owns its own localStorage key and does
+// not read or mutate gameplay state. Just instantiate it.
+const updatesUi = initUpdatesUi();
 ensureNetwork(state);
 const networkUi = makeNetworkUi(state, {
   openDiagnostic: (tab) => breakdownUi && breakdownUi.open && breakdownUi.open(tab),

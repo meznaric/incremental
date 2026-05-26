@@ -36,6 +36,7 @@ const PRECACHE = [
   './styles/network.css',
   './styles/gameLog.css',
   './styles/achievements.css',
+  './styles/updates.css',
   './styles/contactProgress.css',
 
   './src/main.js',
@@ -43,6 +44,9 @@ const PRECACHE = [
   './src/achievements.js',
   './src/achievements-data.js',
   './src/achievementsUi.js',
+  './src/updates.js',
+  './src/updates-data.js',
+  './src/updatesUi.js',
   './src/bignum.js',
   './src/breakdown.js',
   './src/breakdownUi.js',

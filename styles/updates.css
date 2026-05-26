@@ -1,0 +1,159 @@
+/* Updates modal — player-facing changelog. Mirrors the achievements modal
+   shell (bm-card / bm-body) but lays out as a vertical stack of dated cards
+   instead of a category-grouped list. */
+
+#updatesModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 8, 18, 0.65);
+  z-index: 100;
+  padding: 24px;
+}
+#updatesModal.open { display: flex; }
+#updatesModal .bm-card {
+  width: min(640px, 100%);
+  max-height: min(80vh, 720px);
+  background: rgba(20, 22, 38, 0.96);
+  border: 1px solid rgba(120, 140, 255, 0.35);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+#updatesModal .bm-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(120, 140, 255, 0.18);
+}
+#updatesModal .bm-title { font-weight: 600; color: #e8e8f8; font-size: 16px; }
+#updatesModal .up-version {
+  font-size: 12px;
+  color: #8a8ac0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 1;
+}
+#updatesModal .bm-close {
+  background: none;
+  border: 0;
+  color: #b0b0d8;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+#updatesModal .bm-close:hover { color: #fff; }
+#updatesModal .up-body {
+  padding: 8px 18px 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.up-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+.up-empty {
+  color: #8a8ac0;
+  font-size: 13px;
+  text-align: center;
+  padding: 32px 0;
+}
+
+.up-entry {
+  background: rgba(28, 30, 50, 0.75);
+  border: 1px solid rgba(120, 140, 255, 0.18);
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: border-color 0.2s ease;
+}
+.up-entry.is-fresh {
+  border-color: rgba(111, 232, 161, 0.55);
+  box-shadow: 0 0 0 1px rgba(111, 232, 161, 0.15);
+}
+.up-entry.is-highlight {
+  background:
+    linear-gradient(135deg, rgba(157, 110, 224, 0.18), rgba(76, 208, 125, 0.10) 60%, transparent),
+    rgba(28, 30, 50, 0.85);
+  border-color: rgba(157, 110, 224, 0.5);
+}
+.up-entry.is-highlight.is-fresh {
+  border-color: rgba(111, 232, 161, 0.7);
+  box-shadow: 0 0 0 1px rgba(111, 232, 161, 0.25), 0 0 18px -4px rgba(157, 110, 224, 0.45);
+}
+
+.up-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.up-entry-date {
+  font-size: 11px;
+  color: #8a8ac0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+.up-entry-title {
+  font-weight: 600;
+  color: #e8e8f8;
+  font-size: 14px;
+}
+.up-entry.is-highlight .up-entry-title { color: #d8c5ff; }
+.up-entry-new {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  background: #6fe8a1;
+  color: #0a1a14;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.up-entry-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c0c0d8;
+}
+.up-entry.is-highlight .up-entry-body { color: #d4d4ee; }
+
+@media (max-width: 520px) {
+  #updatesModal { padding: 8px; }
+  #updatesModal .bm-card { max-height: 92vh; border-radius: 10px; }
+  .up-entry { padding: 10px 12px; }
+}
+
+/* Hamburger menu pulse for unread updates. Parallel of the .has-unseen
+   rule in achievements.css — kept separate so achievementsUi's toggle
+   doesn't clobber updates' state when the two modules disagree. The two
+   rules are visually identical so a player sees one dot either way. */
+#menuToggle.has-unseen-up {
+  color: #6fe8a1;
+  animation: up-menu-toggle-pulse 2.4s ease-in-out infinite;
+}
+#menuToggle.has-unseen-up::after {
+  content: '';
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #6fe8a1;
+  box-shadow: 0 0 6px rgba(111, 232, 161, 0.85);
+  animation: up-dot-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes up-menu-toggle-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(111, 232, 161, 0); }
+  50%      { text-shadow: 0 0 8px rgba(111, 232, 161, 0.7); }
+}
+@keyframes up-dot-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.25); }
+}

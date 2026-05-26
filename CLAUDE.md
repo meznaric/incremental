@@ -74,6 +74,7 @@ Visual/render regressions: Playwright via MCP — start server, navigate, check 
 - **Commit messages**: single-line imperative, sentence case, no trailing period, ≤~72 chars. Body (optional, blank line above) explains *why* — past commits like `ab49b4c`, `619e648`, `fe3543a` are the template. Don't summarise the diff; describe the failure mode the change fixes or the behaviour it adds.
 - **`queue.txt`** (untracked, root): personal feature queue consumed by the `/queue-tasks` skill. Don't `git add` it. `Merge Task N: …` commits in the log are queue-tasks output.
 - **iOS / mobile is a first-class target.** Every tappable element gets tested on a touch viewport. The commit log is littered with iOS tap fixes — assume any new interactive UI will need the same scrutiny.
+- **Player-facing changelog** ([`src/updates-data.js`](./src/updates-data.js)): before pushing anything a returning player will notice — new content, balance shifts, UI changes — prepend an entry. Topmost entry's `date` becomes the displayed version. One or two sentences, written *for a player coming back to the game*, not as a commit summary. Major updates set `highlight: true`. Skip refactors, internal plumbing, single-typo fixes. The "Updates" menu item lights up when the top date moves past a player's watermark, so a missing entry means the dot never fires for real changes.
 
 ## Save compatibility
 

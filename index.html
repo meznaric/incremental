@@ -44,6 +44,7 @@
   <link rel="stylesheet" href="./styles/network.css" />
   <link rel="stylesheet" href="./styles/gameLog.css" />
   <link rel="stylesheet" href="./styles/achievements.css" />
+  <link rel="stylesheet" href="./styles/updates.css" />
   <link rel="stylesheet" href="./styles/contactProgress.css" />
   <script type="importmap">
     {
@@ -93,6 +94,7 @@
       <div class="menu-view active" data-view="list">
         <button class="menu-item" type="button" data-action="open-game-log"><i class="ri ri-history-line"></i>Past Cycles</button>
         <button class="menu-item" type="button" data-action="open-achievements"><i class="ri ri-medal-line"></i>Achievements</button>
+        <button class="menu-item" type="button" data-action="open-updates"><i class="ri ri-megaphone-line"></i><span class="menu-item-label">Updates</span></button>
         <button class="menu-item" type="button" data-action="open-debug"><i class="ri ri-bug-line"></i>Debug</button>
         <button class="menu-item" type="button" data-action="open-community"><i class="ri ri-discord-line"></i>Community</button>
         <button class="menu-item danger" type="button" data-action="open-reset"><i class="ri ri-refresh-line"></i>Reset save</button>
@@ -332,6 +334,19 @@
       <div class="bm-body ach-body">
         <div class="ach-summary"></div>
         <div class="ach-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="updatesModal" role="dialog" aria-modal="true" aria-label="Updates">
+    <div class="bm-card">
+      <div class="bm-head">
+        <span class="bm-title">Updates</span>
+        <span class="up-version"></span>
+        <button type="button" class="bm-close" aria-label="Close"><i class="ri ri-close-line"></i></button>
+      </div>
+      <div class="bm-body up-body">
+        <div class="up-list"></div>
       </div>
     </div>
   </div>

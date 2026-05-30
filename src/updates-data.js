@@ -14,6 +14,12 @@
 
 export const UPDATES = [
   {
+    date: '2026-05-31',
+    title: 'Contacts arrive in two acts',
+    body: 'Every world you reach now opens on a cinematic reveal — the planet, its name, its fate — before anyone speaks. The dialogue that follows no longer just repeats the caption: Sera and Kalen now add what the world cost, who is accountable, and what is moving underneath it all. Beats across all ten episodes were rewritten, and the leap from the interrogation cell to the relay reads as a real journey now.',
+    highlight: true,
+  },
+  {
     date: '2026-05-30',
     title: 'Bypass cards now unmissable',
     body: 'The Quiet-Law Bypass and Channel Leak cards wear their rarity now — a deep-violet body, holographic sheen, sweeping shine, and a pulsing glow that lifts them off the slate. You will not scroll past one without noticing.',

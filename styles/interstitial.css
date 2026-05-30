@@ -212,8 +212,95 @@
   line-height: 1.5;
   font-style: italic;
 }
+
+/* ===== Contact reveal phase (Phase A) — cinematic world card =====
+   A contact interstitial opens on a static, staggered cascade of the world
+   frame (portrait → name → status → flavor → hint) before any dialogue plays.
+   The cascade mirrors the first-boot intro's year-card DNA (styles/intro.css):
+   each element starts faded/offset and is flipped in by the it-reveal-on class
+   with an increasing transition-delay. No typewriter runs in this phase. */
+.it-card.it-phase-reveal .it-portrait {
+  width: min(480px, 82vw);
+  box-shadow: 0 0 44px -4px rgba(212, 154, 85, 0.55);
+  animation: it-portrait-glow 3.2s ease-in-out infinite;
+}
+/* The chat machinery is dormant in reveal — hide the body, foot, speaker. */
+.it-card.it-phase-reveal .it-body,
+.it-card.it-phase-reveal .it-foot,
+.it-card.it-phase-reveal .it-speaker { display: none; }
+/* Larger flavor in reveal — it's the establishing line, not a footnote. */
+.it-card.it-phase-reveal .it-contact-flavor {
+  font-size: 14px;
+  color: #c2c8e4;
+  max-width: 520px;
+  margin-top: 14px;
+}
+.it-reveal-hint {
+  display: none;
+  margin-top: 22px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: rgba(255, 220, 180, 0.7);
+}
+.it-card.it-phase-reveal .it-reveal-hint { display: block; }
+/* Initial (pre-on) state for every cascaded element. */
+.it-card.it-phase-reveal .it-portrait,
+.it-card.it-phase-reveal .it-contact-tag,
+.it-card.it-phase-reveal .it-contact-name,
+.it-card.it-phase-reveal .it-contact-status,
+.it-card.it-phase-reveal .it-contact-flavor,
+.it-card.it-phase-reveal .it-reveal-hint { opacity: 0; }
+.it-card.it-phase-reveal .it-portrait      { transform: translateY(8px) scale(0.985); transition: opacity 1400ms ease 120ms, transform 2000ms ease 120ms; }
+.it-card.it-phase-reveal .it-contact-tag    { transform: translateY(4px); transition: opacity 800ms ease 500ms, transform 1200ms ease 500ms; }
+.it-card.it-phase-reveal .it-contact-name   { transform: translateY(6px); transition: opacity 1200ms ease 800ms, transform 1600ms ease 800ms; }
+.it-card.it-phase-reveal .it-contact-status { transform: translateY(4px); transition: opacity 900ms ease 1300ms, transform 1400ms ease 1300ms; }
+.it-card.it-phase-reveal .it-contact-flavor { transform: translateY(4px); transition: opacity 1100ms ease 1700ms, transform 1500ms ease 1700ms; }
+.it-card.it-phase-reveal .it-reveal-hint    { transition: opacity 800ms ease 2500ms; }
+/* Flipped-in (on) state. */
+.it-card.it-phase-reveal.it-reveal-on .it-portrait,
+.it-card.it-phase-reveal.it-reveal-on .it-contact-tag,
+.it-card.it-phase-reveal.it-reveal-on .it-contact-name,
+.it-card.it-phase-reveal.it-reveal-on .it-contact-status,
+.it-card.it-phase-reveal.it-reveal-on .it-contact-flavor { opacity: 1; transform: none; }
+.it-card.it-phase-reveal.it-reveal-on .it-reveal-hint {
+  opacity: 1;
+  animation: it-hint-pulse 2.6s ease-in-out infinite 3000ms;
+}
+@keyframes it-hint-pulse {
+  0%, 100% { opacity: 0.6;  letter-spacing: 0.3em; }
+  50%      { opacity: 0.95; letter-spacing: 0.32em; }
+}
+
+/* ===== Chat phase (Phase B) — compact world header =====
+   Once the player taps past the reveal, the contact frame collapses to a small
+   header above the dialogue. The portrait shrinks, the flavor is hidden (it
+   already played in reveal), and the existing .it-contact border-bottom serves
+   as the divider between header and dialogue. */
+.it-card.it-phase-chat .it-portrait {
+  width: min(220px, 50vw);
+  transition: width 0.3s ease;
+}
+.it-card.it-phase-chat .it-contact-flavor { display: none; }
+.it-card.it-phase-chat .it-contact { gap: 8px; padding-bottom: 12px; }
+
 @media (prefers-reduced-motion: reduce) {
   .it-card.it-first-contact .it-portrait { animation: none; }
+  .it-card.it-phase-reveal .it-portrait { animation: none; }
+  /* Collapse the cascade to an instant static frame — the reveal screen still
+     exists and is still tap-to-advance; only the staggered motion is dropped. */
+  .it-card.it-phase-reveal .it-portrait,
+  .it-card.it-phase-reveal .it-contact-tag,
+  .it-card.it-phase-reveal .it-contact-name,
+  .it-card.it-phase-reveal .it-contact-status,
+  .it-card.it-phase-reveal .it-contact-flavor,
+  .it-card.it-phase-reveal .it-reveal-hint {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .it-card.it-phase-reveal.it-reveal-on .it-reveal-hint { animation: none; }
+  .it-card.it-phase-chat .it-portrait { transition: none; }
 }
 /* Speaker badge — portrait + name above each text step. Only shown for
    Kalen / Sera voices; Narrator and Anonymous hide it (italic carries A).
@@ -460,6 +547,8 @@
   .it-card.it-season-finale .it-text { font-size: 18px; line-height: 1.5; }
   .it-portrait { width: min(360px, 76vw); }
   .it-card.it-first-contact .it-portrait { width: min(420px, 84vw); }
+  .it-card.it-phase-reveal .it-portrait { width: min(400px, 80vw); }
+  .it-card.it-phase-chat .it-portrait { width: min(200px, 46vw); }
   .it-btn { font-size: 12px; letter-spacing: 0.12em; padding: 10px 12px; }
 }
 

@@ -59,7 +59,7 @@ export function makeInterstitialUi(state, onShown) {
     }
   }
 
-  let active = null;       // { id, def, stepIdx, isContact }
+  let active = null;       // { id, def, stepIdx, isContact, phase, revealUntil }
   let typing = null;       // { i, full, raf, doneAt }
   let waitingInput = false;
   let autoTimer = 0;
@@ -70,6 +70,12 @@ export function makeInterstitialUi(state, onShown) {
   // before it starts catching input.
   const INPUT_GUARD_MS = 400;
   let guardTimer = 0;
+  // Intra-reveal re-entrancy guard (mirrors introUi's guardUntil). A held or
+  // double tap must not blow through the world-reveal stage AND skip the first
+  // chat step's typewriter in one gesture. Set in showReveal(), checked in
+  // enterChat(). Kept ≥ INPUT_GUARD_MS so there's no frame where the open guard
+  // has lifted but reveal is instantly skippable.
+  const REVEAL_GUARD_MS = 550;
 
   // first_contact uses the *next* contact-bearing id parked on stats so the
   // portrait matches the milestone we're framing.
@@ -160,6 +166,19 @@ export function makeInterstitialUi(state, onShown) {
     return !!(state.contactLog && worldFor(state.contactLog, id));
   }
 
+  // Whether an id gets the cinematic world-reveal phase before its chat.
+  // Contact-bearing, EXCEPT: first_contact (already a reveal-plus-monologue
+  // with its own enlarged glowing portrait) and the single milestone whose
+  // world first_contact already revealed — stamped on close so the same planet
+  // never card-reveals twice in a row. The stamp is robust to queue ordering.
+  function hasReveal(id) {
+    if (id === FIRST_CONTACT_ID) return false;
+    if (!isContactBearing(id)) return false;
+    const consumed = state.messages && state.messages.stats && state.messages.stats.firstRevealConsumedFor;
+    if (consumed && consumed === id) return false;
+    return true;
+  }
+
   // Drop a queue entry that we can't open — keeps drain() from getting stuck
   // re-trying the same dead id every frame.
   function dropFromQueue(id) {
@@ -179,7 +198,8 @@ export function makeInterstitialUi(state, onShown) {
       drain();
       return;
     }
-    active = { id, def, stepIdx: 0, isContact: isContactBearing(id) };
+    const reveal = hasReveal(id);
+    active = { id, def, stepIdx: 0, isContact: isContactBearing(id), phase: reveal ? 'reveal' : 'chat' };
     applyContactFrame(id);
     applyCustomFrame(def);
     if (card) card.classList.toggle('it-single', def.steps.length <= 1);
@@ -188,19 +208,59 @@ export function makeInterstitialUi(state, onShown) {
     if (guardTimer) clearTimeout(guardTimer);
     guardTimer = setTimeout(() => { root.classList.remove('it-guard'); guardTimer = 0; }, INPUT_GUARD_MS);
     requestAnimationFrame(() => root.classList.add('it-visible'));
+    if (reveal) showReveal();
+    else showStep();
+  }
+
+  // Phase A — the cinematic world reveal. No typewriter, no dwell: a static
+  // staggered CSS cascade (driven by it-reveal-on) that waits for input. The
+  // chat machinery (showStep/typing/autoTimer) is intentionally NOT touched
+  // here, so tick()/finishStepDwell()/autoAdvance() stay no-ops until enterChat.
+  function showReveal() {
+    if (!active) return;
+    typing = null;
+    waitingInput = false;
+    autoTimer = 0;
+    active.revealUntil = performance.now() + REVEAL_GUARD_MS;
+    if (card) card.classList.add('it-phase-reveal');
+    textEl.textContent = '';
+    // Double-rAF so the transitions fire from their initial (pre-on) state
+    // rather than being collapsed into the same frame. Mirrors introUi.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (active && active.phase === 'reveal' && card) card.classList.add('it-reveal-on');
+    }));
+  }
+
+  // The single, time-guarded funnel out of Phase A into the chat steps. Every
+  // input path (tap / space / enter / arrow-right) routes here while in reveal.
+  function enterChat() {
+    if (!active || active.phase !== 'reveal') return;
+    if (performance.now() < (active.revealUntil || 0)) return;
+    active.phase = 'chat';
+    if (card) {
+      card.classList.remove('it-phase-reveal', 'it-reveal-on');
+      card.classList.add('it-phase-chat');
+    }
+    active.stepIdx = 0;
     showStep();
   }
 
   function close() {
     if (!active) return;
     const id = active.id;
+    // When the one-shot First Contact beat closes, mark the milestone whose
+    // world it already revealed so that milestone skips its own reveal phase
+    // (no back-to-back card-reveal of the same planet). See hasReveal().
+    if (id === FIRST_CONTACT_ID && state.messages && state.messages.stats) {
+      state.messages.stats.firstRevealConsumedFor = state.messages.stats.firstContactWorld || null;
+    }
     active = null;
     typing = null;
     waitingInput = false;
     autoTimer = 0;
     if (guardTimer) { clearTimeout(guardTimer); guardTimer = 0; }
     clearCustomFrame();
-    if (card) card.classList.remove('it-single', 'it-has-speaker', 'it-awaiting-input', ...VOICE_CLASSES);
+    if (card) card.classList.remove('it-single', 'it-has-speaker', 'it-awaiting-input', 'it-phase-reveal', 'it-phase-chat', 'it-reveal-on', ...VOICE_CLASSES);
     if (inputRow) inputRow.hidden = true;
     if (inputEl) inputEl.value = '';
     root.classList.remove('it-visible', 'it-guard');
@@ -389,6 +449,12 @@ export function makeInterstitialUi(state, onShown) {
       if (e.key === 'Escape') { e.preventDefault(); close(); }
       return;
     }
+    // In the reveal phase the only navigation is forward (or Escape to bail).
+    if (active.phase === 'reveal') {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); enterChat(); }
+      return;
+    }
     if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); return; }
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
@@ -399,6 +465,10 @@ export function makeInterstitialUi(state, onShown) {
 
   function handleInput() {
     if (!active) return;
+    // Phase A (reveal) consumes the first input to advance into the chat. It
+    // returns before the typewriter-skip / last-step logic so one tap is one
+    // advance — no skipping straight into the first chat step's typewriter.
+    if (active.phase === 'reveal') { enterChat(); return; }
     if (typing) {
       // Skip typewriter on first input.
       typing.i = typing.full.length;
@@ -468,6 +538,10 @@ export function makeInterstitialUi(state, onShown) {
   }
   installTap(root, (_e, downTarget) => {
     if (root.classList.contains('it-guard')) return;
+    // Reveal phase: any tap on the overlay advances into the chat. The foot
+    // (prev/next/close) is CSS-hidden in reveal, so there are no action targets
+    // to honour — a blanket advance is correct.
+    if (active && active.phase === 'reveal') { enterChat(); return; }
     const action = actionForTarget(downTarget);
     if (action === 'prev') { goPrev(); return; }
     if (action === 'next') { goNext(); return; }

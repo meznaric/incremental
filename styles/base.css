@@ -1663,7 +1663,9 @@ input[type="text"]:focus { border-color: #6688ff; }
   flex-wrap: nowrap;
   justify-content: flex-start;
   gap: 10px;
-  padding: 10px;
+  /* Extra top/bottom padding gives the dampenBreak halo room to bloom before
+     overflow-y:hidden clips it. */
+  padding: 16px 10px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;

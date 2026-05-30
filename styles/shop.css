@@ -1061,69 +1061,134 @@
 .bm-section.kind-cushion  .ri, .bm-section.kind-cushion  .bm-section-name { color: #ff8a8a; }
 .bm-section.kind-compound .ri, .bm-section.kind-compound .bm-section-name { color: #7c5ad4; }
 
-/* Quiet-Law Bypass / Channel Leak — Pokemon-rare foil treatment. Two layered
-   ::before and ::after fills sweep an animated conic + radial gradient over
-   the card face. position:relative on .slot ensures absolute children pin to
-   the card box; overflow:hidden so the foil never paints outside the chip. */
+/* Quiet-Law Bypass / Channel Leak — the soft-cap breakers. These are the
+   rarest, most over-powered cards on the slate, and the chrome has to scream
+   it the instant one rolls in. The old subtle foil read as nothing against the
+   blue-grey neighbours, so the treatment is now loud and layered:
+     1. A deep-violet card body, so the card is a different *colour* at a glance.
+     2. A pulsing, hue-shifting outer halo (box-shadow) that bleeds past the
+        card box — box-shadow ignores overflow:hidden, so this is what makes the
+        card pop out of a row of flat chips. #slots got extra vertical padding
+        so the bloom isn't clipped.
+     3. ::before — a bright holographic conic sheen spinning behind the content.
+     4. ::after — a specular light bar that sweeps across the face on a loop.
+   position:relative pins the pseudo layers to the card; overflow:hidden keeps
+   the foil + sweep inside the rounded box while the halo escapes via shadow. */
 .slot[data-kind="dampenBreak"] {
   position: relative;
   overflow: hidden;
-  border-color: var(--kind-color);
-  box-shadow: 0 0 0 1px rgba(255, 90, 213, 0.25), 0 0 18px 2px rgba(255, 90, 213, 0.25);
+  border: 1px solid rgba(255, 120, 224, 0.9);
+  background:
+    radial-gradient(130% 100% at 50% -20%, rgba(255, 90, 213, 0.22), transparent 60%),
+    linear-gradient(158deg, rgba(48, 14, 56, 0.94), rgba(20, 9, 34, 0.94));
+  animation: bypass-aura 2.6s ease-in-out infinite;
 }
+/* Keep the magenta body on hover instead of flashing back to the blue-grey
+   default; higher specificity than the generic .slot:hover rule. */
+@media (hover: hover) and (pointer: fine) {
+  .slot[data-kind="dampenBreak"]:hover {
+    border-color: #ffaee8;
+    background:
+      radial-gradient(130% 100% at 50% -20%, rgba(255, 90, 213, 0.30), transparent 60%),
+      linear-gradient(158deg, rgba(58, 18, 66, 0.96), rgba(26, 11, 40, 0.96));
+  }
+}
+/* Restore the buy / win pulse for these cards — the idle aura animation above
+   would otherwise win the cascade and the tap would have no feedback. */
+.slot[data-kind="dampenBreak"].fx-buy    { animation: slot-buy 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.slot[data-kind="dampenBreak"].fx-reject { animation: slot-reject 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
 .slot[data-kind="dampenBreak"]::before {
   content: '';
-  position: absolute; inset: -30%;
+  position: absolute; inset: -35%;
   background:
     conic-gradient(
       from 0deg,
-      rgba(255, 90, 213, 0.35),
-      rgba(120, 200, 255, 0.30),
-      rgba(255, 230, 120, 0.30),
-      rgba(120, 255, 180, 0.30),
-      rgba(255, 90, 213, 0.35)
+      rgba(255, 90, 213, 0.55),
+      rgba(120, 200, 255, 0.50),
+      rgba(255, 230, 120, 0.50),
+      rgba(120, 255, 180, 0.50),
+      rgba(255, 90, 213, 0.55)
     );
-  filter: blur(14px);
-  opacity: 0.55;
+  filter: blur(10px);
+  opacity: 0.7;
   mix-blend-mode: screen;
-  animation: foil-spin 9s linear infinite;
+  animation: foil-spin 8s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
 .slot[data-kind="dampenBreak"]::after {
   content: '';
   position: absolute; inset: 0;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.45) 0 1px, transparent 2px),
-    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px),
-    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.40) 0 1px, transparent 2px),
-    radial-gradient(circle at 85% 25%, rgba(255, 255, 255, 0.30) 0 1px, transparent 2px),
-    radial-gradient(circle at 55% 15%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px);
-  background-size: 220% 220%;
-  animation: shimmer-drift 6s ease-in-out infinite;
-  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.45) 47%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 255, 255, 0.45) 53%,
+    transparent 68%
+  );
+  background-size: 250% 100%;
   mix-blend-mode: screen;
+  animation: bypass-sweep 3.8s ease-in-out infinite;
+  pointer-events: none;
   z-index: 0;
 }
-/* Lift card content above both effect layers so labels stay readable. */
+/* Lift card content above both effect layers so labels stay readable, and make
+   the icon + name glow so the card's identity reads even through the foil. */
 .slot[data-kind="dampenBreak"] > * { position: relative; z-index: 1; }
-/* Legendary variant — quieter foil, no shimmer particles. The mythic stays
-   the loud one; this one whispers. */
-.slot[data-kind="dampenBreak"].dampen-leg::before { opacity: 0.32; animation-duration: 14s; }
-.slot[data-kind="dampenBreak"].dampen-leg::after  { display: none; }
-.slot[data-kind="dampenBreak"].dampen-leg        { box-shadow: 0 0 0 1px rgba(255, 173, 204, 0.20), 0 0 14px 1px rgba(255, 173, 204, 0.18); }
+.slot[data-kind="dampenBreak"] .kind-icon { color: #ff5ad5; text-shadow: 0 0 9px rgba(255, 90, 213, 0.9); }
+.slot[data-kind="dampenBreak"] .name      { color: #ffdaf5; text-shadow: 0 0 7px rgba(255, 90, 213, 0.45); }
 
+/* Legendary variant (Channel Leak) — still clearly a Bypass card, but the
+   documented consolation prize: a gentler halo, dimmer/slower foil, and a slow
+   faint sweep. The mythic stays the loud one. */
+.slot[data-kind="dampenBreak"].dampen-leg          { animation: bypass-aura-leg 3.4s ease-in-out infinite; }
+.slot[data-kind="dampenBreak"].dampen-leg::before  { opacity: 0.4; animation-duration: 13s; }
+.slot[data-kind="dampenBreak"].dampen-leg::after   { opacity: 0.45; animation-duration: 6.5s; }
+
+@keyframes bypass-aura {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 120, 224, 0.9),
+      0 0 18px 3px rgba(255, 90, 213, 0.6),
+      0 0 38px 8px rgba(255, 90, 213, 0.32);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(150, 205, 255, 0.95),
+      0 0 26px 5px rgba(185, 125, 255, 0.75),
+      0 0 52px 14px rgba(255, 90, 213, 0.48);
+  }
+}
+@keyframes bypass-aura-leg {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 173, 204, 0.55), 0 0 14px 2px rgba(255, 130, 200, 0.35); }
+  50%      { box-shadow: 0 0 0 1px rgba(255, 200, 220, 0.65), 0 0 22px 4px rgba(255, 130, 200, 0.5); }
+}
 @keyframes foil-spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-@keyframes shimmer-drift {
-  0%   { background-position: 0% 0%,   20% 60%, 80% 30%, 40% 90%, 60% 10%; }
-  50%  { background-position: 60% 40%, 80% 10%, 30% 70%, 90% 30%, 10% 80%; }
-  100% { background-position: 0% 0%,   20% 60%, 80% 30%, 40% 90%, 60% 10%; }
+/* Streak sweeps in, then rests off-frame before the next pass. */
+@keyframes bypass-sweep {
+  0%        { background-position: 160% 0; }
+  55%, 100% { background-position: -60% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* No motion — but keep the static halo, violet body, and foil so the card is
+     still unmistakable. */
+  .slot[data-kind="dampenBreak"] {
+    animation: none;
+    box-shadow:
+      0 0 0 1px rgba(255, 120, 224, 0.9),
+      0 0 22px 4px rgba(255, 90, 213, 0.5),
+      0 0 44px 10px rgba(255, 90, 213, 0.3);
+  }
+  .slot[data-kind="dampenBreak"].dampen-leg {
+    animation: none;
+    box-shadow: 0 0 0 1px rgba(255, 173, 204, 0.55), 0 0 16px 3px rgba(255, 130, 200, 0.4);
+  }
   .slot[data-kind="dampenBreak"]::before { animation: none; }
-  .slot[data-kind="dampenBreak"]::after  { animation: none; }
+  .slot[data-kind="dampenBreak"]::after  { animation: none; opacity: 0.5; }
 }
 

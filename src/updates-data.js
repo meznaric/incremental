@@ -14,6 +14,11 @@
 
 export const UPDATES = [
   {
+    date: '2026-05-30',
+    title: 'Bypass cards now unmissable',
+    body: 'The Quiet-Law Bypass and Channel Leak cards wear their rarity now — a deep-violet body, holographic sheen, sweeping shine, and a pulsing glow that lifts them off the slate. You will not scroll past one without noticing.',
+  },
+  {
     date: '2026-05-26',
     title: 'Softer cliff',
     body: 'Log dampening past the trillion-mark now taxes 6% per decade instead of 8%. Players deep in the late game (nonillion and beyond) feel the cliff about 2.3× less hard.',

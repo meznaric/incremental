@@ -122,6 +122,7 @@ export function initNamesModalUi(state, opts = {}) {
     for (const p of panels) {
       p.classList.toggle('is-active', p.dataset.tab === name);
     }
+    if (name === 'log') scrollLogToBottom();
   }
 
   function renderGate() {
@@ -244,6 +245,17 @@ export function initNamesModalUi(state, opts = {}) {
         </section>`;
     }).join('');
     logEl.innerHTML = `<p class="cl-log-intro">${LOG_INTRO}</p>${entries}`;
+    // The transcript is oldest-first; open it scrolled to the newest contact.
+    if (activeTab === 'log') scrollLogToBottom();
+  }
+
+  // The Log panel shares .cl-names-body as its scroll container. Jump it to the
+  // bottom so the most recent contact is what greets the player. rAF lets
+  // layout settle first so scrollHeight is final.
+  function scrollLogToBottom() {
+    const body = modal.querySelector('.cl-names-body');
+    if (!body) return;
+    requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; });
   }
 
   function findWorldDef(worldId) {

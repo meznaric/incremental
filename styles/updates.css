@@ -10,7 +10,11 @@
   justify-content: center;
   background: rgba(8, 8, 18, 0.65);
   z-index: 100;
-  padding: 24px;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
 }
 #updatesModal.open { display: flex; }
 #updatesModal .bm-card {
@@ -125,7 +129,13 @@
 .up-entry.is-highlight .up-entry-body { color: #d4d4ee; }
 
 @media (max-width: 520px) {
-  #updatesModal { padding: 8px; }
+  #updatesModal {
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
   #updatesModal .bm-card { max-height: 92vh; border-radius: 10px; }
   .up-entry { padding: 10px 12px; }
 }

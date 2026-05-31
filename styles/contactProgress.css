@@ -346,13 +346,3 @@
   0%, 100% { transform: scaleY(0.55); opacity: 0.75; }
   50%      { transform: scaleY(1);    opacity: 1; }
 }
-.cp-finale-caption {
-  font-size: 11.5px;
-  font-style: italic;
-  color: #d8c4a0;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
-  opacity: 0.92;
-  text-align: center;
-  text-shadow: none;
-}

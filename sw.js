@@ -51,6 +51,7 @@ const PRECACHE = [
   './src/breakdown.js',
   './src/breakdownUi.js',
   './src/contactLog.js',
+  './src/contactLogTab.js',
   './src/contactProgressUi.js',
   './src/cycleModalUi.js',
   './src/namesModalUi.js',

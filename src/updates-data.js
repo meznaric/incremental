@@ -15,6 +15,12 @@
 export const UPDATES = [
   {
     date: '2026-05-31',
+    title: 'A kinder Hail, cleaner runs, and a full transcript',
+    body: 'The Buffer now cushions a failed Hail far better, and each Hail card shows the return you actually get if it lands — the redundant price is gone. Lose one and you will see exactly how many Echoes the Buffer pulled back; lose too many in a row and a voice finally says something. New Cycle Patterns like True North reshape each run, the Mythic band unlocks as it should, and four new clean-run achievements reward reaching high signal without a single Hail or Window. Console and Carrier Mass per cycle are doubled. Open Names for a new Log tab holding every word ever exchanged, plus a live signal readout that blooms into a waveform when you are at your strongest.',
+    highlight: true,
+  },
+  {
+    date: '2026-05-31',
     title: 'Contacts arrive in two acts',
     body: 'Every world you reach now opens on a cinematic reveal — the planet, its name, its fate — before anyone speaks. The dialogue that follows no longer just repeats the caption: Sera and Kalen now add what the world cost, who is accountable, and what is moving underneath it all. Beats across all ten episodes were rewritten, and the leap from the interrogation cell to the relay reads as a real journey now.',
     highlight: true,

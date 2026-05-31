@@ -62,6 +62,24 @@ function buildBanner(won, deltaText) {
   return banner;
 }
 
+// voice: Sera — the Buffer catching part of a lost wager. Procedural, one line.
+// Picked per reveal so a long losing streak doesn't read as a stuck string.
+const BUFFER_LABELS = [
+  'The Buffer caught it',
+  'Partial return logged',
+  'Some of it came home',
+  'Error-correction held',
+];
+function buildBufferBanner(refundText) {
+  const banner = document.createElement('div');
+  banner.className = 'gx-banner gx-buffer';
+  banner.innerHTML = `
+    <div class="gx-label">${pick(BUFFER_LABELS)}</div>
+    <div class="gx-delta"><span class="gx-sign">+</span>${refundText}</div>
+  `;
+  return banner;
+}
+
 function spawnWinMotes(overlay) {
   const n = 18;
   const frag = document.createDocumentFragment();
@@ -98,10 +116,22 @@ function spawnLossDrift(overlay) {
 // is the moment to swap the bought card for the new roll. `onStart` fires
 // immediately so callers can kick off the in-world particle attractor in
 // sync with the banner build-up.
-export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
+export function fireGambleResult({ tappedEl, won, deltaText, refundText, onMid, onStart }) {
   const overlay = ensureOverlay();
   _active = true;
   if (typeof onStart === 'function') onStart();
+
+  // The Buffer return banner follows the loss banner after a short beat — the
+  // loss reads as the headline, the catch as a second, quieter line.
+  const showBuffer = () => {
+    if (!refundText) return;
+    const b = buildBufferBanner(refundText);
+    overlay.appendChild(b);
+    void b.offsetWidth;
+    b.classList.add('gx-in');
+    setTimeout(() => b.classList.add('gx-out'), 900);
+    setTimeout(() => { if (b.parentNode) b.remove(); }, 1900);
+  };
 
   // Reduced motion: skip the burst. Show the banner only.
   if (prefersReducedMotion()) {
@@ -109,6 +139,7 @@ export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
     banner.classList.add('gx-reduced');
     overlay.appendChild(banner);
     setTimeout(() => { if (typeof onMid === 'function') onMid(); }, 120);
+    if (refundText) setTimeout(showBuffer, 600);
     setTimeout(() => {
       if (banner.parentNode) banner.remove();
       _active = false;
@@ -138,6 +169,7 @@ export function fireGambleResult({ tappedEl, won, deltaText, onMid, onStart }) {
     else spawnLossDrift(overlay);
 
     setTimeout(() => { if (typeof onMid === 'function') onMid(); }, 260);
+    if (refundText) setTimeout(showBuffer, outDelay - 200);
 
     setTimeout(() => {
       banner.classList.add('gx-out');

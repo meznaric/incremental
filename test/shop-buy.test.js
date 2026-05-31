@@ -5,6 +5,7 @@ import {
   tryUnlockPinTier, tryTogglePin, isSlotPinned, nextPinTierCost,
   SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST, PIN_TIER_COSTS, MAX_PIN_SLOTS,
   REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS, DEFAULT_SLOTS,
+  gambleEffectiveCushion, CUSHION_CAP,
 } from '../src/shop.js';
 import { getUpgrade, genBaseAdd, genGift, GIFT_SECONDS, convertYieldFor } from '../src/upgrades.js';
 
@@ -162,34 +163,38 @@ test('gamble: win adds payout minus wager, sets cooldown', () => {
   }
 });
 
-test('gamble: loss subtracts wager, returns cushion refund if buff active', () => {
+test('gamble: loss exposes loss + refund; refund = wager × effective cushion', () => {
   const origRandom = Math.random;
   Math.random = () => 0.999; // always loses
   try {
+    const u = getUpgrade('coin_flip');
+    const c = gambleEffectiveCushion(freshState(), u, 0); // base cushion, no Buffer
     const s = freshState({ amount: 1000 });
     installSlot(s, 3, 'coin_flip', 100);
-    s.buffs.gambleCushion.push({ value: 0.05, duration: 60, expiresAt: 60 });
-    tryBuy(s, 3, 0);
-    // lose 100, refund 5% → balance = 1000 - 100 + 5 = 905
-    assert.equal(s.amount, 905);
+    const before = s.amount;
+    const r = tryBuy(s, 3, 0);
+    assert.equal(r.result.won, false);
+    assert.equal(r.result.loss, 100);
+    assert.ok(Math.abs(r.result.refund - 100 * c) < 1e-9);
+    // net delta = -(wager - refund); balance moved by exactly that
+    assert.ok(Math.abs(r.result.delta - -(100 - r.result.refund)) < 1e-9);
+    assert.ok(Math.abs((s.amount - before) - r.result.delta) < 1e-9);
   } finally {
     Math.random = origRandom;
   }
 });
 
-test('gamble: cushion stacks with diminishing returns, capped at 15%', () => {
-  const origRandom = Math.random;
-  Math.random = () => 0.999;
-  try {
-    const s = freshState({ amount: 1000 });
-    installSlot(s, 3, 'coin_flip', 100);
-    // five 50% buffs would be 100% additively, but diminishing gives 1 - 0.5^5 ≈ 0.969, capped at 0.15
-    for (let i = 0; i < 5; i++) s.buffs.gambleCushion.push({ value: 0.5, duration: 60, expiresAt: 60 });
-    tryBuy(s, 3, 0);
-    assert.equal(s.amount, 1000 - 100 + 15);
-  } finally {
-    Math.random = origRandom;
-  }
+test('gamble: Buffer windows add on top of the base cushion, total clamped to 1', () => {
+  const u = getUpgrade('coin_flip');
+  const s = freshState();
+  // base term (no buffer) is below the cap-or-loseodds; big Buffer pushes total to 1.
+  for (let i = 0; i < 5; i++) s.buffs.gambleCushion.push({ value: 0.5, expiresAt: 100 });
+  assert.equal(gambleEffectiveCushion(s, u, 0), 1);
+  // a single modest Buffer adds linearly on top of the base term
+  const s2 = freshState();
+  const base = gambleEffectiveCushion(s2, u, 0);
+  s2.buffs.gambleCushion.push({ value: 0.05, expiresAt: 100 });
+  assert.ok(Math.abs(gambleEffectiveCushion(s2, u, 0) - Math.min(1, base + 0.05)) < 1e-9);
 });
 
 test('gamble: single cushion keeps coin_flip EV negative', () => {

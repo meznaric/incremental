@@ -87,6 +87,20 @@ function readLogFlag(ctx, flag) {
   return false;
 }
 
+// "Clean" peak triggers: reached a magnitude this cycle without ever using a
+// particular tool (a Hail/gamble, or a Window/timed boost). The per-cycle
+// usage flags live on state.messages.stats (usedHail / usedWindow), reset each
+// cycle by the caller. `without` names the discipline ('hail' → usedHail,
+// 'window' → usedWindow); the achievement fires only while that flag is unset.
+const PEAK_CLEAN_FLAG = { hail: 'usedHail', window: 'usedWindow' };
+function peakCleanFired(ctx, t) {
+  if ((ctx.peakAmount || 0) < t.threshold) return false;
+  const flag = PEAK_CLEAN_FLAG[t.without];
+  if (!flag) return false;
+  const s = ctx.messageStats || {};
+  return !s[flag];
+}
+
 function triggerFired(def, ctx) {
   const t = def.trigger;
   if (!t) return false;
@@ -98,6 +112,7 @@ function triggerFired(def, ctx) {
     case 'flag':       return readFlag(ctx, t.flag);
     case 'logFlag':    return readLogFlag(ctx, t.flag);
     case 'buffCount':  return (ctx.buffCount || 0) >= t.at;
+    case 'peakClean':  return peakCleanFired(ctx, t);
     default:           return false;
   }
 }

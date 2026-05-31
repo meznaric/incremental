@@ -10,6 +10,35 @@ import { EP_INTERSTITIALS } from './episodes.js';
 // world image rendered to frame what is about to happen.
 export const FIRST_CONTACT_ID = 'first_contact';
 
+// Persistent "already shown" store for the gamble-failure beats. gambleLosses
+// lives in the per-cycle gameplay save and resets on Cycle close, so gating on
+// it alone re-fires first/tenth/hundredth every cycle. This store lives under
+// its own localStorage key (the contactLog pattern) so a given beat fires
+// exactly once across the player's whole history. Falls back to an in-memory
+// object when localStorage is unavailable (Node tests).
+const GAMBLE_SEEN_KEY = 'eots.gambleseen.v1';
+const _gambleSeenMem = {};
+function readGambleSeen() {
+  if (typeof localStorage === 'undefined') return _gambleSeenMem;
+  try { return JSON.parse(localStorage.getItem(GAMBLE_SEEN_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+function markGambleSeen(key) {
+  if (typeof localStorage === 'undefined') { _gambleSeenMem[key] = true; return; }
+  try {
+    const seen = readGambleSeen();
+    seen[key] = true;
+    localStorage.setItem(GAMBLE_SEEN_KEY, JSON.stringify(seen));
+  } catch { /* storage unavailable — beat just won't persist */ }
+}
+// Enqueue an interstitial id only if it has never been shown across any cycle.
+function enqueueOncePersistent(state, key, delayMs = 0) {
+  if (readGambleSeen()[key]) return;
+  markGambleSeen(key);
+  if (delayMs > 0) setTimeout(() => enqueue(state, key), delayMs);
+  else enqueue(state, key);
+}
+
 // Interstitial messages — lore beats keyed to in-game triggers.
 // Voices: K (Kalen, first person), S (Sera, second person), N (Narrator, third
 // person, rare), A (Anonymous, italic, ~once per season). See
@@ -160,6 +189,15 @@ const BASE_INTERSTITIALS = {
       { voice: 'S', text: 'I have counted ten failed hails on your log.' },
       { voice: 'S', text: 'That is not bad luck. That is a method.' },
       { voice: 'S', text: 'I would like to hear about the method.' },
+    ],
+  },
+
+  // voice: Sera. The hundredth failed hail. Fires once ever.
+  hundredth_loss: {
+    steps: [
+      { voice: 'S', text: 'A hundred failed hails. I stopped rounding the count a while ago.' },
+      { voice: 'S', text: 'You know the carrier dies more than it lands. You key it anyway.' },
+      { voice: 'S', text: 'That is not a habit. That is a decision, made a hundred times.' },
     ],
   },
 
@@ -597,8 +635,12 @@ export function checkGamble(state, result) {
   bumpAnomaly(state, 1);
   if (!result.won) {
     s.gambleLosses = (s.gambleLosses || 0) + 1;
-    if (s.gambleLosses === 1) setTimeout(() => enqueue(state, 'first_gamble'), 1000);
-    if (s.gambleLosses === 10) enqueue(state, 'tenth_loss');
+    // Each beat fires exactly once across the player's whole history — see
+    // enqueueOncePersistent. gambleLosses resets per cycle, so without the
+    // persistent gate these would re-fire every run.
+    if (s.gambleLosses === 1) enqueueOncePersistent(state, 'first_gamble', 1000);
+    if (s.gambleLosses === 10) enqueueOncePersistent(state, 'tenth_loss');
+    if (s.gambleLosses === 100) enqueueOncePersistent(state, 'hundredth_loss');
     if (result.isAllIn && result.balanceAfter <= 0 && !s.allInLost) {
       s.allInLost = true;
       enqueue(state, 'all_in_zero');

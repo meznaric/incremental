@@ -222,10 +222,10 @@ test('patched_frame: gambles are excluded from free-purchase coverage', () => {
     const before = patternFreeLeft(s);
     const r = tryBuy(s, 3, 0);
     assert.ok(r.ok);
-    // Wager (50) is deducted; the Buffer cushions a lost Hail back by 40% of
-    // the wager (floor(50*0.4)=20), so 100 - 50 + 20 = 70. The point of this
-    // test is the invariant below: a gamble must not draw a free purchase.
-    assert.equal(s.amount, 70, 'gamble deducts the wager, Buffer refunds the loss cushion');
+    // Wager (50) is deducted and, with no Buffer active, nothing is refunded
+    // on the loss, so 100 - 50 = 50. The point of this test is the invariant
+    // below: a gamble must not draw a free purchase.
+    assert.equal(s.amount, 50, 'gamble deducts the wager; no Buffer → no refund');
     assert.equal(patternFreeLeft(s), before, 'gamble must not consume a free purchase');
   } finally {
     Math.random = origRandom;

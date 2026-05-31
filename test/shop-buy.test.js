@@ -168,7 +168,7 @@ test('gamble: loss exposes loss + refund; refund = wager × effective cushion', 
   Math.random = () => 0.999; // always loses
   try {
     const u = getUpgrade('coin_flip');
-    const c = gambleEffectiveCushion(freshState(), u, 0); // base cushion, no Buffer
+    const c = gambleEffectiveCushion(freshState(), 0); // no Buffer → cushion is 0
     const s = freshState({ amount: 1000 });
     installSlot(s, 3, 'coin_flip', 100);
     const before = s.amount;
@@ -184,17 +184,21 @@ test('gamble: loss exposes loss + refund; refund = wager × effective cushion', 
   }
 });
 
-test('gamble: Buffer windows add on top of the base cushion, total clamped to 1', () => {
-  const u = getUpgrade('coin_flip');
+test('gamble: cushion is buff-only — zero with no Buffer, sum capped at CUSHION_CAP', () => {
+  // No Buffer window → no cushion at all (no always-on base refund).
+  assert.equal(gambleEffectiveCushion(freshState(), 0), 0);
+  // Buffers sum but cap at CUSHION_CAP.
   const s = freshState();
-  // base term (no buffer) is below the cap-or-loseodds; big Buffer pushes total to 1.
   for (let i = 0; i < 5; i++) s.buffs.gambleCushion.push({ value: 0.5, expiresAt: 100 });
-  assert.equal(gambleEffectiveCushion(s, u, 0), 1);
-  // a single modest Buffer adds linearly on top of the base term
+  assert.equal(gambleEffectiveCushion(s, 0), CUSHION_CAP);
+  // A single modest Buffer is returned as-is below the cap.
   const s2 = freshState();
-  const base = gambleEffectiveCushion(s2, u, 0);
   s2.buffs.gambleCushion.push({ value: 0.05, expiresAt: 100 });
-  assert.ok(Math.abs(gambleEffectiveCushion(s2, u, 0) - Math.min(1, base + 0.05)) < 1e-9);
+  assert.ok(Math.abs(gambleEffectiveCushion(s2, 0) - 0.05) < 1e-9);
+  // Expired Buffers don't count.
+  const s3 = freshState();
+  s3.buffs.gambleCushion.push({ value: 0.3, expiresAt: 50 });
+  assert.equal(gambleEffectiveCushion(s3, 100), 0);
 });
 
 test('gamble: single cushion keeps coin_flip EV negative', () => {

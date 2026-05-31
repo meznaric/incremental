@@ -669,11 +669,17 @@ export function initMainUi(state, deps) {
         const effChance = effectiveGambleChance(state, u, now);
         const winPct = fmtPct(effChance);
         const losePct = fmtPct(1 - effChance);
-        const cushionPct = Math.round(gambleEffectiveCushion(state, u, now) * 100);
+        // Buffer line only when a cushion buff is active — it shows the actual
+        // Echoes recovered on a loss, not a percent. No buff → no line.
+        const cushion = gambleEffectiveCushion(state, now);
+        const refund = cost * cushion;
+        const cushionRow = cushion > 0
+          ? `<div class="outcome cushion"><i class="ri ri-shield-fill"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(refund)}</span> Buffer</div>`
+          : '';
         outcomes =
           `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
           `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>` +
-          `<div class="outcome cushion"><i class="ri ri-shield-fill"></i> Buffer returns ${cushionPct}% of a failed Hail</div>`;
+          cushionRow;
       } else if (u.kind === 'convert') {
         // Convert no longer credits flatBonus on purchase — the burn buys a
         // placement token. Preview what the token will be worth before sector

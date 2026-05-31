@@ -18,18 +18,17 @@ export const MAX_SLOTS = 10;
 // few percent stay on the other side.
 export const GAMBLE_CHANCE_CAP = 0.85;
 
-// Loss cushion (Buffer): fraction of a failed Hail wager refunded. The base
-// term comes from the upgrade's own lose-odds — a near-coin-flip Hail refunds
-// more than a long-shot — capped by CUSHION_CAP, then active Buffer windows
-// add on top. Single source of truth for both the roll (tryBuy) and the card.
+// Loss cushion (Buffer): fraction of a failed Hail wager refunded. Comes ONLY
+// from active Buffer (gambleCushion) windows — no base term. With no Buffer
+// active the cushion is 0 and a lost Hail refunds nothing. Active windows sum,
+// capped by CUSHION_CAP. Single source of truth for both the roll (tryBuy) and
+// the card.
 export const CUSHION_CAP = 0.40;
-export function gambleEffectiveCushion(state, upgrade, now = 0) {
-  const win = (upgrade && typeof upgrade.chance === 'number') ? upgrade.chance : 0;
-  const lose = 1 - win;
+export function gambleEffectiveCushion(state, now = 0) {
   let bufferFrac = 0;
   const buffs = (state && state.buffs && state.buffs.gambleCushion) || [];
   for (const b of buffs) if (now < b.expiresAt) bufferFrac += Math.max(0, Math.min(1, b.value));
-  return Math.min(1, Math.min(CUSHION_CAP, lose) + bufferFrac);
+  return Math.min(CUSHION_CAP, bufferFrac);
 }
 
 // Single source of truth for the win-chance a Hail card actually rolls against.
@@ -451,7 +450,7 @@ export function tryBuy(state, slotIdx, now) {
       state.amount += payout;
       result = { id: slot.id, won: true, delta: payout - cost };
     } else {
-      const cushion = gambleEffectiveCushion(state, u, now);
+      const cushion = gambleEffectiveCushion(state, now);
       const refund = cost * cushion;
       state.amount += refund;
       result = { id: slot.id, won: false, delta: -(cost - refund), loss: cost, refund, cushion };

@@ -320,32 +320,22 @@ export function initContactProgressUi(state, deps = {}) {
     const next = nextContactMilestone(state);
     if (!next) {
       // Cycle catalogue exhausted — no names left to answer. Reuse the same
-      // canvas seek-wave the strip shows during normal contact-seeking: alive
-      // (animating) when this run is the player's best ever, flat/static when
-      // it isn't. "At max" = this cycle's peak has reached or beaten the
-      // all-time best peak banked in the persistent log (contactLog.bestPeak).
-      // WHY this rule: bestPeak only updates on cycle close, so during the live
-      // cycle it's the player's prior record — the wave goes alive the moment
-      // this run becomes their best ever, and rings down flat otherwise.
+      // canvas seek-wave the strip shows during normal contact-seeking, driven
+      // by the same growth-energy envelope: the wave goes wavy the moment the
+      // player climbs past this cycle's peak (peakAmount rising injects energy
+      // in step()) and rings down flat when they stall — exactly like a guitar
+      // string. No binary all-time-best pin; progress now == motion.
       //
-      // No traveller, no live dot, no sparks: the wave fills the full strip
-      // (travelerPct = 1) and energy is pinned directly off atMax rather than
-      // peak growth, so a still cycle reads as a dead-flat line. is-ready is
-      // suppressed here too so the green inset-shadow pulse doesn't blink over
-      // the finished state.
-      const log = state.contactLog || {};
-      const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
-      const best = Number.isFinite(log.bestPeak) ? log.bestPeak : 0;
-      const atMax = peak >= best;
+      // No traveller, no live dot: the wave fills the full strip
+      // (travelerPct = 1). is-ready is suppressed here so the green inset-shadow
+      // pulse doesn't blink over the finished state.
       trackEl.classList.remove('is-ready');
       leftEl.classList.remove('is-unread');
       rightEl.classList.remove('is-unread');
       root.classList.add('cp-finale-on');
-      timeAcc += dt || 0;
-      charges.length = 0;
       travelerPct = 1;
       currentPct = 0;
-      energy = atMax ? 1 : 0;
+      step(dt || 0);
       render();
       return;
     }

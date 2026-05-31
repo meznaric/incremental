@@ -30,13 +30,9 @@ import { nextContactMilestone, currentMilestones } from './interstitial.js';
 import { installTap } from './tap.js';
 
 // Cycle-catalogue-exhausted state. There are no more names to answer, so the
-// strip drops the old "X worlds answered" copy and shows a signal indicator
-// instead: a living waveform when this cycle is the player's best ever, a flat
-// line when it isn't. The caption is one short in-voice line, not a wall.
-//
-// voice: Kalen, first person.
-const SIGNAL_ALIVE_CAPTION = 'The carrier is louder than it has ever been.';
-const SIGNAL_FLAT_CAPTION  = 'The carrier holds. I have pushed it higher before.';
+// strip drops the old "X worlds answered" copy and shows a bare signal
+// indicator: a living waveform when this cycle is the player's best ever, a
+// flat line when it isn't. No caption — just the line.
 
 const AMPLITUDE_SCALE = 0.5;       // 1 means it goes to the edge of the canvas
 // Wave/signal tuning. Constants live next to the code per CLAUDE.md.
@@ -85,7 +81,6 @@ export function initContactProgressUi(state, deps = {}) {
           <path class="cp-signal-flat" d="M0 16 H120" />
           <path class="cp-signal-wave" d="M0 16 Q7.5 4 15 16 T30 16 T45 16 T60 16 T75 16 T90 16 T105 16 T120 16" />
         </svg>
-        <span class="cp-finale-caption"></span>
       </div>
     </button>
     <button type="button" class="cp-edge cp-edge-right" aria-label="Open Rig">
@@ -134,8 +129,6 @@ export function initContactProgressUi(state, deps = {}) {
   const travelerEl = root.querySelector('.cp-traveler');
   const travelerImg = root.querySelector('.cp-traveler-img');
   const travelerFallback = root.querySelector('.cp-traveler-fallback');
-  const finaleEl = root.querySelector('.cp-finale');
-  const finaleCaptionEl = root.querySelector('.cp-finale-caption');
   const canvas = root.querySelector('canvas.cp-wave');
   const ctx = canvas.getContext('2d');
 
@@ -359,7 +352,6 @@ export function initContactProgressUi(state, deps = {}) {
       const atMax = peak >= best;
       root.classList.add('cp-finale-on');
       root.classList.toggle('cp-signal-alive', atMax);
-      finaleCaptionEl.textContent = atMax ? SIGNAL_ALIVE_CAPTION : SIGNAL_FLAT_CAPTION;
       step(dt || 0);
       render();
       return;

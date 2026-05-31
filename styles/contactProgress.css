@@ -313,14 +313,9 @@
   .cp-finale { font-size: 10px; }
 }
 
-/* Cycle-exhausted signal indicator. The finale slot now holds a waveform SVG
-   plus one short caption instead of a rotating lore line. When the cycle is
-   the player's best ever (.cp-signal-alive) the sine wave animates and the
-   flat line hides; otherwise the flat line shows and the wave hides. */
-.cp-finale {
-  flex-direction: column;
-  gap: 4px;
-}
+/* Cycle-exhausted signal indicator. The finale slot holds only the waveform
+   SVG — no caption. When the cycle is the player's best ever (.cp-signal-alive)
+   the sine wave animates; otherwise the flat line shows and the wave hides. */
 .cp-signal {
   width: 120px;
   max-width: 60%;

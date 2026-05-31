@@ -29,14 +29,14 @@ import { worldFor } from './contactLog.js';
 import { nextContactMilestone, currentMilestones } from './interstitial.js';
 import { installTap } from './tap.js';
 
-// voice: Kalen. Single line, italic. Rotated per session so a player who lingers
-// on the closed cycle for hours sees the rig speak once, not every poll.
-const FINALE_COPY = [
-  'Every name in the cycle is on the log. The dark is, briefly, full. Close the cycle — let what was heard become mass.',
-  'Ten worlds answered. Nothing else this side of the rest. Close the cycle. The rig will keep the warmth.',
-  'I have heard everyone who was going to speak. The carrier is at the brim. The rest of the climb is for the engravings.',
-  'The catalogue for this cycle is shut. Close it. What carries forward, carries.',
-];
+// Cycle-catalogue-exhausted state. There are no more names to answer, so the
+// strip drops the old "X worlds answered" copy and shows a signal indicator
+// instead: a living waveform when this cycle is the player's best ever, a flat
+// line when it isn't. The caption is one short in-voice line, not a wall.
+//
+// voice: Kalen, first person.
+const SIGNAL_ALIVE_CAPTION = 'The carrier is louder than it has ever been.';
+const SIGNAL_FLAT_CAPTION  = 'The carrier holds. I have pushed it higher before.';
 
 const AMPLITUDE_SCALE = 0.5;       // 1 means it goes to the edge of the canvas
 // Wave/signal tuning. Constants live next to the code per CLAUDE.md.
@@ -80,7 +80,13 @@ export function initContactProgressUi(state, deps = {}) {
           <div class="cp-traveler-fallback" aria-hidden="true"></div>
         </div>
       </div>
-      <div class="cp-finale" aria-hidden="true"></div>
+      <div class="cp-finale" aria-hidden="true">
+        <svg class="cp-signal" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
+          <path class="cp-signal-flat" d="M0 16 H120" />
+          <path class="cp-signal-wave" d="M0 16 Q7.5 4 15 16 T30 16 T45 16 T60 16 T75 16 T90 16 T105 16 T120 16" />
+        </svg>
+        <span class="cp-finale-caption"></span>
+      </div>
     </button>
     <button type="button" class="cp-edge cp-edge-right" aria-label="Open Rig">
       <div class="cp-edge-glow"></div>
@@ -129,11 +135,11 @@ export function initContactProgressUi(state, deps = {}) {
   const travelerImg = root.querySelector('.cp-traveler-img');
   const travelerFallback = root.querySelector('.cp-traveler-fallback');
   const finaleEl = root.querySelector('.cp-finale');
+  const finaleCaptionEl = root.querySelector('.cp-finale-caption');
   const canvas = root.querySelector('canvas.cp-wave');
   const ctx = canvas.getContext('2d');
 
   let lastNextId = null;
-  let finaleCopy = null;
   let energy = 0;
   let lastPeak = -1;
   let timeAcc = 0;
@@ -340,18 +346,26 @@ export function initContactProgressUi(state, deps = {}) {
 
     const next = nextContactMilestone(state);
     if (!next) {
-      // Cycle catalogue exhausted — swap the traveller for a single lore line.
-      // Rotate the line on first hit per session so a long lingerer doesn't
-      // stare at the same sentence.
-      if (!finaleCopy) finaleCopy = FINALE_COPY[Math.floor(Math.random() * FINALE_COPY.length)];
+      // Cycle catalogue exhausted — no names left to answer, so swap the
+      // traveller for a signal indicator. "At max" = this cycle's peak has
+      // reached or beaten the all-time best peak banked in the persistent log
+      // (contactLog.bestPeak). WHY this rule: bestPeak only updates on cycle
+      // close, so during the live cycle it's the player's prior record — the
+      // wave goes alive the moment this run becomes their best ever, and reads
+      // flat while they're still short of it.
+      const log = state.contactLog || {};
+      const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
+      const best = Number.isFinite(log.bestPeak) ? log.bestPeak : 0;
+      const atMax = peak >= best;
       root.classList.add('cp-finale-on');
-      finaleEl.textContent = finaleCopy;
+      root.classList.toggle('cp-signal-alive', atMax);
+      finaleCaptionEl.textContent = atMax ? SIGNAL_ALIVE_CAPTION : SIGNAL_FLAT_CAPTION;
       step(dt || 0);
       render();
       return;
     }
     root.classList.remove('cp-finale-on');
-    finaleCopy = null;
+    root.classList.remove('cp-signal-alive');
 
     const def = worldFor(state.contactLog, next.id);
     if (def && def.id !== lastNextId) {

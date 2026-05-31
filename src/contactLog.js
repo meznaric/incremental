@@ -454,13 +454,13 @@ export function closeCycle(log, peakAmount) {
 // WHY a separate currency: shards count names; Mass counts magnitude. Pushing
 // further in a single cycle is what mints Mass.
 //
-// Formula: floor(log10(peakAmount)) − 2. A cycle that peaks at 1k bites zero;
-// 100k bites 3 kg; 1B bites 7 kg; 1T bites 10 kg. Tuned so the first cycle close
-// (which under the new wall lands around 100k–1M) gives 3–4 kg — enough for
-// First Light, Bone Memory level 1, and a head start on Quick Wake.
+// Formula: 2 × (floor(log10(peakAmount)) − 2). A cycle that peaks at 1k bites
+// zero; 100k bites 6 kg; 1B bites 14 kg; 1T bites 20 kg. The ×2 doubles the
+// payout so cross-cycle progression lands faster — enough for First Light,
+// Bone Memory level 1, and a head start on Quick Wake on the first close.
 export function massForPeak(peakAmount) {
   if (!Number.isFinite(peakAmount) || peakAmount < 1000) return 0;
-  return Math.max(0, Math.floor(Math.log10(peakAmount)) - 2);
+  return Math.max(0, Math.floor(Math.log10(peakAmount)) - 2) * 2;
 }
 
 export function getMass(log) {

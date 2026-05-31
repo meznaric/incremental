@@ -320,8 +320,8 @@ test('closeCycle: advances the run and keeps the world list intact', () => {
   const log = freshLog();
   recordContact(log, 'milestone_1k', 100);
   recordContact(log, 'milestone_1m', 110);
-  const banked = closeCycle(log, 1e6); // 1M peak → log10(1e6) - 2 = 4 kg
-  assert.equal(banked, 4);
+  const banked = closeCycle(log, 1e6); // 1M peak → (log10(1e6) - 2) * 2 = 8 kg
+  assert.equal(banked, 8);
   assert.equal(getRun(log), 2);
   assert.equal(log.worlds.length, 2, 'worlds survive prestige');
   assert.equal(memoryShards(log), 2);
@@ -335,22 +335,22 @@ test('massForPeak: zero below 1k', () => {
   assert.equal(massForPeak(NaN), 0);
 });
 
-test('massForPeak: log10(peak) - 2, floored', () => {
-  assert.equal(massForPeak(1e3), 1);
-  assert.equal(massForPeak(1e6), 4);
-  assert.equal(massForPeak(1e9), 7);
-  assert.equal(massForPeak(1e12), 10);
-  assert.equal(massForPeak(5e6), 4);
+test('massForPeak: (log10(peak) - 2) * 2, floored', () => {
+  assert.equal(massForPeak(1e3), 2);
+  assert.equal(massForPeak(1e6), 8);
+  assert.equal(massForPeak(1e9), 14);
+  assert.equal(massForPeak(1e12), 20);
+  assert.equal(massForPeak(5e6), 8);
 });
 
 test('closeCycle: banks mass against peak, persists across closes', () => {
   const log = freshLog();
   recordContact(log, 'milestone_1k', 100);
   closeCycle(log, 1e6);
-  assert.equal(getMass(log), 4);
+  assert.equal(getMass(log), 8);
   recordContact(log, 'milestone_1m', 200);
   closeCycle(log, 1e9);
-  assert.equal(getMass(log), 11);
+  assert.equal(getMass(log), 22);
 });
 
 test('closeCycle: refusal does not bank mass', () => {
@@ -481,7 +481,7 @@ test('closeCycle: Loop-mode close advances run and banks mass without contacts',
     loopMode: true, loopCycles: 0 };
   const startRun = getRun(log);
   const banked = closeCycle(log, 1e9);
-  assert.equal(banked, 7);
+  assert.equal(banked, 14);
   assert.equal(getRun(log), startRun + 1);
   assert.equal(echoLoopLevel(log), 1, 'first loop close bumps to 1');
 });

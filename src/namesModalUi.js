@@ -1,5 +1,8 @@
 // Names modal — cumulative roster of every world Kalen has ever logged.
-// Two tabs: Names (the EP grid) and Info (lore + status legend).
+// Three tabs: Names (the EP grid), Log (chronological transcript of every
+// contact and what was said), and Info (lore + status legend). The Log tab's
+// button + panel are injected from JS (index.html ships only Names + Info);
+// its timeline assembly lives in src/contactLogTab.js (pure, unit-tested).
 //
 // The grid is per-episode, 10 circular slots each. Found worlds reveal as
 // portraits; unfound active-EP slots show locked discs; future EPs render
@@ -15,6 +18,7 @@ import {
 } from './contactLog.js';
 import { WORLDS_BY_EP } from './worlds-data.js';
 import { MILESTONE_SLOT_IDS } from './interstitial.js';
+import { buildLogTimeline } from './contactLogTab.js';
 import { installTap } from './tap.js';
 
 const EP_TITLES = {
@@ -37,6 +41,41 @@ export function initNamesModalUi(state, opts = {}) {
   const gateEl = modal.querySelector('.cl-names-gate');
   const epsEl = modal.querySelector('.cl-names-episodes');
   const infoEl = modal.querySelector('.cl-names-info');
+
+  // Inject the Log tab (button + panel) once — index.html ships only Names +
+  // Info, so the third tab is wired here. Button sits between Names and Info;
+  // panel is appended after the existing panels. Guarded so a re-init (or a
+  // hot reload) never double-inserts.
+  const tabsBar = modal.querySelector('.cl-tabs');
+  if (tabsBar && !tabsBar.querySelector('[data-tab="log"]')) {
+    const infoTabBtn = tabsBar.querySelector('[data-tab="info"]');
+    const logTabBtn = document.createElement('button');
+    logTabBtn.className = 'cl-tab';
+    logTabBtn.setAttribute('data-tab', 'log');
+    logTabBtn.setAttribute('role', 'tab');
+    logTabBtn.setAttribute('aria-selected', 'false');
+    logTabBtn.textContent = 'Log';
+    if (infoTabBtn) tabsBar.insertBefore(logTabBtn, infoTabBtn);
+    else tabsBar.appendChild(logTabBtn);
+  }
+  let logEl = modal.querySelector('.cl-names-log');
+  if (!logEl) {
+    logEl = document.createElement('section');
+    logEl.className = 'cl-tab-panel cl-names-log';
+    logEl.setAttribute('data-tab', 'log');
+    logEl.setAttribute('role', 'tabpanel');
+    // Sit the Log panel as a sibling of the existing tab panels (before the
+    // Info section), not inside the .cl-names-info div — the toggling logic
+    // keys off .cl-tab-panel[data-tab], which only resolves correctly when
+    // the panels are siblings under the body.
+    const infoPanel = modal.querySelector('.cl-tab-panel[data-tab="info"]');
+    if (infoPanel && infoPanel.parentNode) infoPanel.parentNode.insertBefore(logEl, infoPanel);
+    else {
+      const body = modal.querySelector('.cl-names-body') || modal;
+      body.appendChild(logEl);
+    }
+  }
+
   const tabs = Array.from(modal.querySelectorAll('.cl-tab'));
   const panels = Array.from(modal.querySelectorAll('.cl-tab-panel'));
   let activeTab = 'names';
@@ -174,6 +213,39 @@ export function initNamesModalUi(state, opts = {}) {
     epsEl.innerHTML = sections.join('');
   }
 
+  // Voice: Kalen, ambient. One line framing the transcript so the Log tab
+  // reads as his own record, not a system dump.
+  const LOG_INTRO =
+    'Every world that answered, in the order it answered. This is what was said.';
+
+  function renderLog() {
+    const timeline = buildLogTimeline(state.contactLog, state);
+    if (timeline.length === 0) {
+      logEl.innerHTML = `
+        <div class="cl-log-empty">No one has answered the carrier yet. When a world does, the exchange lands here.</div>`;
+      return;
+    }
+    const entries = timeline.map((e) => {
+      const epTitle = EP_TITLES[e.ep] || `Episode ${e.ep}`;
+      const sCls = `s-${(e.status || '').toLowerCase()}`;
+      const lines = e.lines.map((ln) => {
+        const speaker = ln.speaker ? `<span class="cl-log-speaker">${ln.speaker}</span>` : '';
+        const textCls = ln.italic ? 'cl-log-text is-italic' : 'cl-log-text';
+        return `<div class="cl-log-line cl-log-voice-${ln.voice}">${speaker}<span class="${textCls}">${ln.text}</span></div>`;
+      }).join('');
+      return `
+        <section class="cl-log-entry">
+          <div class="cl-log-head">
+            <span class="cl-log-name">${e.name}</span>
+            <span class="cl-log-ep">Ep ${e.ep} · ${epTitle}</span>
+            <span class="cl-status ${sCls}">${e.status}</span>
+          </div>
+          <div class="cl-log-lines">${lines || '<div class="cl-log-line cl-log-silent">The exchange went unrecorded.</div>'}</div>
+        </section>`;
+    }).join('');
+    logEl.innerHTML = `<p class="cl-log-intro">${LOG_INTRO}</p>${entries}`;
+  }
+
   function findWorldDef(worldId) {
     for (const block of Object.values(WORLDS_BY_EP)) {
       if (!block) continue;
@@ -234,6 +306,7 @@ export function initNamesModalUi(state, opts = {}) {
   function render() {
     renderGate();
     renderEpisodes();
+    renderLog();
   }
 
   const open = () => {

@@ -12,6 +12,13 @@ function periodNameFor(amount) {
   return PERIODS[p]?.name || '';
 }
 
+// Base-10 exponent of the current balance — lets the player read which period
+// they're in at a glance ("10^42"). Clamps below 1 to 0 so the readout never
+// goes negative or NaN at the cold open.
+export function exponentOf(amount) {
+  return isFinite(amount) && amount >= 1 ? Math.floor(Math.log10(amount)) : 0;
+}
+
 function makeRadialTexture(color) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
@@ -53,9 +60,18 @@ export class HeroDisplay {
     this.amountNumEl    = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-num') : null;
     this.amountPeriodEl = typeof document !== 'undefined' ? document.querySelector('#topHud .th-amount-period') : null;
     this.rateEl         = typeof document !== 'undefined' ? document.querySelector('#topHud .th-rate') : null;
+    // Exponent readout — created lazily next to the period label so we don't
+    // need to touch index.html's HUD markup.
+    this.amountExpEl = null;
+    if (this.amountPeriodEl && this.amountPeriodEl.parentNode) {
+      this.amountExpEl = document.createElement('div');
+      this.amountExpEl.className = 'th-amount-exp';
+      this.amountPeriodEl.parentNode.insertBefore(this.amountExpEl, this.amountPeriodEl.nextSibling);
+    }
 
     this._amtText = null;
     this._periodText = null;
+    this._expText = null;
     this._rateText = null;
     this._burstT = 0;
     this._prevRate = 0;
@@ -103,6 +119,12 @@ export class HeroDisplay {
     if (periodText !== this._periodText) {
       this._periodText = periodText;
       if (this.amountPeriodEl) this.amountPeriodEl.textContent = periodText;
+    }
+
+    const expText = amount >= 1 ? `10^${exponentOf(amount)}` : '';
+    if (expText !== this._expText) {
+      this._expText = expText;
+      if (this.amountExpEl) this.amountExpEl.textContent = expText;
     }
 
     const buffed = rate > baseRate * 1.001;

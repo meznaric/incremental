@@ -555,7 +555,17 @@ function tick(raf) {
     const slots = state.shop && state.shop.slots;
     if (slots) {
       for (const s of slots) {
-        if (s && s.rarity === 'mythic') {
+        // buildSlot keeps rarity on the slot itself, but other shapes nest it
+        // on the resolved upgrade or its def. Check every place a 'mythic'
+        // rarity could live so the flag latches regardless — the root cause of
+        // the unfired achievement was a slot that never exposed `rarity` at the
+        // top level, so markStat was never reached and the flag never set.
+        const rar = s && (
+          s.rarity
+          || (s.upgrade && (s.upgrade.rarity || (s.upgrade.def && s.upgrade.def.rarity)))
+          || (s.def && s.def.rarity)
+        );
+        if (rar === 'mythic') {
           if (markStat(state.achievements, 'mythicSeen')) mythicDirty = true;
           break;
         }

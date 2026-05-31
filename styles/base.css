@@ -365,6 +365,14 @@ input[type="text"]:focus { border-color: #6688ff; }
   padding-left: 2px;
 }
 .th-amount-period:empty { display: none; }
+.th-amount-exp {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #6a6d86;
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.th-amount-exp:empty { display: none; }
 .th-rate {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-weight: 700;
@@ -1815,3 +1823,64 @@ input[type="text"]:focus { border-color: #6688ff; }
   .slot[data-kind="dampenBreak"]:hover { border-color: var(--kind-color); }
 }
 
+
+/* Log tab — chronological transcript of every contact and what was said. */
+.cl-names-log { }
+.cl-log-intro {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #c9b896;
+}
+.cl-log-empty {
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #b9a884;
+  padding: 8px 0;
+}
+.cl-log-entry {
+  border-left: 2px solid rgba(212, 175, 110, 0.3);
+  padding: 0 0 4px 14px;
+  margin-bottom: 20px;
+}
+.cl-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+.cl-log-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f3e3c4;
+}
+.cl-log-ep {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: #a8966f;
+}
+.cl-log-head .cl-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.cl-log-lines { display: flex; flex-direction: column; gap: 7px; }
+.cl-log-line { font-size: 13.5px; line-height: 1.5; }
+.cl-log-speaker {
+  display: inline-block;
+  margin-right: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d4af6e;
+}
+.cl-log-text { color: #d4c2a0; }
+.cl-log-text.is-italic { font-style: italic; color: #c2b290; }
+.cl-log-silent { font-style: italic; color: #8f8166; }

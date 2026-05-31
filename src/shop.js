@@ -18,6 +18,20 @@ export const MAX_SLOTS = 10;
 // few percent stay on the other side.
 export const GAMBLE_CHANCE_CAP = 0.85;
 
+// Loss cushion (Buffer): fraction of a failed Hail wager refunded. The base
+// term comes from the upgrade's own lose-odds — a near-coin-flip Hail refunds
+// more than a long-shot — capped by CUSHION_CAP, then active Buffer windows
+// add on top. Single source of truth for both the roll (tryBuy) and the card.
+export const CUSHION_CAP = 0.40;
+export function gambleEffectiveCushion(state, upgrade, now = 0) {
+  const win = (upgrade && typeof upgrade.chance === 'number') ? upgrade.chance : 0;
+  const lose = 1 - win;
+  let bufferFrac = 0;
+  const buffs = (state && state.buffs && state.buffs.gambleCushion) || [];
+  for (const b of buffs) if (now < b.expiresAt) bufferFrac += Math.max(0, Math.min(1, b.value));
+  return Math.min(1, Math.min(CUSHION_CAP, lose) + bufferFrac);
+}
+
 // Single source of truth for the win-chance a Hail card actually rolls against.
 // Both the renderer (so the % the player reads matches reality) and tryBuy
 // (the actual roll) walk through this. Callers pass the current `now` so an
@@ -118,7 +132,7 @@ export function makeShopState() {
     messages: {
       shown: {},
       queue: [],
-      stats: { gambles: 0, gambleLosses: 0, allInLost: false, peakAmount: 0 },
+      stats: { gambles: 0, gambleLosses: 0, allInLost: false, peakAmount: 0, usedHail: false, usedWindow: false },
     },
   };
 }
@@ -429,6 +443,7 @@ export function tryBuy(state, slotIdx, now) {
     if (now < (state.gambleCd[slot.id] || 0)) return { ok: false, reason: 'cooldown' };
     if (state.amount < cost) return { ok: false, reason: 'broke' };
     state.amount -= cost;
+    if (state.messages && state.messages.stats) state.messages.stats.usedHail = true;
     const won = Math.random() < effectiveGambleChance(state, u, now);
     let result;
     if (won) {
@@ -436,12 +451,10 @@ export function tryBuy(state, slotIdx, now) {
       state.amount += payout;
       result = { id: slot.id, won: true, delta: payout - cost };
     } else {
-      let lose = 1;
-      for (const b of state.buffs.gambleCushion) if (now < b.expiresAt) lose *= 1 - Math.max(0, Math.min(1, b.value));
-      const cushion = Math.min(0.15, 1 - lose);
+      const cushion = gambleEffectiveCushion(state, u, now);
       const refund = cost * cushion;
       state.amount += refund;
-      result = { id: slot.id, won: false, delta: -(cost - refund) };
+      result = { id: slot.id, won: false, delta: -(cost - refund), loss: cost, refund, cushion };
     }
     state.gambleCd[slot.id] = now + u.cooldown;
     checkGamble(state, { won: result.won, isAllIn: u.wagerPct >= 1, balanceAfter: state.amount });
@@ -453,6 +466,7 @@ export function tryBuy(state, slotIdx, now) {
     if (!usePatternFree && state.amount < cost) return { ok: false, reason: 'broke' };
     if (usePatternFree) consumePatternFreePurchase(state);
     else state.amount -= cost;
+    if (state.messages && state.messages.stats) state.messages.stats.usedWindow = true;
     applyBuff(state, u, now);
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);

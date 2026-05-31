@@ -17,7 +17,7 @@ import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX, VIGIL_ID, VIGIL_K
 import {
   effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
-  marginalRateForPurchase, effectiveGambleChance, nextPinTierCost, isSlotPinned,
+  marginalRateForPurchase, effectiveGambleChance, gambleEffectiveCushion, nextPinTierCost, isSlotPinned,
   REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_AT, MAX_PIN_SLOTS,
 } from './shop.js';
 import { nowSeconds } from './save.js';
@@ -419,11 +419,17 @@ export function initMainUi(state, deps) {
             // would scribble over the inline transforms the gravity pull
             // applies to this card. The centred banner is the feedback.
             const won = !!res.result.won;
-            const deltaText = formatAbbrev(Math.abs(res.result.delta || 0));
+            // On a loss the headline is the full wager lost; the Buffer return
+            // (if any) is surfaced separately, right after, so the player sees
+            // the sting first and the catch second.
+            const lossAmt = won ? 0 : (typeof res.result.loss === 'number' ? res.result.loss : Math.abs(res.result.delta || 0));
+            const deltaText = won ? formatAbbrev(Math.abs(res.result.delta || 0)) : formatAbbrev(lossAmt);
+            const refund = won ? 0 : (res.result.refund || 0);
             fireGambleResult({
               tappedEl: el,
               won,
               deltaText,
+              refundText: refund > 0 ? formatAbbrev(refund) : null,
               onMid: () => { renderShop(); markContentFresh(el); },
               onStart: () => {
                 triggerGambleFx({ won, durationMs: 1400, now: nowSeconds() });
@@ -644,11 +650,15 @@ export function initMainUi(state, deps) {
       // Surface it as "FREE" on the cost cell so the player sees the charge being
       // used before they tap.
       const patternFree = (state.patternFreeLeft || 0) > 0 && u.kind !== 'gamble' && u.kind !== 'gift';
-      const costHtml = u.kind === 'gift'
-        ? 'FREE'
-        : patternFree
-          ? `<span class="cc">FREE</span> <span class="cc-strike">${ECHO_ICON}${formatAbbrev(cost)}</span>`
-          : `${ECHO_ICON}${formatAbbrev(cost)}`;
+      // Gamble cards already show the wager/outcome amounts and the lose %, so
+      // the separate price line is redundant noise — suppress it for Hails.
+      const costHtml = u.kind === 'gamble'
+        ? ''
+        : u.kind === 'gift'
+          ? 'FREE'
+          : patternFree
+            ? `<span class="cc">FREE</span> <span class="cc-strike">${ECHO_ICON}${formatAbbrev(cost)}</span>`
+            : `${ECHO_ICON}${formatAbbrev(cost)}`;
       setHtmlIfChanged(el.querySelector('.cost'), costHtml);
 
       let outcomes = '';
@@ -659,9 +669,11 @@ export function initMainUi(state, deps) {
         const effChance = effectiveGambleChance(state, u, now);
         const winPct = fmtPct(effChance);
         const losePct = fmtPct(1 - effChance);
+        const cushionPct = Math.round(gambleEffectiveCushion(state, u, now) * 100);
         outcomes =
           `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> <span class="cc">${ECHO_ICON}+${formatAbbrev(winNet)}</span> · ${winPct}</div>` +
-          `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>`;
+          `<div class="outcome lose"><i class="ri ri-arrow-down-line"></i> <span class="cc">${ECHO_ICON}−${formatAbbrev(cost)}</span> · ${losePct}</div>` +
+          `<div class="outcome cushion"><i class="ri ri-shield-fill"></i> Buffer returns ${cushionPct}% of a failed Hail</div>`;
       } else if (u.kind === 'convert') {
         // Convert no longer credits flatBonus on purchase — the burn buys a
         // placement token. Preview what the token will be worth before sector

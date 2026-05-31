@@ -312,3 +312,52 @@
   .cp-traveler { width: 28px; height: 28px; margin-left: -14px; }
   .cp-finale { font-size: 10px; }
 }
+
+/* Cycle-exhausted signal indicator. The finale slot now holds a waveform SVG
+   plus one short caption instead of a rotating lore line. When the cycle is
+   the player's best ever (.cp-signal-alive) the sine wave animates and the
+   flat line hides; otherwise the flat line shows and the wave hides. */
+.cp-finale {
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-signal {
+  width: 120px;
+  max-width: 60%;
+  height: 22px;
+  overflow: visible;
+}
+.cp-signal path {
+  fill: none;
+  stroke: rgba(212, 154, 85, 0.85);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* Default (not at max): flat line shown, wave hidden. */
+.cp-signal-wave { display: none; }
+.cp-signal-flat { display: inline; opacity: 0.6; }
+/* At max: living wave shown + animated, flat line hidden. */
+.cp-root.cp-signal-alive .cp-signal-flat { display: none; }
+.cp-root.cp-signal-alive .cp-signal-wave {
+  display: inline;
+  filter: drop-shadow(0 0 3px rgba(212, 154, 85, 0.55));
+  animation: cp-signal-pulse 1.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes cp-signal-pulse {
+  0%, 100% { transform: scaleY(0.55); opacity: 0.75; }
+  50%      { transform: scaleY(1);    opacity: 1; }
+}
+.cp-finale-caption {
+  font-size: 11.5px;
+  font-style: italic;
+  color: #d8c4a0;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  opacity: 0.92;
+  text-align: center;
+  text-shadow: none;
+}

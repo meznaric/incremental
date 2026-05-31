@@ -22,17 +22,12 @@
 // hanging in space on a fresh post-close session before the player has
 // climbed back into shop territory. Once every contact-bearing milestone in
 // the current EP has been crossed (nextContactMilestone(state) === null)
-// the strip swaps the traveler for a lore line nudging the player toward
-// Close the Cycle.
+// the strip drops the traveler and reuses the same seek-wave as a bare
+// signal indicator — see the finale branch in update().
 
 import { worldFor } from './contactLog.js';
 import { nextContactMilestone, currentMilestones } from './interstitial.js';
 import { installTap } from './tap.js';
-
-// Cycle-catalogue-exhausted state. There are no more names to answer, so the
-// strip drops the old "X worlds answered" copy and shows a bare signal
-// indicator: a living waveform when this cycle is the player's best ever, a
-// flat line when it isn't. No caption — just the line.
 
 const AMPLITUDE_SCALE = 0.5;       // 1 means it goes to the edge of the canvas
 // Wave/signal tuning. Constants live next to the code per CLAUDE.md.
@@ -75,12 +70,6 @@ export function initContactProgressUi(state, deps = {}) {
           <img class="cp-traveler-img" alt="" />
           <div class="cp-traveler-fallback" aria-hidden="true"></div>
         </div>
-      </div>
-      <div class="cp-finale" aria-hidden="true">
-        <svg class="cp-signal" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
-          <path class="cp-signal-flat" d="M0 16 H120" />
-          <path class="cp-signal-wave" d="M0 16 Q7.5 4 15 16 T30 16 T45 16 T60 16 T75 16 T90 16 T105 16 T120 16" />
-        </svg>
       </div>
     </button>
     <button type="button" class="cp-edge cp-edge-right" aria-label="Open Rig">
@@ -250,7 +239,7 @@ export function initContactProgressUi(state, deps = {}) {
     const W = canvas.width;
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-    if (!root.classList.contains('cp-visible') || root.classList.contains('cp-finale-on')) return;
+    if (!root.classList.contains('cp-visible')) return;
 
     const midY = H / 2;
     // The canvas is intentionally taller than the strip (see contactProgress.css)
@@ -326,38 +315,48 @@ export function initContactProgressUi(state, deps = {}) {
     root.classList.toggle('cp-visible', visible);
     if (!visible) return;
 
-    // Affordance pulse states pulled fresh per tick from contactLogUi.
-    // cycleReady drives the center wave pulse; namesUnread drives the left
-    // planet pulse; rigUnread drives the right radar pulse. Missing
-    // affordance source = silent strip, no pulses.
-    if (typeof getAffordance === 'function') {
-      const a = getAffordance() || {};
-      trackEl.classList.toggle('is-ready', !!a.cycleReady);
-      leftEl.classList.toggle('is-unread', !!a.namesUnread);
-      rightEl.classList.toggle('is-unread', !!a.rigUnread);
-    }
+    const a = typeof getAffordance === 'function' ? (getAffordance() || {}) : {};
 
     const next = nextContactMilestone(state);
     if (!next) {
-      // Cycle catalogue exhausted — no names left to answer, so swap the
-      // traveller for a signal indicator. "At max" = this cycle's peak has
-      // reached or beaten the all-time best peak banked in the persistent log
-      // (contactLog.bestPeak). WHY this rule: bestPeak only updates on cycle
-      // close, so during the live cycle it's the player's prior record — the
-      // wave goes alive the moment this run becomes their best ever, and reads
-      // flat while they're still short of it.
+      // Cycle catalogue exhausted — no names left to answer. Reuse the same
+      // canvas seek-wave the strip shows during normal contact-seeking: alive
+      // (animating) when this run is the player's best ever, flat/static when
+      // it isn't. "At max" = this cycle's peak has reached or beaten the
+      // all-time best peak banked in the persistent log (contactLog.bestPeak).
+      // WHY this rule: bestPeak only updates on cycle close, so during the live
+      // cycle it's the player's prior record — the wave goes alive the moment
+      // this run becomes their best ever, and rings down flat otherwise.
+      //
+      // No traveller, no live dot, no sparks: the wave fills the full strip
+      // (travelerPct = 1) and energy is pinned directly off atMax rather than
+      // peak growth, so a still cycle reads as a dead-flat line. is-ready is
+      // suppressed here too so the green inset-shadow pulse doesn't blink over
+      // the finished state.
       const log = state.contactLog || {};
       const peak = (state.messages && state.messages.stats && state.messages.stats.peakAmount) || state.amount || 0;
       const best = Number.isFinite(log.bestPeak) ? log.bestPeak : 0;
       const atMax = peak >= best;
+      trackEl.classList.remove('is-ready');
+      leftEl.classList.remove('is-unread');
+      rightEl.classList.remove('is-unread');
       root.classList.add('cp-finale-on');
-      root.classList.toggle('cp-signal-alive', atMax);
-      step(dt || 0);
+      timeAcc += dt || 0;
+      charges.length = 0;
+      travelerPct = 1;
+      currentPct = 0;
+      energy = atMax ? 1 : 0;
       render();
       return;
     }
     root.classList.remove('cp-finale-on');
-    root.classList.remove('cp-signal-alive');
+
+    // Affordance pulse states pulled fresh per tick from contactLogUi.
+    // cycleReady drives the center wave pulse; namesUnread drives the left
+    // planet pulse; rigUnread drives the right radar pulse.
+    trackEl.classList.toggle('is-ready', !!a.cycleReady);
+    leftEl.classList.toggle('is-unread', !!a.namesUnread);
+    rightEl.classList.toggle('is-unread', !!a.rigUnread);
 
     const def = worldFor(state.contactLog, next.id);
     if (def && def.id !== lastNextId) {

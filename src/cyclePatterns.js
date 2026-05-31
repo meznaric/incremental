@@ -23,6 +23,17 @@
 // the same cycle.
 
 export const PATTERNS = [
+  // voice: Sera. "No skew this cycle. The rig runs the way it was built."
+  // The baseline. Every modifier neutral — identical to playing with no
+  // pattern at all, which is exactly the first cycle's experience. Offered so a
+  // player can deliberately choose "no trade-off this run" from cycle 2 on, and
+  // so the first cycle has a name for the shape it already has.
+  { id: 'true_north',
+    name: 'True North',
+    voice: 'sera',
+    desc: 'No skew this cycle. Base listening, windows, and bands all run at standard. The rig is exactly what it was built to be.',
+    gameplay: 'No modifiers. The default cycle.',
+  },
   // voice: Sera. "The pour comes early. Catch what you can before the line goes thin."
   { id: 'surge_tide',
     name: 'Surge Tide',
@@ -77,6 +88,42 @@ export const PATTERNS = [
     gameplay: 'Network contribution ×2. Base listening ×0.5.',
     networkYieldMul: 2.0,
     baseRateMul: 0.5,
+  },
+  // voice: Sera. "The sky is wide open and cheap. Patch in fast before it tightens."
+  // Front-loaded build pattern: bands are cheap and the sweep is generous, but
+  // the base carrier runs slightly lean. Rewards filling the Console early.
+  { id: 'open_market',
+    name: 'Open Market',
+    voice: 'sera',
+    desc: 'Bands come cheap this cycle and the sweep runs almost free. The base carrier listens a little quieter for it.',
+    gameplay: 'Purchase cost ×0.6, re-tune cost ×0.5. ×0.85 base rate.',
+    purchaseCostMul: 0.6,
+    rerollCostMul: 0.5,
+    baseRateMul: 0.85,
+  },
+  // voice: Sera. "A clean, steady sky. Nothing rushes you and nothing helps you."
+  // Pure long-haul pattern: a strong, multi-hour standing carrier window seeded
+  // at open, paired with weak short windows. Rewards patience over micro-play.
+  { id: 'steady_sky',
+    name: 'Steady Sky',
+    voice: 'sera',
+    desc: 'The cycle opens under a long, calm carrier that holds for two hours. Short windows you buy after barely register.',
+    gameplay: '×2 effective rate for the first 2 hours. Purchased window strength ×0.5.',
+    seedRateMulBuff: { value: 2.0, duration: 7200, sourceId: 'steady_sky' },
+    buffRateMulStrength: 0.5,
+  },
+  // voice: Sera. "Loud rig, expensive sky. You will hear well and pay for it."
+  // High-risk-high-reward: a strong base carrier and far-carrying hails, but
+  // every band and every sweep bills double. Rewards a small, decisive slate.
+  { id: 'hot_band',
+    name: 'Hot Band',
+    voice: 'sera',
+    desc: 'The base carrier runs hot and every hail carries a full ten points further. Everything you patch in or sweep bills double.',
+    gameplay: '×1.5 base rate. Hail carry-chance +10%. Purchase and re-tune cost ×2.',
+    baseRateMul: 1.5,
+    gambleLuckBonus: 0.10,
+    purchaseCostMul: 2.0,
+    rerollCostMul: 2.0,
   },
 ];
 

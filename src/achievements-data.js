@@ -11,6 +11,9 @@
 //   { kind: 'flag',        flag: '<state-stats key>' } — messages.stats[flag] truthy
 //   { kind: 'logFlag',     flag: '<contactLog key>'  } — contactLog[flag] truthy
 //   { kind: 'buffCount',   at: <count>               } — N+ simultaneous active buffs
+//   { kind: 'peakClean',   threshold: <peak>, without: 'hail'|'window' }
+//        — peak amount >= threshold this cycle AND the matching per-cycle usage
+//          flag (messages.stats.usedHail / usedWindow) is still unset.
 //
 // Categories — display order matches CATEGORY_ORDER below.
 
@@ -157,6 +160,31 @@ export const ACHIEVEMENTS = [
     desc: 'Took every Cycle Pattern through a full cycle close. The rig has been every shape it knows.',
     hint: 'Close a cycle on each Cycle Pattern at least once.',
     trigger: { kind: 'logFlag', flag: 'allPatternsCompleted' } },
+
+  // — "Clean" magnitude runs — reached a high signal on the rig's own power,
+  // with no Hail (gamble) or no Window (timed boost) touched that cycle.
+  // Sera-voiced descriptions: she is reading the discipline of the run back to
+  // Kalen, not congratulating him.
+  { id: 'clean_quintillion_nohail', category: 'play',
+    name: 'No hand on the dice',
+    desc: 'Crossed one nonillion Echoes in a cycle without opening a single Hail. The carrier carried itself.',
+    hint: 'Reach 1e30 Echoes in one cycle without using a Hail.',
+    trigger: { kind: 'peakClean', threshold: 1e30, without: 'hail' } },
+  { id: 'clean_quintillion_nowindow', category: 'play',
+    name: 'No window opened',
+    desc: 'Crossed one nonillion Echoes in a cycle without holding a single carrier Window. Steady listening, nothing borrowed.',
+    hint: 'Reach 1e30 Echoes in one cycle without using a Window.',
+    trigger: { kind: 'peakClean', threshold: 1e30, without: 'window' } },
+  { id: 'clean_undecillion_nohail', category: 'play',
+    name: 'The straight line',
+    desc: 'Crossed one undecillion Echoes in a cycle and never reached for a Hail. The rig did this on its own current.',
+    hint: 'Reach 1e60 Echoes in one cycle without using a Hail.',
+    trigger: { kind: 'peakClean', threshold: 1e60, without: 'hail' } },
+  { id: 'clean_undecillion_nowindow', category: 'play',
+    name: 'The long quiet climb',
+    desc: 'Crossed one undecillion Echoes in a cycle with no Window held open. The base carrier alone took the line that high.',
+    hint: 'Reach 1e60 Echoes in one cycle without using a Window.',
+    trigger: { kind: 'peakClean', threshold: 1e60, without: 'window' } },
 ];
 
 export const ACH_BY_ID = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

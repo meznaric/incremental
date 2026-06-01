@@ -557,6 +557,43 @@ export function tryBuy(state, slotIdx, now) {
   return { ok: false, reason: 'unknown' };
 }
 
+// Bulk-buy convenience for base (permanent-additive) upgrades. Late game a
+// single base card is affordable thousands of times over and tapping it that
+// many times — each tap re-rolling the slot — is busywork. A bundle buys up to
+// `qty` copies of the *current* card in one action (each copy applies +value to
+// flatBonus, same fixed unit price, no escalation — identical to buying it that
+// many times if it never re-rolled), then re-rolls the slot once at the end.
+// qty === Infinity means "as many as affordable". Only permanent/add is
+// bundleable by design; every other kind stays single-tap.
+export function tryBuyBundle(state, slotIdx, qty, now) {
+  const slot = state.shop.slots[slotIdx];
+  if (!slot) return { ok: false, reason: 'invalid' };
+  const u = resolveUpgrade(slot);
+  if (!u || u.kind !== 'permanent' || u.permType !== 'add') return { ok: false, reason: 'unbundleable' };
+  // Pattern: Patched Frame scales the per-copy price; free-purchase charges
+  // cover a copy outright. Both are honoured per copy, mirroring tryBuy.
+  const unit = slot.cost * patternPurchaseCostMul(state);
+  let bought = 0;
+  while (bought < qty) {
+    const free = patternFreeLeft(state) > 0;
+    if (!free) {
+      if (unit <= 0 || state.amount < unit) break;
+      state.amount -= unit;
+    } else {
+      consumePatternFreePurchase(state);
+    }
+    state.flatBonus += u.value;
+    state.owned[u.id] = (state.owned[u.id] || 0) + 1;
+    bought++;
+  }
+  if (bought === 0) return { ok: false, reason: 'broke' };
+  // Milestone check runs once for the whole bundle — the per-copy interstitial
+  // spam would be unbearable at qty=1000.
+  checkPurchase(state, u);
+  replaceSlot(state, slotIdx, now);
+  return { ok: true, bought };
+}
+
 // After buying, replace the slot and clear any pin on it — purchasing frees
 // the slot so the replacement card lands unpinned (player request: a used pin
 // shouldn't keep locking the next random roll).

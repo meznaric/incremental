@@ -14,6 +14,11 @@
 
 export const UPDATES = [
   {
+    date: '2026-06-01',
+    title: 'Buy in bulk, and clearer active windows',
+    body: 'Base relay cards now carry ×10 / ×100 / ×1K / ×10K and Max chips once you can afford a stack — buy a thousand in one tap instead of a thousand taps. Active-window readouts no longer clip huge numbers: a stacked Carrier reads ×390.62 K and the tiles grow to fit, the combined Buffer now shows the real capped refund it pays back, and you can scroll a crowded window stack sideways.',
+  },
+  {
     date: '2026-05-31',
     title: 'A kinder Hail, cleaner runs, and a full transcript',
     body: 'The Buffer now cushions a failed Hail far better, and each Hail card shows the return you actually get if it lands — the redundant price is gone. Lose one and you will see exactly how many Echoes the Buffer pulled back; lose too many in a row and a voice finally says something. New Cycle Patterns like True North reshape each run, the Mythic band unlocks as it should, and four new clean-run achievements reward reaching high signal without a single Hail or Window. Console and Carrier Mass per cycle are doubled. Open Names for a new Log tab holding every word ever exchanged, plus a live signal readout that blooms into a waveform when you are at your strongest.',

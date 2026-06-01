@@ -15,15 +15,21 @@ import { formatAbbrev, parseAmount } from './bignum.js';
 import { resolveUpgrade, KIND_THEME, kindLabel, getUpgrade, convertYieldFor } from './upgrades.js';
 import { coilDropChance, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX, VIGIL_ID, VIGIL_K, VIGIL_MAX_REDUCTION } from './network.js';
 import {
-  effectiveRate, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
+  effectiveRate, tryBuy, tryBuyBundle, tryReroll, tryUnlockSlot, tryUnlockReroll, tryUnlockPinTier, tryTogglePin,
   nextSlotUnlockCost, computeRerollCost, grantFreeRerollsForStall,
   marginalRateForPurchase, effectiveGambleChance, gambleEffectiveCushion, nextPinTierCost, isSlotPinned,
-  REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_AT, MAX_PIN_SLOTS,
+  REROLL_UNLOCK_COST, REROLL_UNLOCK_AT, PIN_UNLOCK_AT, MAX_PIN_SLOTS, CUSHION_CAP,
 } from './shop.js';
 import { nowSeconds } from './save.js';
 import { installTap } from './tap.js';
 import { isGambleFxActive, fireGambleResult } from './gambleFx.js';
 import { patternPurchaseCostMul } from './cyclePatterns.js';
+
+// Bulk-buy steps offered on base (additive) cards, plus their compact labels.
+// A chip shows only when the player can afford that many copies; "Max" buys
+// every affordable copy. See renderShop + tryBuyBundle.
+const BUNDLE_STEPS = [10, 100, 1000, 10000];
+const BUNDLE_LABEL = { 10: '10', 100: '100', 1000: '1K', 10000: '10K' };
 
 export function initMainUi(state, deps) {
   const { triggerGambleFx } = deps;
@@ -103,6 +109,16 @@ export function initMainUi(state, deps) {
   function fmtMult(v) {
     if (!Number.isFinite(v)) return '0';
     return Number(v.toFixed(3)).toString();
+  }
+
+  // Multiplier label that stays narrow no matter how large. Below 1000 it reads
+  // exactly (fmtMult trims trailing zeros: ×2.5, ×625); at/above 1000 it
+  // switches to the same K/M/Qa abbreviations the rest of the HUD uses
+  // (×390625 → ×390.62 K) so a stacked Carrier or runaway Resonance can't blow
+  // out the buff tile / card.
+  function fmtMultDisplay(v) {
+    if (!Number.isFinite(v)) return '∞';
+    return v < 1000 ? fmtMult(v) : formatAbbrev(v);
   }
 
   function openSlotModal(idx) {
@@ -386,6 +402,7 @@ export function initMainUi(state, deps) {
         <div class="cost"></div>
         <div class="outcomes"></div>
         <div class="meta"></div>
+        <div class="bundle"></div>
         <div class="foot">
           <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
         </div>
@@ -398,6 +415,17 @@ export function initMainUi(state, deps) {
           return;
         }
         if (target.closest('.slot-info')) { openSlotModal(idx); return; }
+        // Bundle chips on base (additive) cards: buy ×10 / ×100 / ×1 K / ×10 K
+        // or Max in one tap, then re-roll once. The chip swallows the tap so
+        // the card-body single-buy below doesn't also fire.
+        const chip = target.closest('.bundle-chip');
+        if (chip) {
+          const qty = chip.dataset.qty === 'max' ? Infinity : Number(chip.dataset.qty);
+          const r = tryBuyBundle(state, idx, qty, nowSeconds());
+          if (r.ok) { playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); flyOutAndReplace(el); scheduleFreeRerollCheck(); }
+          else playSlotFx(el, 'fx-reject');
+          return;
+        }
         // Block taps on a gamble slot while a Hail reveal is on screen —
         // double-rolling through it is jarring and lets the player stack
         // overlapping bursts. Non-gamble slots still buy through.
@@ -727,6 +755,24 @@ export function initMainUi(state, deps) {
       if (u.kind === 'gamble' && cdLeft > 0) meta = `cooldown ${cdLeft.toFixed(1)}s`;
       else if ((u.kind === 'permanent' || u.kind === 'drift' || u.kind === 'coil' || u.kind === 'dampenBreak') && state.owned[u.id]) meta = `owned ×${state.owned[u.id]}`;
       el.querySelector('.meta').textContent = meta;
+
+      // Bundle chips: base (additive) cards become buyable in bulk once the
+      // player can afford ≥10 copies, so a late-game relay isn't tapped a
+      // thousand times. Each chip buys that many at the fixed unit price and
+      // re-rolls once (see tryBuyBundle). Below ×10 affordability the card is
+      // just a normal single-tap buy — no chips.
+      let bundleHtml = '';
+      if (u.kind === 'permanent' && u.permType === 'add' && cost > 0) {
+        const affordable = Math.floor(state.amount / cost);
+        if (affordable >= 10) {
+          const chips = BUNDLE_STEPS
+            .filter((n) => n <= affordable)
+            .map((n) => `<button type="button" class="bundle-chip" data-qty="${n}">×${BUNDLE_LABEL[n]}</button>`);
+          chips.push('<button type="button" class="bundle-chip bundle-max" data-qty="max">Max</button>');
+          bundleHtml = chips.join('');
+        }
+      }
+      setHtmlIfChanged(el.querySelector('.bundle'), bundleHtml);
       const pinEl = el.querySelector('.pin');
       pinEl.style.display = (state.shop.pinSlots || 0) > 0 ? '' : 'none';
       el.classList.toggle('pinned', isSlotPinned(state, i));
@@ -854,6 +900,23 @@ export function initMainUi(state, deps) {
     if (Number.isInteger(idx)) openBuffDetail(idx);
   });
 
+  // Trackpad / mouse-wheel horizontal scroll for the mobile buff rows, mirroring
+  // the #slots shim. The expanded secondary row (and a crowded primary row) can
+  // overflow horizontally; touch pans it natively via overflow-x:auto, but a
+  // vertical wheel does nothing without this — so a desktop / narrow-window
+  // player couldn't reach the buffs that ran off the right edge. Delegated on
+  // the persistent #buffs node since the rows are rebuilt every render.
+  buffsEl.addEventListener('wheel', (e) => {
+    const row = e.target.closest('.buff-row');
+    if (!row) return;
+    const dy = e.deltaY || e.deltaX;
+    if (!dy) return;
+    const max = row.scrollWidth - row.clientWidth;
+    if (max <= 1) return;
+    e.preventDefault();
+    row.scrollLeft += dy;
+  }, { passive: false });
+
   // Expansion via JS class instead of :hover. :hover hit-tests against the
   // group's current bounding box, which shrinks mid-transition — cursor falls
   // off, hover toggles, layout flickers. mouseover/mouseout fire only on real
@@ -891,10 +954,10 @@ export function initMainUi(state, deps) {
       groups[kind].push({ idx, value, numeric, remain, duration, pct, icon, name });
     };
     const active = (list) => list.filter((x) => x.expiresAt > now).sort((a, b) => a.expiresAt - b.expiresAt);
-    for (const x of active(b.rateMul))       push('rate',     `×${fmtMult(x.value)}`,                                  x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.rateMul))       push('rate',     `×${fmtMultDisplay(x.value)}`,                          x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
     for (const x of active(b.gambleLuck))    push('luck',     `+${Math.round(x.value * 100)}%`,                       x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
     for (const x of active(b.gambleCushion)) push('cushion',  `${Math.round(x.value * 100)}%`,                        x.value,                                      x.expiresAt - now, x.duration, x.sourceId);
-    for (const x of active(b.compound))      push('compound', `×${Math.pow(1 + x.rate, now - x.startedAt).toFixed(2)}`, Math.pow(1 + x.rate, now - x.startedAt),     x.expiresAt - now, x.duration, x.sourceId);
+    for (const x of active(b.compound))      push('compound', `×${fmtMultDisplay(Math.pow(1 + x.rate, now - x.startedAt))}`, Math.pow(1 + x.rate, now - x.startedAt),     x.expiresAt - now, x.duration, x.sourceId);
 
     const cardHtml = (g, extraClass = '', extraAttrs = '') => {
       // Combined card with 2+ stacked buffs shows one mini bar per buff,
@@ -930,11 +993,18 @@ export function initMainUi(state, deps) {
       let value, numeric;
       if (kind === 'rate' || kind === 'compound') {
         numeric = list.reduce((acc, x) => acc * x.numeric, 1);
-        value = `×${numeric.toFixed(2)}`;
+        value = `×${fmtMultDisplay(numeric)}`;
+      } else if (kind === 'cushion') {
+        // Buffer windows refund a slice of a lost Hail, but the effective
+        // refund is capped (CUSHION_CAP) and each window clamps at 100% —
+        // exactly what gambleEffectiveCushion feeds the Hail card. Show that
+        // capped figure here so the combined tile reads the same number the
+        // card pays back, instead of an uncapped sum the game never honours.
+        numeric = Math.min(CUSHION_CAP, list.reduce((acc, x) => acc + Math.min(1, x.numeric), 0));
+        value = `${Math.round(numeric * 100)}%`;
       } else {
         numeric = list.reduce((acc, x) => acc + x.numeric, 0);
-        const pct = Math.round(numeric * 100);
-        value = kind === 'luck' ? `+${pct}%` : `${pct}%`;
+        value = `+${Math.round(numeric * 100)}%`;
       }
       // Soonest-expiring still drives `remain` for any single-bar fallback.
       // The multi-bar render uses the per-buff `bars` list instead.

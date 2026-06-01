@@ -1785,6 +1785,35 @@ input[type="text"]:focus { border-color: #6688ff; }
 }
 .slot .slot-info:hover { color: #c0d0ff; }
 
+/* Bundle chips — bulk-buy controls that appear on base (additive) cards once
+   the player can afford ≥10 copies. Sit between meta and foot; .foot's
+   margin-top:auto keeps the info button pinned to the card bottom. */
+.slot .bundle { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.slot .bundle:empty { display: none; }
+.bundle-chip {
+  pointer-events: auto;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #4cd07d;
+  background: rgba(76, 208, 125, 0.12);
+  border: 1px solid rgba(76, 208, 125, 0.4);
+  border-radius: 5px;
+  padding: 3px 7px;
+  cursor: pointer;
+  line-height: 1;
+  touch-action: pan-x;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, transform 0.1s;
+}
+.bundle-chip:active { transform: translateY(1px); }
+.bundle-chip.bundle-max { color: #f5d34a; background: rgba(245, 211, 74, 0.12); border-color: rgba(245, 211, 74, 0.4); }
+@media (hover: hover) and (pointer: fine) {
+  .bundle-chip:hover { background: rgba(76, 208, 125, 0.24); }
+  .bundle-chip.bundle-max:hover { background: rgba(245, 211, 74, 0.24); }
+}
+
 /* Unlock-slot card — sits at the end of the slot row. Reads as a locked
    upgrade card whose kind icon/color previews the next slot index. The
    card itself is the click target. */

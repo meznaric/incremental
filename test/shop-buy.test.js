@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  makeShopState, tryBuy, tryReroll, tryUnlockSlot, tryUnlockReroll,
+  makeShopState, tryBuy, tryBuyBundle, tryReroll, tryUnlockSlot, tryUnlockReroll,
   tryUnlockPinTier, tryTogglePin, isSlotPinned, nextPinTierCost,
   SLOT_UNLOCK_COSTS, REROLL_UNLOCK_COST, PIN_TIER_COSTS, MAX_PIN_SLOTS,
   REROLL_PCT_PER_SLOT, REROLL_FLOOR_SECONDS, DEFAULT_SLOTS,
@@ -43,6 +43,63 @@ test('permanent: deducts cost, increments owned, applies flat bonus', () => {
   assert.equal(s.amount, 900);
   assert.equal(s.owned[u.id], 1);
   assert.equal(s.flatBonus, before + u.value);
+});
+
+test('tryBuyBundle: buys exact qty, deducts qty×cost, applies value qty times, rerolls once', () => {
+  const s = freshState({ amount: 1000 });
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 1000, owned: {} }, 10);
+  const slotBefore = s.shop.slots[0];
+  const flatBefore = s.flatBonus;
+
+  const res = tryBuyBundle(s, 0, 10, 0);
+  assert.ok(res.ok);
+  assert.equal(res.bought, 10);
+  assert.equal(s.amount, 1000 - 10 * 10);
+  assert.equal(s.owned[u.id], 10);
+  assert.equal(s.flatBonus, flatBefore + 10 * u.value);
+  // Slot re-rolled exactly once for the whole bundle.
+  assert.notEqual(s.shop.slots[0], slotBefore);
+});
+
+test('tryBuyBundle: max (Infinity) buys all affordable, leaves remainder under one unit', () => {
+  const s = freshState({ amount: 95 });
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 95, owned: {} }, 10);
+  const res = tryBuyBundle(s, 0, Infinity, 0);
+  assert.ok(res.ok);
+  assert.equal(res.bought, 9); // floor(95 / 10)
+  assert.equal(s.amount, 5);
+  assert.equal(s.owned[u.id], 9);
+});
+
+test('tryBuyBundle: caps at the requested qty even when more is affordable', () => {
+  const s = freshState({ amount: 100000 });
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 100000, owned: {} }, 10);
+  const res = tryBuyBundle(s, 0, 100, 0);
+  assert.ok(res.ok);
+  assert.equal(res.bought, 100);
+  assert.equal(s.owned[u.id], 100);
+  assert.equal(s.amount, 100000 - 100 * 10);
+});
+
+test('tryBuyBundle: refused (broke) when not even one copy is affordable; state untouched', () => {
+  const s = freshState({ amount: 5 });
+  const u = installDynAdd(s, 0, 'common', { rate: 10, balance: 5, owned: {} }, 10);
+  const slotBefore = s.shop.slots[0];
+  const res = tryBuyBundle(s, 0, 100, 0);
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'broke');
+  assert.equal(s.amount, 5);
+  assert.equal(s.owned[u.id] || 0, 0);
+  assert.equal(s.shop.slots[0], slotBefore); // no re-roll on a failed bundle
+});
+
+test('tryBuyBundle: refuses non-additive upgrades (unbundleable)', () => {
+  const s = freshState({ amount: 1_000_000 });
+  installSlot(s, 0, 'mult25', 100); // permanent, permType=mul
+  const res = tryBuyBundle(s, 0, 10, 0);
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'unbundleable');
+  assert.equal(s.amount, 1_000_000);
 });
 
 test('permanent: applies mul to permMul', () => {

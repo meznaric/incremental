@@ -370,7 +370,11 @@
 .buff-tile {
   position: relative;
   flex: 0 0 auto;
-  width: 70px;
+  /* Width grows with the value (a stacked Carrier reads ×390.62 K) instead of
+     clipping inside a fixed box. min-width keeps short tiles uniform; the side
+     padding gives the abbreviated number room. */
+  min-width: 70px;
+  width: auto;
   height: 36px;
   border-radius: 8px;
   background: rgba(20, 20, 40, 0.78);
@@ -381,7 +385,7 @@
   -webkit-tap-highlight-color: transparent;
   pointer-events: auto;
   backdrop-filter: blur(6px);
-  padding: 0;
+  padding: 0 9px;
   font-family: inherit;
   color: #e8e8f0;
   display: none;
@@ -414,6 +418,7 @@
 .buff-tile .buff-tile-val {
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 /* Combined tile: dashed border signals a stack to drill into. The
    .is-expanded flip to solid + lifted bg is the "this drawer is open" cue. */

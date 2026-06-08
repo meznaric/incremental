@@ -142,11 +142,14 @@ export function initMainUi(state, deps) {
     } else if (u.kind === 'convert') {
       // Token-style preview: this purchase queues a placement, not a /s bump.
       // Show what the token carries; sector and clustering multipliers land later.
+      // A placed relay carries a fixed share of base rate that scales as the
+      // base grows (network.js rebaseRelays), so the honest figure is the
+      // percentage, not a flat +/s that goes stale the moment base moves.
       const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
-      const tokenYield = convertYieldFor(u, slot.cost, baseAdd);
+      const tokenFrac = convertYieldFor(u, slot.cost, baseAdd) / Math.max(1, baseAdd);
       rows.push(
         `<div class="slot-modal-row"><span>Token tier</span><span>${u.rarity}</span></div>`,
-        `<div class="slot-modal-row"><span>Base yield</span><span>+${formatAbbrev(tokenYield)}/s (before sector × cluster)</span></div>`,
+        `<div class="slot-modal-row"><span>Adds to base</span><span>+${fmtPct(tokenFrac)} of base rate (before sector × cluster)</span></div>`,
         `<div class="slot-modal-row"><span>On purchase</span><span>Queue for placement on the Network map</span></div>`,
       );
     } else if (u.kind === 'permanent' && u.permType === 'add') {
@@ -714,9 +717,14 @@ export function initMainUi(state, deps) {
         // and clustering multipliers. Yield uses the rolled cost (slot.cost),
         // not the pattern-scaled price — Patched Frame doubles the price
         // without doubling the yield, so the preview must match.
+        // Show the relay's share of base rate, not a flat +/s: a placed relay
+        // now holds a fixed fraction of base (it scales as you grow — see
+        // network.js rebaseRelays), so a frozen "+X/s" reads as deceptively
+        // small the instant the base moves. The fraction is what the token
+        // actually carries (matches the frac stored in shop.tryBuy).
         const baseAdd = (state.basePerSecond || 0) + (state.flatBonus || 0);
-        const tokenYield = convertYieldFor(u, slot.cost, baseAdd);
-        outcomes = `<div class="outcome win"><i class="ri ri-add-circle-line"></i> Queue token · +${formatAbbrev(tokenYield)}/s base</div>`;
+        const tokenFrac = convertYieldFor(u, slot.cost, baseAdd) / Math.max(1, baseAdd);
+        outcomes = `<div class="outcome win"><i class="ri ri-add-circle-line"></i> Queue relay · +${fmtPct(tokenFrac)} of base</div>`;
       } else if (u.kind === 'permanent' && (u.permType === 'add' || u.permType === 'mul')) {
         const eff = marginalRateForPurchase(state, slot, now);
         outcomes = `<div class="outcome win"><i class="ri ri-arrow-up-line"></i> +${formatAbbrev(eff)}/s effective</div>`;

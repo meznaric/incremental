@@ -16,7 +16,7 @@ export const UPDATES = [
   {
     date: '2026-06-08',
     title: 'Anchor your relays — lock, amplify, scale',
-    body: 'Seed Relays no longer fade behind your progress: a placed relay now holds a fixed share of your base, so its output climbs as you grow instead of going stale before it even ripens. Once a relay ripens you can drive Anchors into it — the first one hides it from ComDef for good, and every anchor amplifies its carrier. Rarer relays anchor deeper (commons can\'t anchor at all), building a glowing pyramid on the cell. Break a relay down any time to relocate it and recover half the Echoes you spent anchoring.',
+    body: 'Seed Relays no longer fade behind your progress: a placed relay now holds a fixed share of your base, so its output climbs as you grow instead of going stale before it even ripens. The shop card now reads that share as a percentage of base rate, not a flat per-second figure that lied the moment your base moved. Once a relay ripens you can drive Anchors into it — the first one hides it from ComDef for good, and every anchor amplifies its carrier. Rarer relays anchor deeper (commons can\'t anchor at all), building a glowing pyramid on the cell. Break a relay down any time to relocate it and recover half the Echoes you spent anchoring.',
     highlight: true,
   },
   {

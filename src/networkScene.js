@@ -17,7 +17,7 @@
 
 import * as THREE from 'three';
 import {
-  SECTORS, getHexes, hexCenter, hexDistance, adjacentOnlineCount,
+  SECTORS, getHexes, hexCenter, hexDistance, adjacentOnlineCount, relayStacks,
 } from './network.js';
 
 // Geometry — keep these in one block; tuning is "edit and see."
@@ -559,9 +559,10 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       const expectedRipening = now < r.ripensAt;
       const adj = adjacentOnlineCount(net, r, now);
       const expectedIsolated = !expectedRipening && adj === 0;
+      const expectedStacks = relayStacks(r);
       // Recreate if status changed materially — cheaper than mutating
       // half a dozen materials and rebuilding rings count etc.
-      if (!entry || entry.ripening !== expectedRipening || entry.isolated !== expectedIsolated || entry.tier !== r.tier) {
+      if (!entry || entry.ripening !== expectedRipening || entry.isolated !== expectedIsolated || entry.tier !== r.tier || entry.stacks !== expectedStacks) {
         if (entry) {
           relayLayer.remove(entry.group);
           disposeGroup(entry.group);
@@ -757,12 +758,42 @@ export function makeNetworkScene({ canvas, getState, onSelect }) {
       group.add(beam);
     }
 
+    // Anchor pyramid — one shrinking hex tier per anchor, climbing above the
+    // cell ceiling so a reinforced relay reads as a golden ziggurat. The lock
+    // (hidden-from-ComDef) + amplify state is carried entirely by these tiers.
+    const stacks = relayStacks(relay);
+    if (stacks > 0) {
+      const ceilingY = HEX_THICKNESS / 2;
+      const tierH = 0.16;
+      for (let i = 0; i < stacks; i++) {
+        const shrink = Math.max(0.14, 0.7 - i * 0.11);
+        const rad = (HEX_R - HEX_INSET) * shrink;
+        const geo = new THREE.CylinderGeometry(rad, rad, tierH, 6, 1, false);
+        const y = ceilingY + 0.10 + i * (tierH + 0.05);
+        const tier = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          color: 0xffd86b,
+          transparent: true,
+          opacity: 0.30,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }));
+        tier.position.y = y;
+        group.add(tier);
+        const tEdge = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.72, depthWrite: false }),
+        );
+        tEdge.position.y = y;
+        group.add(tEdge);
+      }
+    }
+
     // World position of the top orb — used by cluster beams. Local + base.
     const topWorld = new THREE.Vector3(base.x, topY, base.z);
 
     return {
       group, top, beam, rings, fill, pulse, hit,
-      ripening, isolated, tier: relay.tier,
+      ripening, isolated, tier: relay.tier, stacks,
       sector: relay.sector, q: relay.hex.q, r: relay.hex.r,
       stalkHeight, stalkBaseY,
       topWorld,

@@ -5,7 +5,10 @@ import {
   networkContribution, networkStatus,
   relayYield, discoveryRatePerMin, adjacentOnlineCount, coverageMultiplier,
   ensureNetwork, bleedValue, hexDistance,
+  baseAdditive, maxStacksFor, relayStacks, stackYieldMul, stackCost, stackRefund,
+  addStack, breakDownRelay, canAddStack, isLocked,
 } from './network.js';
+import { effectiveRate } from './shop.js';
 import { makeNetworkScene } from './networkScene.js';
 import { nowSeconds } from './save.js';
 
@@ -121,6 +124,37 @@ export function makeNetworkUi(state, opts) {
       renderOverlays();
       return;
     }
+    if (target.closest('[data-act="reinforce-relay"]')) {
+      const now = nowSeconds();
+      const net = state.network;
+      const relay = net && net.relays.find((r) => r.id === selectedRelayId);
+      // First anchor only after the relay has ripened — see network.js.
+      if (relay && now >= relay.ripensAt && canAddStack(relay)) {
+        const cost = stackCost(effectiveRate(state, now), relay.tier, relayStacks(relay));
+        if ((state.amount || 0) >= cost) {
+          state.amount -= cost;
+          addStack(relay);
+          if (scene) scene.refresh(now);
+          renderOverlays();
+        }
+      }
+      return;
+    }
+    if (target.closest('[data-act="breakdown-relay"]')) {
+      const now = nowSeconds();
+      const net = state.network;
+      const relay = net && net.relays.find((r) => r.id === selectedRelayId);
+      if (relay) {
+        const refund = stackRefund(effectiveRate(state, now), relay.tier, relayStacks(relay));
+        breakDownRelay(state, relay.id);
+        if (refund > 0) state.amount += refund;
+        clearSelection();
+        if (scene) scene.refresh(now);
+        pushSelectionToScene();
+        renderOverlays();
+      }
+      return;
+    }
     if (target.closest('[data-act="toggle-info"]')) {
       infoPanelOpen = !infoPanelOpen;
       applySheetState();
@@ -178,6 +212,14 @@ export function makeNetworkUi(state, opts) {
     }
     pushSelectionToScene();
     renderOverlays();
+  }
+
+  // Projected /s a queued token would carry if placed right now (before sector
+  // / cluster). frac-bearing tokens track the live base; legacy ones fall back
+  // to their frozen baseYield.
+  function tokenBaseYield(t) {
+    if (!t) return 0;
+    return t.frac != null ? t.frac * baseAdditive(state) : (Number(t.baseYield) || 0);
   }
 
   function pushSelectionToScene() {
@@ -242,7 +284,7 @@ export function makeNetworkUi(state, opts) {
         <span class="net-upnext-pos">${i === 0 ? 'next' : `#${i + 1}`}</span>
         <span class="net-token-dot rar-${t.tier}"></span>
         <span class="net-upnext-tier">${TIER_LABEL[t.tier] || t.tier}</span>
-        <span class="net-upnext-yield">+${formatAbbrev(t.baseYield)}/s</span>
+        <span class="net-upnext-yield">+${formatAbbrev(tokenBaseYield(t))}/s</span>
       </div>
     `).join('');
     return `
@@ -264,7 +306,7 @@ export function makeNetworkUi(state, opts) {
           <div class="net-queue-row">
             <span class="net-token-dot rar-${t.tier}"></span>
             <span class="net-token-tier">${TIER_LABEL[t.tier] || t.tier}</span>
-            <span class="net-token-yield">+${formatAbbrev(t.baseYield)}/s</span>
+            <span class="net-token-yield">+${formatAbbrev(tokenBaseYield(t))}/s</span>
             <span class="net-token-pos">${i === 0 ? 'next' : `#${i + 1}`}</span>
           </div>
         `).join('');
@@ -366,13 +408,17 @@ export function makeNetworkUi(state, opts) {
     const token = net.queued[0];
     const sector = SECTORS[ph.sector] || SECTORS.frontier;
     const tier = TIER_INFO[token.tier] || TIER_INFO.common;
-    const projectedYield = (Number(token.baseYield) || 0) * sector.yieldMul;
+    const projectedYield = tokenBaseYield(token) * sector.yieldMul;
     const ripenSec = tier.ripenSec * sector.ripenMul;
     const queueTail = net.queued.length > 1 ? ` <span class="net-place-sep">·</span> <span>${net.queued.length - 1} more queued</span>` : '';
     const adjOnline = countAdjacentOnline(net, ph, now);
     const clusterHint = adjOnline > 0
       ? `<span>${adjOnline} online neighbour${adjOnline === 1 ? '' : 's'} → +${(adjOnline * 25)}% cluster</span>`
       : `<span>isolated · mesh bleed enabled</span>`;
+    const maxStacks = maxStacksFor(token.tier);
+    const anchorHint = maxStacks > 0
+      ? `<span class="net-place-sep">·</span> <span>anchors to ${maxStacks} (lock + amplify)</span>`
+      : `<span class="net-place-sep">·</span> <span>too common to anchor</span>`;
     return `
       <div class="net-place-bar staged" role="dialog" aria-label="Confirm placement">
         <div class="net-place-head">
@@ -380,7 +426,7 @@ export function makeNetworkUi(state, opts) {
           <span class="net-detail-sec sec-tag-${ph.sector}">${sector.label}</span>
         </div>
         <div class="net-detail-row"><span>+${formatAbbrev(projectedYield)}/s when ripe</span><span>ripens in ${fmtMin(ripenSec)}</span></div>
-        <div class="net-place-stats">${clusterHint}${queueTail}</div>
+        <div class="net-place-stats">${clusterHint}${anchorHint}${queueTail}</div>
         <div class="net-place-hint">Tap another empty hex to move.</div>
         <div class="net-place-actions">
           <button class="net-place-btn cancel" type="button" data-act="cancel-placement">Cancel</button>
@@ -397,24 +443,54 @@ export function makeNetworkUi(state, opts) {
     const isolated = online && adj === 0;
     const tier = TIER_INFO[relay.tier] || TIER_INFO.common;
     const neighbourTiers = listAdjacentOnlineTiers(net, relay, now);
-    const status = online ? (isolated ? 'isolated' : 'clustered') : 'ripening';
+    const locked = isLocked(relay);
+    const stacks = relayStacks(relay);
+    const maxStacks = maxStacksFor(relay.tier);
+    const status = online ? (locked ? 'anchored' : (isolated ? 'isolated' : 'clustered')) : 'ripening';
     const yieldNow = relayYield(net, relay, now);
     const headStat = online
       ? `<div class="net-detail-row"><span>Live yield</span><span>+${formatAbbrev(yieldNow)}/s</span></div>`
       : `<div class="net-detail-row"><span>Ripens in</span><span>${fmtMin(relay.ripensAt - now)}</span></div>`;
     const baseRow = `<div class="net-detail-row"><span>Base × sector</span><span>+${formatAbbrev(relay.baseYield)} × ${sector.yieldMul}</span></div>`;
+    const anchorRow = stacks > 0
+      ? `<div class="net-detail-row good"><span>Anchored · ×${stackYieldMul(relay).toFixed(1)} yield</span><span>${stacks} / ${maxStacks} layers</span></div>`
+      : '';
     const neighbourLine = online
       ? `<div class="net-detail-row"><span>Neighbours online</span><span>${adj}${neighbourTiers ? ` · ${neighbourTiers}` : ''}</span></div>`
       : '';
     const bleedLine = (online && isolated && tier.bleedPeriodSec > 0)
       ? `<div class="net-detail-row warn"><span>Isolated · mesh bleed</span><span>+${formatAbbrev(bleedValue(relay))} every ${fmtMin(tier.bleedPeriodSec)}</span></div>`
       : '';
-    let halfLifeLine = '';
+    let riskLine = '';
     if (online) {
-      const discPerMin = discoveryRatePerMin(net, relay, now);
-      const halfLifeMin = discPerMin > 0 ? Math.log(2) / discPerMin : Infinity;
-      const halfLifeStr = isFinite(halfLifeMin) ? fmtMin(halfLifeMin * 60) : '—';
-      halfLifeLine = `<div class="net-detail-row"><span>Half-life to discovery</span><span>${halfLifeStr}</span></div>`;
+      if (locked) {
+        riskLine = `<div class="net-detail-row good"><span>Hidden from ComDef</span><span>locked</span></div>`;
+      } else {
+        const discPerMin = discoveryRatePerMin(net, relay, now);
+        const halfLifeMin = discPerMin > 0 ? Math.log(2) / discPerMin : Infinity;
+        const halfLifeStr = isFinite(halfLifeMin) ? fmtMin(halfLifeMin * 60) : '—';
+        riskLine = `<div class="net-detail-row"><span>Half-life to discovery</span><span>${halfLifeStr}</span></div>`;
+      }
+    }
+    // Anchor controls — ripened relays only. First anchor locks against
+    // discovery; rarity caps the depth (commons can't anchor at all).
+    let actions = '';
+    if (online) {
+      const rate = effectiveRate(state, now);
+      let reinforceBtn = '';
+      if (maxStacks <= 0) {
+        reinforceBtn = `<span class="net-anchor-note">Too common to anchor</span>`;
+      } else if (canAddStack(relay)) {
+        const cost = stackCost(rate, relay.tier, stacks);
+        const afford = (state.amount || 0) >= cost;
+        const label = stacks === 0 ? 'Anchor' : 'Reinforce';
+        reinforceBtn = `<button class="net-place-btn reinforce" type="button" data-act="reinforce-relay" ${afford ? '' : 'disabled'}>${label} · ${formatAbbrev(cost)}</button>`;
+      } else {
+        reinforceBtn = `<span class="net-anchor-note">Fully anchored</span>`;
+      }
+      const refund = stackRefund(rate, relay.tier, stacks);
+      const breakBtn = `<button class="net-place-btn breakdown" type="button" data-act="breakdown-relay">Break down${refund > 0 ? ` · +${formatAbbrev(refund)}` : ''}</button>`;
+      actions = `<div class="net-place-actions">${reinforceBtn}${breakBtn}</div>`;
     }
     return `
       <div class="net-place-bar relay status-${status}" role="dialog" aria-label="Relay detail">
@@ -427,9 +503,11 @@ export function makeNetworkUi(state, opts) {
         </div>
         ${headStat}
         ${baseRow}
+        ${anchorRow}
         ${neighbourLine}
         ${bleedLine}
-        ${halfLifeLine}
+        ${riskLine}
+        ${actions}
       </div>
     `;
   }
@@ -504,7 +582,16 @@ export function makeNetworkUi(state, opts) {
   let pendingExitTimer = null;
   function barIdentity() {
     if (pendingPlacement) return `staged-${pendingPlacement.q},${pendingPlacement.r}`;
-    if (selectedRelayId) return `relay-${selectedRelayId}`;
+    if (selectedRelayId) {
+      // Fold anchor depth + ripe state into the identity so the bar rebuilds
+      // (showing new cost / controls) the moment either changes — otherwise the
+      // 100ms tick leaves the docked bar alone to keep buttons tappable.
+      const net = state.network;
+      const relay = net && net.relays.find((r) => r.id === selectedRelayId);
+      const stk = relay ? relayStacks(relay) : 0;
+      const online = relay && nowSeconds() >= relay.ripensAt ? 1 : 0;
+      return `relay-${selectedRelayId}-${stk}-${online}`;
+    }
     if (selectedEmptyHex) return `empty-${selectedEmptyHex.q},${selectedEmptyHex.r}`;
     return 'none';
   }

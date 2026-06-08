@@ -1,5 +1,5 @@
 import { integrateRate, pruneBuffs, validateSlate, effectiveRate, applyOfflineCheapReroll, MAX_SLOTS, DEFAULT_SLOTS } from './shop.js';
-import { ensureNetwork, reconcileOffline, reconcileOfflineBleeds, getHexAt } from './network.js';
+import { ensureNetwork, reconcileOffline, reconcileOfflineBleeds, getHexAt, baseAdditive, rebaseRelays, maxStacksFor } from './network.js';
 
 export const SAVE_KEY = 'incremental.save.v14';
 
@@ -144,6 +144,11 @@ export function loadState(state) {
   const net = ensureNetwork(state);
   if (s.network && typeof s.network === 'object') {
     const now0 = nowSeconds();
+    // Base to migrate pre-`frac` saves against — relays/tokens saved before the
+    // scaling change carry only an absolute baseYield, so derive their share of
+    // base from the base as it stands now. They keep their current value and
+    // start tracking progression from here.
+    const migBase = Math.max(1, baseAdditive(state));
     const relays = Array.isArray(s.network.relays) ? s.network.relays : [];
     net.relays = relays.map((r) => {
       if (!r || typeof r !== 'object') return null;
@@ -153,10 +158,16 @@ export function loadState(state) {
       if (!getHexAt(q, rr)) return null;
       const plantedAt = Number(r.plantedAt);
       const ripensAt = Number(r.ripensAt);
+      const tier = typeof r.tier === 'string' ? r.tier : 'common';
+      const baseYield = Math.max(0, Number(r.baseYield) || 0);
+      const fracRaw = Number(r.frac);
+      const frac = Number.isFinite(fracRaw) && fracRaw >= 0 ? fracRaw : baseYield / migBase;
       return {
         id: String(r.id || `r_${Math.floor(now0 * 1000)}_${Math.random()}`),
-        tier: typeof r.tier === 'string' ? r.tier : 'common',
-        baseYield: Math.max(0, Number(r.baseYield) || 0),
+        tier,
+        baseYield,
+        frac,
+        stacks: Math.max(0, Math.min(maxStacksFor(tier), Math.floor(Number(r.stacks) || 0))),
         hex: { q, r: rr },
         sector: typeof r.sector === 'string' ? r.sector : 'frontier',
         plantedAt: Number.isFinite(plantedAt) ? plantedAt : now0,
@@ -164,11 +175,15 @@ export function loadState(state) {
       };
     }).filter(Boolean);
     const queued = Array.isArray(s.network.queued) ? s.network.queued : [];
-    net.queued = queued.map((t) => ({
-      tier: typeof t.tier === 'string' ? t.tier : 'common',
-      baseYield: Math.max(0, Number(t.baseYield) || 0),
-    }));
+    net.queued = queued.map((t) => {
+      const baseYield = Math.max(0, Number(t.baseYield) || 0);
+      const fracRaw = Number(t.frac);
+      const frac = Number.isFinite(fracRaw) && fracRaw >= 0 ? fracRaw : baseYield / migBase;
+      return { tier: typeof t.tier === 'string' ? t.tier : 'common', baseYield, frac };
+    });
     net.lostCount = Math.max(0, Number(s.network.lostCount) || 0);
+    // Sync cached baseYields to current base now that frac is populated.
+    rebaseRelays(state, nowSeconds());
   }
 
   const now = nowSeconds();

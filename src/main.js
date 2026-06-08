@@ -29,7 +29,7 @@ import { showWelcomeBack } from './welcomeBack.js';
 import { initBreakdownUi } from './breakdownUi.js';
 import { hasPendingPatternChoice } from './cyclePatterns.js';
 import { showPatternSelect } from './patternUi.js';
-import { ensureNetwork, tickNetwork, tickBleedDrip, SECTORS } from './network.js';
+import { ensureNetwork, tickNetwork, tickBleedDrip, rebaseRelays, SECTORS } from './network.js';
 import { makeNetworkUi } from './networkUi.js';
 import { initMainUi } from './mainUi.js';
 import { initDebugUi } from './debugUi.js';
@@ -460,6 +460,10 @@ function tick(raf) {
   const wallDt = Math.max(0, t - lastWall);
   lastWall = t;
 
+  // Rebase relay yields to current production before anything samples the
+  // network — a placed relay holds a fixed share of base, so its raw /s has to
+  // track the base as it grows this frame.
+  rebaseRelays(state, t);
   // Network discovery + ripening pass runs before rate integration so any
   // status changes are reflected in this frame's accrual.
   const losses = tickNetwork(state, wallDt, t);

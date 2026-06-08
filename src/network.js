@@ -60,6 +60,95 @@ export function vigilOfflineDiscoveryMul(state) {
   return 1 - VIGIL_MAX_REDUCTION * (n / (n + VIGIL_K));
 }
 
+// Anchor reinforcement. A ripened relay can be reinforced with "anchor"
+// layers driven straight down into the hex. The first anchor hides the relay
+// from ComDef entirely (discovery → 0); every anchor also amplifies its
+// carrier. Rarity caps how deep you can go — commons can't be anchored at all,
+// the top obtainable rarity (legendary) reaches the full five. Reads as a
+// shrinking pyramid of hex tiers in the 3D scene. See docs/lore/world-rules.md.
+export const MAX_STACKS = { common: 0, uncommon: 2, rare: 3, legendary: 5, mythic: 5 };
+export const STACK_YIELD_PER = 0.6;     // each anchor adds +60% to the relay's yield
+// Anchor price tracks live production so it stays a real Echo sink late:
+//   cost = rate × STACK_BASE_SECONDS × rarityMul × STACK_GROWTH^existingAnchors
+// First anchor on an uncommon is ~1.5 min of production; each further anchor
+// 2.5× the last, and richer rarities pay more (they're worth more locked).
+export const STACK_BASE_SECONDS = 75;
+export const STACK_GROWTH = 2.5;
+export const STACK_RARITY_MUL = { common: 1, uncommon: 1.2, rare: 1.8, legendary: 3, mythic: 3 };
+export const STACK_REFUND_RATE = 0.5;   // break-down returns half the anchors' spend
+
+export function maxStacksFor(tier) { return MAX_STACKS[tier] || 0; }
+export function relayStacks(relay) { return Math.max(0, Math.floor((relay && relay.stacks) || 0)); }
+export function isLocked(relay) { return relayStacks(relay) > 0; }
+export function canAddStack(relay) { return relay ? relayStacks(relay) < maxStacksFor(relay.tier) : false; }
+export function stackYieldMul(relay) { return 1 + STACK_YIELD_PER * relayStacks(relay); }
+
+// Echo cost of the next anchor on a relay that already carries `existingStacks`.
+// rate is passed in (effectiveRate, from shop.js) to avoid a circular import.
+export function stackCost(rate, tier, existingStacks) {
+  const r = Math.max(1, Number(rate) || 0);
+  const mul = STACK_RARITY_MUL[tier] ?? 1;
+  return r * STACK_BASE_SECONDS * mul * Math.pow(STACK_GROWTH, Math.max(0, existingStacks));
+}
+
+// Echoes refunded when a relay carrying `stacks` anchors is broken down — half
+// of everything spent driving them in. Recomputed (cost is deterministic) so we
+// don't have to persist a running spend total per relay.
+export function stackRefund(rate, tier, stacks) {
+  let total = 0;
+  for (let i = 0; i < stacks; i++) total += stackCost(rate, tier, i);
+  return total * STACK_REFUND_RATE;
+}
+
+// Add one anchor. Pure on the relay; the caller charges the Echo cost. Returns
+// true if an anchor was added (relay had room), false otherwise.
+export function addStack(relay) {
+  if (!canAddStack(relay)) return false;
+  relay.stacks = relayStacks(relay) + 1;
+  return true;
+}
+
+// Tear a relay out of the mesh, returning its placement token to the front of
+// the queue so the player can re-place it elsewhere ("change them"). Anchors
+// are not carried on the token — the caller refunds them in Echoes. Returns the
+// freed token, or null if the relay wasn't found.
+export function breakDownRelay(state, relayId) {
+  const net = state && state.network;
+  if (!net || !net.relays) return null;
+  const idx = net.relays.findIndex((r) => r.id === relayId);
+  if (idx < 0) return null;
+  const r = net.relays[idx];
+  net.relays.splice(idx, 1);
+  const token = { tier: r.tier, baseYield: r.baseYield || 0 };
+  if (r.frac != null) token.frac = r.frac;
+  net.queued.unshift(token);
+  return token;
+}
+
+// The additive base a relay's yield is measured against — same quantity the
+// convert cap uses (basePerSecond + flatBonus), deliberately excluding the
+// network's own contribution so a relay can't feed back into its own scaling.
+export function baseAdditive(state) {
+  return (state.basePerSecond || 0) + (state.flatBonus || 0);
+}
+
+// Refresh each relay's cached absolute baseYield from its immutable `frac` (the
+// share of additive base captured at buy time) against the *current* base. This
+// is what keeps a placed relay relevant as you progress: its share of base is
+// fixed, its raw Echoes/s tracks the base as it grows — so a node placed when
+// you earned 1×/s is still meaningful after the base climbs 100×. Relays
+// without a `frac` (legacy saves migrate to one on load; test fixtures stay
+// frozen) are left alone. Called once per foreground tick and once at load
+// before the offline integral samples networkContribution.
+export function rebaseRelays(state, now) {
+  const net = state && state.network;
+  if (!net || !net.relays || !net.relays.length) return;
+  const base = baseAdditive(state);
+  for (const r of net.relays) {
+    if (r.frac != null) r.baseYield = Math.max(0, r.frac) * base;
+  }
+}
+
 function grantRerolls(state, n) {
   if (!(n > 0)) return 0;
   const before = state.freeRerolls || 0;
@@ -206,7 +295,7 @@ export function relayYield(network, relay, now) {
   const sector = SECTORS[relay.sector] || SECTORS.frontier;
   const adj = adjacentOnlineCount(network, relay, now);
   const cluster = 1 + adj * CLUSTER_YIELD_PER_NEIGHBOR;
-  return (relay.baseYield || 0) * sector.yieldMul * cluster;
+  return (relay.baseYield || 0) * sector.yieldMul * cluster * stackYieldMul(relay);
 }
 
 export function coverageMultiplier(network, now) {
@@ -235,6 +324,7 @@ export function networkContribution(state, now) {
 // risk, isolation shield. Ripening relays are not findable.
 export function discoveryRatePerMin(network, relay, now) {
   if (!isOnline(relay, now)) return 0;
+  if (isLocked(relay)) return 0;   // anchored relays are hidden from ComDef
   const tier = TIER_INFO[relay.tier] || TIER_INFO.common;
   const sector = SECTORS[relay.sector] || SECTORS.frontier;
   const adj = adjacentOnlineCount(network, relay, now);
@@ -256,10 +346,18 @@ export function placeRelay(state, hex, now) {
   const tier = TIER_INFO[token.tier] || TIER_INFO.common;
   const sectorDef = SECTORS[sector] || SECTORS.frontier;
   const ripenSec = tier.ripenSec * sectorDef.ripenMul;
+  // A token with a `frac` is measured as a share of base; its cached baseYield
+  // tracks the current base at placement (and every tick after, via
+  // rebaseRelays). A token without one (test fixtures, legacy debug) keeps its
+  // literal baseYield, frozen.
+  const frac = token.frac != null ? Math.max(0, Number(token.frac)) : null;
+  const baseYield = frac != null ? frac * baseAdditive(state) : (Number(token.baseYield) || 0);
   const relay = {
     id: newRelayId(now),
     tier: token.tier,
-    baseYield: Number(token.baseYield) || 0,
+    baseYield,
+    frac,
+    stacks: 0,
     hex: { q: hex.q, r: hex.r },
     sector,
     plantedAt: now,
@@ -270,9 +368,13 @@ export function placeRelay(state, hex, now) {
 }
 
 // Queue a placement token. Called by shop tryBuy when a convert is purchased.
-export function queueToken(state, tier, baseYield) {
+// `frac` (optional) is the relay's share of additive base — when present the
+// placed relay scales with progression instead of freezing at baseYield.
+export function queueToken(state, tier, baseYield, frac) {
   const network = ensureNetwork(state);
-  network.queued.push({ tier, baseYield: Math.max(0, Number(baseYield) || 0) });
+  const token = { tier, baseYield: Math.max(0, Number(baseYield) || 0) };
+  if (frac != null && Number.isFinite(Number(frac))) token.frac = Math.max(0, Number(frac));
+  network.queued.push(token);
 }
 
 // What a single Bleed drop is worth, in raw Echoes (no permMul, no coverage).
@@ -281,7 +383,7 @@ export function queueToken(state, tier, baseYield) {
 // climbs around it.
 export function bleedValue(relay) {
   const sec = SECTORS[relay.sector] || SECTORS.frontier;
-  return (relay.baseYield || 0) * sec.yieldMul * BLEED_YIELD_SECONDS;
+  return (relay.baseYield || 0) * sec.yieldMul * BLEED_YIELD_SECONDS * stackYieldMul(relay);
 }
 
 // Per-tick Bleed drip — only isolated online relays drop. On average each

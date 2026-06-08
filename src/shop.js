@@ -496,7 +496,11 @@ export function tryBuy(state, slotIdx, now) {
     // Yield credit follows the rolled cost, not the pattern-scaled price.
     // Patched Frame doubles what the player pays for a convert without doubling
     // what the relay ends up worth — the cost penalty has to actually bite.
-    queueToken(state, u.rarity, convertYieldFor(u, slot.cost, baseAdd));
+    // baseYield = capped absolute at buy time; frac = its share of base, which
+    // is what the relay actually scales on (so a node placed early stays
+    // relevant after the base climbs). See network.js rebaseRelays.
+    const convYield = convertYieldFor(u, slot.cost, baseAdd);
+    queueToken(state, u.rarity, convYield, convYield / Math.max(1, baseAdd));
     checkPurchase(state, u);
     replaceSlot(state, slotIdx, now);
     return { ok: true };

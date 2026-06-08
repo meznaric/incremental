@@ -90,9 +90,11 @@ export function initDebugUi(state, deps) {
   }
 
   function queueSeed(tier) {
-    // Yield scaled to current rate so the relay actually shifts the meter.
-    const baseYield = Math.max(10, (state.basePerSecond || 0) + (state.flatBonus || 0) || 1000);
-    queueToken(state, tier, baseYield * (tier === 'mythic' ? 5 : 1));
+    // Yield scaled to current rate so the relay actually shifts the meter, with
+    // a frac so it tracks progression like a real placement.
+    const base = Math.max(1, (state.basePerSecond || 0) + (state.flatBonus || 0));
+    const baseYield = Math.max(10, base) * (tier === 'mythic' ? 5 : 1);
+    queueToken(state, tier, baseYield, baseYield / base);
     if (showToast) showToast(`debug · queued ${tier} seed (+${formatAbbrev(baseYield)}/s base)`);
     if (refreshNetwork) refreshNetwork();
   }

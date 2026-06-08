@@ -14,6 +14,12 @@
 
 export const UPDATES = [
   {
+    date: '2026-06-08',
+    title: 'Anchor your relays — lock, amplify, scale',
+    body: 'Seed Relays no longer fade behind your progress: a placed relay now holds a fixed share of your base, so its output climbs as you grow instead of going stale before it even ripens. Once a relay ripens you can drive Anchors into it — the first one hides it from ComDef for good, and every anchor amplifies its carrier. Rarer relays anchor deeper (commons can\'t anchor at all), building a glowing pyramid on the cell. Break a relay down any time to relocate it and recover half the Echoes you spent anchoring.',
+    highlight: true,
+  },
+  {
     date: '2026-06-01',
     title: 'Buy in bulk, and clearer active windows',
     body: 'Base relay cards now carry ×10 / ×100 / ×1K / ×10K and Max chips once you can afford a stack — buy a thousand in one tap instead of a thousand taps. Active-window readouts no longer clip huge numbers: a stacked Carrier reads ×390.62 K and the tiles grow to fit, the combined Buffer now shows the real capped refund it pays back, and you can scroll a crowded window stack sideways.',

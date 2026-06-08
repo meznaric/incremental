@@ -10,6 +10,10 @@ import {
   MAP_RADIUS, COVERAGE_BONUS_PER_SECTOR, CLUSTER_YIELD_PER_NEIGHBOR,
   coilDropChance, countOnlineRelays, COIL_ID, COIL_DROP_K, COIL_DROP_PMAX,
   vigilOfflineDiscoveryMul, VIGIL_ID, VIGIL_K, VIGIL_MAX_REDUCTION,
+  rebaseRelays, relayYield, discoveryRatePerMin,
+  maxStacksFor, relayStacks, isLocked, canAddStack, addStack, stackYieldMul,
+  stackCost, stackRefund, breakDownRelay, STACK_YIELD_PER, STACK_GROWTH,
+  STACK_BASE_SECONDS, STACK_RARITY_MUL, STACK_REFUND_RATE, MAX_STACKS,
 } from '../src/network.js';
 
 function s() {
@@ -381,6 +385,112 @@ test('vigilOfflineDiscoveryMul: 1 with no coils, monotone decreasing toward 1 - 
   assert.ok(Math.abs(mHalf - (1 - VIGIL_MAX_REDUCTION / 2)) < 1e-9);
   // Asymptote: stays above the floor.
   assert.ok(mBig > 1 - VIGIL_MAX_REDUCTION);
+});
+
+// --- Progression scaling (frac-based relay yield) ---
+
+test('rebaseRelays: a frac-bearing relay tracks the additive base as it grows', () => {
+  const st = { amount: 0, basePerSecond: 100, flatBonus: 0, network: makeNetworkState() };
+  // 4% share of base. queueToken carries the frac through placement.
+  queueToken(st, 'common', 4, 0.04);
+  const hex = getHexes().find((h) => h.sector === 'frontier');
+  const r = placeRelay(st, hex, 0);
+  assert.equal(r.frac, 0.04);
+  assert.equal(r.baseYield, 0.04 * 100);            // placed against base 100
+  // Base climbs 100×; rebase tracks it instead of freezing.
+  st.basePerSecond = 10000;
+  rebaseRelays(st, 1);
+  assert.equal(r.baseYield, 0.04 * 10000);
+});
+
+test('rebaseRelays: a relay without frac is left frozen (legacy fixtures)', () => {
+  const st = { amount: 0, basePerSecond: 100, flatBonus: 0, network: makeNetworkState() };
+  queueToken(st, 'common', 100);                    // no frac → frozen
+  placeRelay(st, getHexes()[0], 0);
+  const r = st.network.relays[0];
+  assert.equal(r.frac, null);
+  st.basePerSecond = 999999;
+  rebaseRelays(st, 1);
+  assert.equal(r.baseYield, 100);
+});
+
+// --- Anchor reinforcement ---
+
+test('maxStacksFor: commons cannot anchor, legendary reaches the cap', () => {
+  assert.equal(maxStacksFor('common'), 0);
+  assert.equal(maxStacksFor('legendary'), 5);
+  assert.equal(maxStacksFor('legendary'), MAX_STACKS.legendary);
+});
+
+test('addStack: respects the rarity cap and is gated by canAddStack', () => {
+  const common = { tier: 'common', stacks: 0 };
+  assert.equal(canAddStack(common), false);
+  assert.equal(addStack(common), false);
+  assert.equal(relayStacks(common), 0);
+
+  const rare = { tier: 'rare', stacks: 0 };
+  assert.equal(addStack(rare), true);
+  assert.equal(addStack(rare), true);
+  assert.equal(addStack(rare), true);            // rare cap = 3
+  assert.equal(addStack(rare), false);
+  assert.equal(relayStacks(rare), 3);
+});
+
+test('isLocked + discoveryRatePerMin: the first anchor hides the relay from ComDef', () => {
+  const st = s();
+  const watch = getHexes().find((h) => h.sector === 'watch');
+  queueToken(st, 'rare', 100);
+  placeRelay(st, watch, 0);
+  const r = st.network.relays[0];
+  r.ripensAt = 0;
+  assert.equal(isLocked(r), false);
+  assert.ok(discoveryRatePerMin(st.network, r, 1) > 0);
+  addStack(r);
+  assert.equal(isLocked(r), true);
+  assert.equal(discoveryRatePerMin(st.network, r, 1), 0);
+});
+
+test('stackYieldMul: each anchor adds STACK_YIELD_PER, applied to relayYield', () => {
+  const st = s();
+  const edge = getHexes().find((h) => h.sector === 'edge'); // yieldMul 1.0, isolated
+  queueToken(st, 'rare', 100);
+  placeRelay(st, edge, 0);
+  const r = st.network.relays[0];
+  r.ripensAt = 0;
+  const before = relayYield(st.network, r, 1);
+  addStack(r);
+  addStack(r);
+  assert.equal(stackYieldMul(r), 1 + STACK_YIELD_PER * 2);
+  const after = relayYield(st.network, r, 1);
+  assert.ok(Math.abs(after - before * (1 + STACK_YIELD_PER * 2)) < 1e-6, `got ${after}`);
+});
+
+test('stackCost: scales with rate, rarity and grows per existing anchor', () => {
+  const rate = 1000;
+  const c0 = stackCost(rate, 'rare', 0);
+  assert.equal(c0, rate * STACK_BASE_SECONDS * STACK_RARITY_MUL.rare);
+  const c1 = stackCost(rate, 'rare', 1);
+  assert.ok(Math.abs(c1 - c0 * STACK_GROWTH) < 1e-6);
+});
+
+test('stackRefund: returns half of all anchors driven in', () => {
+  const rate = 1000;
+  const expected = (stackCost(rate, 'rare', 0) + stackCost(rate, 'rare', 1)) * STACK_REFUND_RATE;
+  assert.ok(Math.abs(stackRefund(rate, 'rare', 2) - expected) < 1e-6);
+});
+
+test('breakDownRelay: removes the relay and returns its token to the front of the queue', () => {
+  const st = { amount: 0, basePerSecond: 100, flatBonus: 0, network: makeNetworkState() };
+  queueToken(st, 'rare', 50, 0.5);
+  placeRelay(st, getHexes()[0], 0);
+  const r = st.network.relays[0];
+  addStack(r);
+  const token = breakDownRelay(st, r.id);
+  assert.equal(st.network.relays.length, 0);
+  assert.equal(st.network.queued.length, 1);
+  assert.equal(st.network.queued[0], token);
+  assert.equal(token.tier, 'rare');
+  assert.equal(token.frac, 0.5);                 // frac preserved so it can re-place at value
 });
 
 test('reconcileOffline: Vigil Coil meaningfully reduces loss probability over a long window', () => {

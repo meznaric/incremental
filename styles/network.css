@@ -572,6 +572,34 @@
 .net-place-btn.confirm:hover {
   background: linear-gradient(180deg, rgba(255, 224, 130, 0.35), rgba(255, 224, 130, 0.18));
 }
+.net-place-btn.reinforce {
+  background: linear-gradient(180deg, rgba(255, 216, 107, 0.28), rgba(255, 216, 107, 0.12));
+  color: #ffe9a8;
+  border-color: rgba(255, 216, 107, 0.6);
+  box-shadow: 0 0 10px rgba(255, 216, 107, 0.2);
+}
+.net-place-btn.reinforce:hover:not([disabled]) {
+  background: linear-gradient(180deg, rgba(255, 216, 107, 0.4), rgba(255, 216, 107, 0.2));
+}
+.net-place-btn[disabled] { opacity: 0.4; cursor: default; }
+.net-place-btn.breakdown {
+  background: rgba(255, 255, 255, 0.04);
+  color: #b9b9cf;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.net-place-btn.breakdown:hover { background: rgba(244, 63, 94, 0.12); color: #ffadcc; border-color: rgba(244, 63, 94, 0.4); }
+.net-anchor-note {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #8a8ac0;
+}
+.net-place-bar .net-detail-row.good { color: #8bf0c0; }
+.net-place-bar.status-anchored { box-shadow: inset 0 0 0 1px rgba(255, 216, 107, 0.3); }
 
 /* On narrow viewports the side panel becomes a docked bottom sheet so it
    doesn't eat half the canvas width. Up-next ribbon shows above the hex

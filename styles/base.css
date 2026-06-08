@@ -1767,7 +1767,7 @@ input[type="text"]:focus { border-color: #6688ff; }
 .slot .outcome.lose { color: #ff7a8c; }
 .slot .outcome .cc  { color: #d49a55; }
 .slot .meta { font-size: 10px; color: #8a8ac0; min-height: 12px; margin-top: 2px; }
-.slot .foot { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 4px; }
+.slot .foot { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 4px; }
 .slot .slot-info {
   display: inline-flex;
   align-items: center;
@@ -1786,21 +1786,21 @@ input[type="text"]:focus { border-color: #6688ff; }
 .slot .slot-info:hover { color: #c0d0ff; }
 
 /* Bundle chips — bulk-buy controls that appear on base (additive) cards once
-   the player can afford ≥10 copies. Sit between meta and foot; .foot's
-   margin-top:auto keeps the info button pinned to the card bottom. */
-.slot .bundle { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+   the player can afford ≥10 copies. Live inside .foot, left of the info button;
+   margin-right:auto keeps the info button pinned to the card's right edge. */
+.slot .bundle { display: flex; flex-wrap: wrap; gap: 5px; margin-right: auto; }
 .slot .bundle:empty { display: none; }
 .bundle-chip {
   pointer-events: auto;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: #4cd07d;
   background: rgba(76, 208, 125, 0.12);
   border: 1px solid rgba(76, 208, 125, 0.4);
-  border-radius: 5px;
-  padding: 3px 7px;
+  border-radius: 6px;
+  padding: 4px 9px;
   cursor: pointer;
   line-height: 1;
   touch-action: pan-x;
@@ -1808,10 +1808,8 @@ input[type="text"]:focus { border-color: #6688ff; }
   transition: background 0.12s, transform 0.1s;
 }
 .bundle-chip:active { transform: translateY(1px); }
-.bundle-chip.bundle-max { color: #f5d34a; background: rgba(245, 211, 74, 0.12); border-color: rgba(245, 211, 74, 0.4); }
 @media (hover: hover) and (pointer: fine) {
   .bundle-chip:hover { background: rgba(76, 208, 125, 0.24); }
-  .bundle-chip.bundle-max:hover { background: rgba(245, 211, 74, 0.24); }
 }
 
 /* Unlock-slot card — sits at the end of the slot row. Reads as a locked

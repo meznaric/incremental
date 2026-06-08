@@ -26,8 +26,8 @@ import { isGambleFxActive, fireGambleResult } from './gambleFx.js';
 import { patternPurchaseCostMul } from './cyclePatterns.js';
 
 // Bulk-buy steps offered on base (additive) cards, plus their compact labels.
-// A chip shows only when the player can afford that many copies; "Max" buys
-// every affordable copy. See renderShop + tryBuyBundle.
+// Only the two largest steps the player can currently afford are shown, inline
+// with the info button. See renderShop + tryBuyBundle.
 const BUNDLE_STEPS = [10, 100, 1000, 10000];
 const BUNDLE_LABEL = { 10: '10', 100: '100', 1000: '1K', 10000: '10K' };
 
@@ -258,6 +258,24 @@ export function initMainUi(state, deps) {
     // Safety fallback if animationend doesn't fire (reduced motion hides it).
     setTimeout(() => { if (c.parentNode) c.remove(); }, 600);
   }
+  // Bundle purchase flourish — a green resonance pulse on the card plus a fan of
+  // Echo glyphs rising and spreading outward, so a bulk buy reads as a surge
+  // rather than a single tap. Each glyph carries a --dx offset (see shop.css).
+  function fireBundleBurst(el) {
+    el.classList.remove('fx-bundle');
+    void el.offsetWidth;
+    el.classList.add('fx-bundle');
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('i');
+      c.className = 'ri-voiceprint-fill echo-burn echo-burn-bundle';
+      c.style.setProperty('--dx', `${(i - (n - 1) / 2) * 18}px`);
+      c.style.animationDelay = `${i * 40}ms`;
+      el.appendChild(c);
+      c.addEventListener('animationend', () => c.remove(), { once: true });
+      setTimeout(() => { if (c.parentNode) c.remove(); }, 900 + i * 40);
+    }
+  }
 
   // Hail win burst — a wave of carrier returning. The card pulses, a triple-arc
   // glyph blooms outward, twelve ringed dots radiate, the page rim glows once.
@@ -405,8 +423,8 @@ export function initMainUi(state, deps) {
         <div class="cost"></div>
         <div class="outcomes"></div>
         <div class="meta"></div>
-        <div class="bundle"></div>
         <div class="foot">
+          <div class="bundle"></div>
           <button class="slot-info" type="button" aria-label="Details"><i class="ri ri-information-line"></i></button>
         </div>
       `;
@@ -419,14 +437,22 @@ export function initMainUi(state, deps) {
         }
         if (target.closest('.slot-info')) { openSlotModal(idx); return; }
         // Bundle chips on base (additive) cards: buy ×10 / ×100 / ×1 K / ×10 K
-        // or Max in one tap, then re-roll once. The chip swallows the tap so
-        // the card-body single-buy below doesn't also fire.
+        // in one tap, then re-roll once. The chip swallows the tap so the
+        // card-body single-buy below doesn't also fire. Applying thousands of
+        // copies can block the main thread for a beat, so we paint the chip's
+        // charge pulse first (double rAF) and only then run the buy — the pulse
+        // animates on the compositor and stays smooth across the freeze.
         const chip = target.closest('.bundle-chip');
         if (chip) {
-          const qty = chip.dataset.qty === 'max' ? Infinity : Number(chip.dataset.qty);
-          const r = tryBuyBundle(state, idx, qty, nowSeconds());
-          if (r.ok) { playSlotFx(el, 'fx-buy'); spawnEchoBurn(el); flyOutAndReplace(el); scheduleFreeRerollCheck(); }
-          else playSlotFx(el, 'fx-reject');
+          if (chip.classList.contains('charging')) return;
+          const qty = Number(chip.dataset.qty);
+          chip.classList.add('charging');
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            const r = tryBuyBundle(state, idx, qty, nowSeconds());
+            chip.classList.remove('charging');
+            if (r.ok) { playSlotFx(el, 'fx-buy'); fireBundleBurst(el); flyOutAndReplace(el); scheduleFreeRerollCheck(); }
+            else playSlotFx(el, 'fx-reject');
+          }));
           return;
         }
         // Block taps on a gamble slot while a Hail reveal is on screen —
@@ -767,17 +793,18 @@ export function initMainUi(state, deps) {
       // Bundle chips: base (additive) cards become buyable in bulk once the
       // player can afford ≥10 copies, so a late-game relay isn't tapped a
       // thousand times. Each chip buys that many at the fixed unit price and
-      // re-rolls once (see tryBuyBundle). Below ×10 affordability the card is
-      // just a normal single-tap buy — no chips.
+      // re-rolls once (see tryBuyBundle). We surface only the two largest steps
+      // the player can afford — the smaller ones are redundant once you're rich.
+      // Below ×10 affordability the card is just a normal single-tap buy.
       let bundleHtml = '';
       if (u.kind === 'permanent' && u.permType === 'add' && cost > 0) {
         const affordable = Math.floor(state.amount / cost);
         if (affordable >= 10) {
-          const chips = BUNDLE_STEPS
+          bundleHtml = BUNDLE_STEPS
             .filter((n) => n <= affordable)
-            .map((n) => `<button type="button" class="bundle-chip" data-qty="${n}">×${BUNDLE_LABEL[n]}</button>`);
-          chips.push('<button type="button" class="bundle-chip bundle-max" data-qty="max">Max</button>');
-          bundleHtml = chips.join('');
+            .slice(-2)
+            .map((n) => `<button type="button" class="bundle-chip" data-qty="${n}">×${BUNDLE_LABEL[n]}</button>`)
+            .join('');
         }
       }
       setHtmlIfChanged(el.querySelector('.bundle'), bundleHtml);
